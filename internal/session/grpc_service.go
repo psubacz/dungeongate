@@ -262,9 +262,6 @@ func NewServiceHealthChecker(userClient UserServiceClient, gameClient GameServic
 func (h *ServiceHealthChecker) CheckAllServices(ctx context.Context) map[string]error {
 	results := make(map[string]error)
 
-	// Check auth service
-	results["auth"] = h.checkAuthService(ctx)
-
 	// Check user service
 	results["user"] = h.checkUserService(ctx)
 
@@ -272,15 +269,6 @@ func (h *ServiceHealthChecker) CheckAllServices(ctx context.Context) map[string]
 	results["game"] = h.checkGameService(ctx)
 
 	return results
-}
-
-func (h *ServiceHealthChecker) checkAuthService(ctx context.Context) error {
-	// Try to validate a dummy token
-	_, err := h.authClient.ValidateToken(ctx, "health_check_token")
-	if err != nil && !strings.Contains(err.Error(), "invalid token") {
-		return err
-	}
-	return nil
 }
 
 func (h *ServiceHealthChecker) checkUserService(ctx context.Context) error {

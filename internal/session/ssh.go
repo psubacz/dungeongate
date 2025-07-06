@@ -431,6 +431,9 @@ func (s *SSHServer) handlePTYRequest(sessionCtx *SSHSessionContext, req *ssh.Req
 	}
 
 	sessionCtx.TerminalType = string(req.Payload[4 : 4+termLen])
+	
+	// Track terminal type
+	s.promMetrics.TerminalTypes.WithLabelValues(sessionCtx.TerminalType).Inc()
 
 	// Extract window dimensions
 	offset := 4 + int(termLen)
@@ -483,6 +486,9 @@ func (s *SSHServer) handleWindowChangeRequest(sessionCtx *SSHSessionContext, req
 		sessionCtx.WindowSize.Height = uint16(req.Payload[2])<<8 | uint16(req.Payload[3])
 		sessionCtx.WindowSize.X = sessionCtx.WindowSize.Width
 		sessionCtx.WindowSize.Y = sessionCtx.WindowSize.Height
+		
+		// Track terminal size change
+		s.promMetrics.TerminalSizeChanges.Inc()
 
 		// Update PTY window size if active
 		if sessionCtx.ptySession != nil {
@@ -1072,10 +1078,16 @@ func (s *SSHServer) handleLogin(ctx context.Context, sessionCtx *SSHSessionConte
 		return true
 	}
 
+	// Track authentication attempt
+	authStart := time.Now()
+	s.promMetrics.AuthAttemptsTotal.WithLabelValues("password", username).Inc()
+	
 	// REPLACE THIS: Direct call to user service instead of auth client
 	if s.sessionService.userService != nil {
 		authenticatedUser, err := s.sessionService.userService.AuthenticateUser(ctx, username, password)
 		if err != nil {
+			s.promMetrics.AuthFailuresTotal.WithLabelValues("password", "invalid_credentials").Inc()
+			s.promMetrics.AuthDuration.Observe(time.Since(authStart).Seconds())
 			s.writeToSession(sessionCtx, "Login failed. Please try again.\r\n")
 			s.waitForKeypress(sessionCtx)
 			return true
@@ -1100,6 +1112,9 @@ func (s *SSHServer) handleLogin(ctx context.Context, sessionCtx *SSHSessionConte
 			}(),
 		}
 		sessionCtx.Username = authenticatedUser.Username
+		
+		// Track successful authentication
+		s.promMetrics.AuthDuration.Observe(time.Since(authStart).Seconds())
 
 		s.writeToSession(sessionCtx, "Login successful - Press any key to continue!\r\n")
 		s.waitForKeypress(sessionCtx)
@@ -1422,9 +1437,15 @@ func (s *SSHServer) handlePlayGame(ctx context.Context, sessionCtx *SSHSessionCo
 
 // startGameInPTY starts a game in a PTY session
 func (s *SSHServer) startGameInPTY(ctx context.Context, sessionCtx *SSHSessionContext, game *Game, gameSession *Session) error {
+	// Track game start
+	gameStart := time.Now()
+	s.promMetrics.GamesStartedTotal.WithLabelValues(game.ID, game.Name).Inc()
+	s.promMetrics.GamesActive.WithLabelValues(game.ID, game.Name).Inc()
+	
 	// Allocate PTY
 	ptySession, err := s.ptyManager.AllocatePTY(sessionCtx.SessionID, sessionCtx.Username, game.ID, *sessionCtx.WindowSize)
 	if err != nil {
+		s.promMetrics.GameSessionErrors.WithLabelValues(game.ID, "pty_allocation").Inc()
 		return fmt.Errorf("failed to allocate PTY: %w", err)
 	}
 
@@ -1436,8 +1457,16 @@ func (s *SSHServer) startGameInPTY(ctx context.Context, sessionCtx *SSHSessionCo
 	// Start game process
 	if err := ptySession.StartCommand(command, args); err != nil {
 		s.ptyManager.ReleasePTY(sessionCtx.SessionID)
+		s.promMetrics.GameSessionErrors.WithLabelValues(game.ID, "start_failed").Inc()
+		s.promMetrics.GamesActive.WithLabelValues(game.ID, game.Name).Dec()
 		return fmt.Errorf("failed to start game: %w", err)
 	}
+	
+	// Set up cleanup for when game ends
+	defer func() {
+		s.promMetrics.GamesActive.WithLabelValues(game.ID, game.Name).Dec()
+		s.promMetrics.GameDuration.WithLabelValues(game.ID, game.Name).Observe(time.Since(gameStart).Seconds())
+	}()
 
 	s.writeToSession(sessionCtx, "Game started! Press Ctrl+C to exit.\r\n")
 	time.Sleep(1 * time.Second)

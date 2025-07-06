@@ -162,7 +162,6 @@ encryption:
   key_rotation_interval: "24h"
 
 services:
-  auth_service: "localhost:9090"
   user_service: "localhost:9091"
   game_service: "localhost:9092"
 

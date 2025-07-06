@@ -21,14 +21,12 @@ development:
     
   # Service replicas
   replicas:
-    auth_service: 1
     user_service: 1
     game_service: 1
     session_service: 1
     
   # Resource limits
   resources:
-    auth_service:
       limits:
         cpu: "200m"
         memory: "256Mi"

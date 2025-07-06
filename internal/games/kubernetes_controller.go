@@ -8,7 +8,9 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/dungeongate/pkg/config"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
@@ -26,13 +28,13 @@ type KubernetesController struct {
 // NewKubernetesController creates a new Kubernetes controller
 func NewKubernetesController(namespace string, cfg *config.GameServiceConfig) (*KubernetesController, error) {
 	// Create in-cluster config
-	config, err := rest.InClusterConfig()
+	kubeConfig, err := rest.InClusterConfig()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create in-cluster config: %w", err)
 	}
 
 	// Create clientset
-	clientset, err := kubernetes.NewForConfig(config)
+	clientset, err := kubernetes.NewForConfig(kubeConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Kubernetes clientset: %w", err)
 	}
@@ -406,10 +408,14 @@ func (k *KubernetesController) waitForPodReady(ctx context.Context, podName stri
 }
 
 // parseResourceQuantity parses a resource quantity string into a Kubernetes resource.Quantity
-func parseResourceQuantity(s string) corev1.ResourceList {
-	// This is a simplified implementation
-	// In production, use k8s.io/apimachinery/pkg/api/resource.ParseQuantity
-	return corev1.ResourceList{}
+func parseResourceQuantity(s string) resource.Quantity {
+	// Parse the resource quantity string
+	quantity, err := resource.ParseQuantity(s)
+	if err != nil {
+		// Return zero quantity on error
+		return resource.Quantity{}
+	}
+	return quantity
 }
 
 // GetPodMetrics returns resource usage metrics for a pod

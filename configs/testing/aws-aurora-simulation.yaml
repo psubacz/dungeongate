@@ -110,7 +110,6 @@ session_service:
       public_key_auth: false
       allow_anonymous: false
   services:
-    auth_service: "localhost:9090"
     user_service: "localhost:9091"
     game_service: "localhost:9092"
   storage:

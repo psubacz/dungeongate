@@ -24,14 +24,12 @@ production:
     
   # Service replicas
   replicas:
-    auth_service: 3
     user_service: 3
     game_service: 5
     session_service: 3
     
   # Resource limits
   resources:
-    auth_service:
       limits:
         cpu: "1000m"
         memory: "1Gi"

@@ -276,6 +276,29 @@ make dev                     # Start with auto-reload
 
 ### Build Commands
 
+#### First Time Setup
+
+  1. Install NetHack(if not already installed):
+   - macOS with homebrew
+    ```bash
+    brew install nethack
+    ```
+  - Ubuntu/Debian
+    ```bash
+    sudo apt-get install nethack
+    ```
+    
+  2. Update Game Path in configs/development/local.yaml:
+  games:
+    - id: "nethack"
+      binary:
+        path: "/usr/games/nethack"  # Update this to your NetHack path
+
+  3. Create Required Directories:
+  mkdir -p data/sqlite
+  mkdir -p /tmp/nethack-saves
+
+
 **Legacy build method:**
 ```bash
 make build

@@ -7,7 +7,6 @@ toolchain go1.24.4
 require (
 	github.com/creack/pty v1.1.9
 	github.com/go-sql-driver/mysql v1.7.1
-	github.com/golang-jwt/jwt/v5 v5.0.0
 	github.com/lib/pq v1.10.9
 	github.com/mattn/go-sqlite3 v1.14.18
 	github.com/op/go-logging v0.0.0-20160315200505-970db520ece7

@@ -70,7 +70,6 @@ session_service:
     banner: "Welcome to DungeonGate Test Server (MySQL)!\r\n"
     max_sessions: 10
   services:
-    auth_service: "localhost:9090"
     user_service: "localhost:9091"
     game_service: "localhost:9092"
   storage:

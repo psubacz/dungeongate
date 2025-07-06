@@ -13,8 +13,6 @@ import (
 	"github.com/dungeongate/pkg/config"
 	"github.com/dungeongate/pkg/database"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 // GameEvent represents a game event for streaming
