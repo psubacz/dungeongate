@@ -44,6 +44,12 @@ func main() {
 		log.Fatalf("Failed to load configuration: %v", err)
 	}
 
+	// Load session configuration (needed for user service)
+	sessionCfg, err := config.LoadSessionServiceConfig(*configFile)
+	if err != nil {
+		log.Fatalf("Failed to load session configuration: %v", err)
+	}
+
 	// Setup database
 	db, err := database.NewConnection(cfg.Database)
 	if err != nil {
@@ -62,7 +68,7 @@ func main() {
 	}
 
 	// Setup user service
-	userService, err := user.NewService(db, cfg)
+	userService, err := user.NewService(db, cfg, sessionCfg)
 	if err != nil {
 		log.Fatalf("Failed to initialize user service: %v", err)
 	}
