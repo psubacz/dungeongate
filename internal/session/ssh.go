@@ -1850,11 +1850,6 @@ func (s *SSHServer) startSpectating(ctx context.Context, sessionCtx *SSHSessionC
 		return true
 	}
 
-	// Start spectating
-	s.clearScreen(sessionCtx)
-	s.writeToSession(sessionCtx, fmt.Sprintf("Now spectating %s's game of %s...\r\n", selectedSession.Username, selectedSession.GameID))
-	s.writeToSession(sessionCtx, "Press Ctrl+C to stop spectating.\r\n\r\n")
-
 	// Run spectating loop
 	return s.runSpectatorSession(ctx, sessionCtx, selectedSession.ID, userID)
 }
@@ -1864,9 +1859,10 @@ func (s *SSHServer) runSpectatorSession(ctx context.Context, sessionCtx *SSHSess
 	// Create a channel to handle user input for exiting
 	exitChan := make(chan struct{})
 
-	// Clear screen and show spectator mode message
-	s.writeToSession(sessionCtx, "\033[H\033[2J")
-	s.writeToSession(sessionCtx, "Entering spectator mode. Press Ctrl+C to exit.\r\n\r\n")
+	// Initialize terminal for spectating
+	// Clear screen and set up terminal properly
+	s.writeToSession(sessionCtx, "\033[2J\033[H") // Clear screen and home cursor
+	s.writeToSession(sessionCtx, "\033[?1049h")   // Switch to alternate screen buffer (like vim/less)
 
 	// Start goroutine to handle user input (Ctrl+C to exit)
 	go func() {
@@ -1901,9 +1897,15 @@ func (s *SSHServer) runSpectatorSession(ctx context.Context, sessionCtx *SSHSess
 	// Wait for exit signal or context cancellation
 	select {
 	case <-exitChan:
-		s.writeToSession(sessionCtx, "\r\nExiting spectator mode...\r\n")
+		// Restore terminal state
+		s.writeToSession(sessionCtx, "\033[?1049l") // Switch back from alternate screen buffer
+		s.writeToSession(sessionCtx, "\033[2J\033[H") // Clear screen
+		s.writeToSession(sessionCtx, "Exiting spectator mode...\r\n")
 	case <-ctx.Done():
-		s.writeToSession(sessionCtx, "\r\nConnection terminated.\r\n")
+		// Restore terminal state
+		s.writeToSession(sessionCtx, "\033[?1049l") // Switch back from alternate screen buffer
+		s.writeToSession(sessionCtx, "\033[2J\033[H") // Clear screen
+		s.writeToSession(sessionCtx, "Connection terminated.\r\n")
 	}
 
 	// Remove spectator from session

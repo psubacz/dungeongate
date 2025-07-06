@@ -288,6 +288,31 @@ func (s *Service) AddSpectatorWithConnection(ctx context.Context, sessionID stri
 			// Update legacy field for JSON serialization
 			session.Spectators = newRegistry.GetSpectators()
 
+			// Send recent frames to the new spectator
+			if session.StreamManager != nil {
+				recentFrames := session.StreamManager.GetRecentFrames()
+				if len(recentFrames) > 0 {
+					log.Printf("Sending %d recent frames to new spectator %s", len(recentFrames), username)
+					go func() {
+						// Small delay to ensure spectator is ready
+						time.Sleep(100 * time.Millisecond)
+						
+						// Send each frame with a small delay to avoid overwhelming
+						for i, frame := range recentFrames {
+							if spectator.Connection != nil && spectator.Connection.IsConnected() {
+								if err := spectator.Connection.Write(frame); err != nil {
+									log.Printf("Failed to send historical frame %d to spectator %s: %v", i, username, err)
+									break
+								}
+								// Small delay between frames to ensure proper rendering
+								time.Sleep(10 * time.Millisecond)
+							}
+						}
+						log.Printf("Finished sending historical frames to spectator %s", username)
+					}()
+				}
+			}
+
 			return nil
 		}
 		// If swap failed, another goroutine updated the registry, retry
