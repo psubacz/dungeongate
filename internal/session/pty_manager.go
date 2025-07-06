@@ -98,8 +98,17 @@ func (pm *PTYManager) AllocatePTY(sessionID, username, gameID string, windowSize
 
 	// Set default environment variables
 	session.Environment["TERM"] = "xterm-256color"
-	session.Environment["COLUMNS"] = fmt.Sprintf("%d", windowSize.Width)
-	session.Environment["LINES"] = fmt.Sprintf("%d", windowSize.Height)
+	// Ensure minimum window size for NetHack
+	cols := windowSize.Width
+	rows := windowSize.Height
+	if cols == 0 {
+		cols = 80 // Default width
+	}
+	if rows == 0 {
+		rows = 24 // Default height
+	}
+	session.Environment["COLUMNS"] = fmt.Sprintf("%d", cols)
+	session.Environment["LINES"] = fmt.Sprintf("%d", rows)
 	session.Environment["USER"] = username
 	session.Environment["HOME"] = fmt.Sprintf("/tmp/%s", username) // Use /tmp for safety
 	session.Environment["SHELL"] = "/bin/bash"
@@ -201,8 +210,8 @@ func (ps *PTYSession) StartCommand(command string, args []string) error {
 
 	// Set up process group
 	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Setsid:  true,
-		Setctty: true,
+		Setsid: true,
+		// Remove Setctty for compatibility with NetHack
 	}
 
 	// Connect to PTY
@@ -252,8 +261,8 @@ func (ps *PTYSession) StartCommandWithDir(command string, args []string, working
 
 	// Set up process group
 	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Setsid:  true,
-		Setctty: true,
+		Setsid: true,
+		// Remove Setctty for compatibility with NetHack
 	}
 
 	// Connect to PTY
@@ -270,6 +279,12 @@ func (ps *PTYSession) StartCommandWithDir(command string, args []string, working
 	ps.ProcessPID = cmd.Process.Pid
 
 	log.Printf("Command started in PTY session %s: %s (PID: %d) in directory: %s", ps.SessionID, command, ps.ProcessPID, workingDir)
+	log.Printf("DEBUG: NetHack command: %s %v", command, args)
+	log.Printf("DEBUG: Working directory: %s", workingDir)
+	log.Printf("DEBUG: Environment variables:")
+	for key, value := range ps.Environment {
+		log.Printf("DEBUG:   %s=%s", key, value)
+	}
 
 	// Monitor process
 	go ps.monitorProcess()

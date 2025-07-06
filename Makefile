@@ -255,17 +255,12 @@ run-debug: build-debug ## Run with debug build
 	@echo "$(GREEN)Starting DungeonGate Session Service (debug)...$(NC)"
 	./$(BUILD_DIR)/$(BINARY_NAME)-debug -config=$(TEST_CONFIG)
 
-.PHONY: dev
-dev: deps-tools ## Run development server with auto-restart
-	@echo "$(GREEN)Starting development server...$(NC)"
-	@which air > /dev/null || (echo "$(RED)air not installed. Run 'make deps-tools'$(NC)" && exit 1)
-	air
 
 .PHONY: test-run
 test-run: build setup-test-env ## Run test session service on port 2222
 	@echo "$(GREEN)Starting test session service...$(NC)"
-	@cp $(TEST_CONFIG) /tmp/dungeongate-session-service.yaml
-	./$(BUILD_DIR)/$(BINARY_NAME) -config=/tmp/dungeongate-session-service.yaml
+	@cp $(TEST_CONFIG) configs/development/local.yaml
+	./$(BUILD_DIR)/$(BINARY_NAME) -config=/configs/development/local.yaml
 
 .PHONY: test-run-auth
 test-run-auth: build-auth ## Run test auth service on port 8082

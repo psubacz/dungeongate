@@ -194,9 +194,9 @@ func (sm *SaveManager) PrepareUserSaveEnvironment(username, gameID string) (map[
 	}
 
 	env := map[string]string{
-		"HACKDIR":    sm.baseSaveDir,
-		"NETHACKDIR": sm.baseSaveDir,
-		"HOME":       userDir,
+		"HACKDIR":    "/opt/homebrew/Cellar/nethack/3.6.7/libexec", // NetHack data directory
+		"NETHACKDIR": "/opt/homebrew/Cellar/nethack/3.6.7/libexec", // NetHack data directory
+		"HOME":       fmt.Sprintf("/tmp/%s", username), // Use simple temp directory like older version
 		"USER":       username,
 		"LOGNAME":    username,
 	}

@@ -13,7 +13,6 @@ DungeonGate microservices-based platform for hosting terminal games like NetHack
 - `make build` - Build session service binary
 - `make build-auth` - Build auth service binary
 - `make build-all` - Build all service binaries
-- `make dev` - Run development server with auto-restart (requires `air`)
 - `make test` - Run all tests
 - `make test-run` - Run SSH service on port 2222 for testing
 - `make test-run-all` - Run both auth and session services for full testing

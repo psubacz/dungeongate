@@ -917,49 +917,6 @@ func (s *SSHServer) showMenu(sessionCtx *SSHSessionContext) {
 	s.showDynamicMenu(sessionCtx, menuWidth)
 }
 
-// // showMenu displays the main menu
-// func (s *SSHServer) showMenu(sessionCtx *SSHSessionContext) {
-// 	s.clearScreen(sessionCtx)
-
-// 	menu := `
-// ╔══════════════════════════════════════════════════════════════════════════════╗
-// ║                            DungeonGate - SSH Edition                         ║
-// ╠══════════════════════════════════════════════════════════════════════════════╣
-// ║                                                                              ║
-// `
-
-// 	if sessionCtx.IsAuthenticated && sessionCtx.AuthenticatedUser != nil {
-// 		menu += fmt.Sprintf("║  Welcome, %s!%-60s║\r\n",
-// 			sessionCtx.AuthenticatedUser.Username,
-// 			strings.Repeat(" ", 60-len(sessionCtx.AuthenticatedUser.Username)-10))
-// 		menu += `║                                                                              ║
-// ║  [p] Play a game                                                             ║
-// ║  [w] Watch games                                                             ║
-// ║  [e] Edit profile                                                            ║
-// ║  [l] List games                                                              ║
-// ║  [r] View recordings                                                         ║
-// ║  [s] Statistics                                                              ║
-// ║  [q] Quit                                                                    ║
-// `
-// 	} else {
-// 		menu += `║  Welcome, anonymous user!                                                    ║
-// ║                                                                              ║
-// ║  [l] Login                                                                   ║
-// ║  [r] Register                                                                ║
-// ║  [w] Watch games                                                             ║
-// ║  [g] List games                                                              ║
-// ║  [q] Quit                                                                    ║
-// `
-// 	}
-
-// 	menu += `║                                                                              ║
-// ╚══════════════════════════════════════════════════════════════════════════════╝
-
-// Choice: `
-
-// 	s.writeToSession(sessionCtx, menu)
-// }
-
 // readUserInput reads user input from the SSH session
 func (s *SSHServer) readUserInput(sessionCtx *SSHSessionContext) (string, error) {
 	buffer := make([]byte, 1)
@@ -1127,7 +1084,7 @@ func (s *SSHServer) handleLogin(ctx context.Context, sessionCtx *SSHSessionConte
 		for s.sessionService.authMiddleware == nil {
 			s.writeToSession(sessionCtx, "Authentication service is starting up, please wait...\r\n")
 			time.Sleep(2 * time.Second)
-			
+
 			// Check if connection is still alive
 			if sessionCtx.Channel == nil {
 				return true // Connection was closed
@@ -1362,7 +1319,6 @@ func (s *SSHServer) handleRegisterEnhanced(ctx context.Context, sessionCtx *SSHS
 		return true
 	}
 }
-
 
 // handlePlayGame handles game selection and launching
 func (s *SSHServer) handlePlayGame(ctx context.Context, sessionCtx *SSHSessionContext) bool {
