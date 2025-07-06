@@ -13,6 +13,173 @@
 
 DungeonGate is a over-engineered microservices-based platform inspired by [dgamelaunch](https://github.com/paxed/dgamelaunch) for hosting terminal games like NetHack.
 
+## 🚀 Quick Start
+
+### 1. Run with Make (Easiest)
+
+- review the config options in `configs/development/local.yaml` and make changes to your liking. You can find more information about the options in `docs/CONFIG.md`. the `local.yaml` defualts to a local sqlite database and requires nethack to be installed locally
+
+```bash
+make test-run
+```
+
+This will:
+- Build the session service
+- Copy the development config to `/tmp/dungeongate-session-service.yaml`
+- Start the SSH server on port 2222
+
+> Note: If you have ran DungeonGate previous or changed the host key, you will need to remove it from your known hosts file 
+
+### 2. Connect via SSH
+
+```bash
+ssh -p 2222 localhost
+```
+
+### 3. View Metrics
+
+Open your browser to: http://localhost:8083/metrics
+
+### Manual Run
+
+1. **Build the Service**
+```bash
+make build
+```
+
+2. **Run with Config**
+```bash
+./build/dungeongate-session-service -config=configs/development/local.yaml
+```
+
+### Configuration
+
+The `configs/development/local.yaml` file controls:
+- **SSH Port**: 2222 (non-privileged for development)
+- **HTTP Port**: 8083 (for metrics)
+- **Database**: SQLite at `./data/sqlite/dungeongate-dev.db`
+- **SSH Host Key**: `host_key_path` - Path to SSH host key (auto-generated if missing)
+- **Games**: NetHack configuration (binary path, environment, etc.)
+
+### First Time Setup
+
+1. **Install NetHack** (if not already installed):
+```bash
+# macOS
+brew install nethack
+
+# Ubuntu/Debian
+sudo apt-get install nethack
+```
+
+2. **Update Game Path** in `configs/development/local.yaml`:
+```yaml
+games:
+  - id: "nethack"
+    binary:
+      path: "/usr/games/nethack"  # Update this to your NetHack path
+```
+
+3. **Create Required Directories**:
+```bash
+mkdir -p data/sqlite
+mkdir -p /tmp/nethack-saves
+```
+
+### What You'll See
+
+1. SSH connection shows a welcome banner
+2. Anonymous users see:
+   - **[l]** Login
+   - **[r]** Register
+   - **[w]** Watch games
+   - **[g]** List games
+   - **[q]** Quit
+3. After registering/logging in:
+   - **[p]** Play a game
+   - **[w]** Watch games
+   - **[e]** Edit profile
+   - Plus other options
+
+### Troubleshooting
+
+If port 2222 is in use:
+```bash
+lsof -ti:2222 | xargs kill -9
+```
+
+If you get permission errors, make sure the data directories exist and are writable.
+
+## 📦 Dependencies
+
+### Core Go Dependencies
+
+- **[golang.org/x/crypto](https://pkg.go.dev/golang.org/x/crypto)** - SSH server implementation and bcrypt for password hashing
+- **[github.com/creack/pty](https://github.com/creack/pty)** - PTY (pseudo-terminal) management for game sessions
+- **[google.golang.org/grpc](https://grpc.io/)** - gRPC for microservices communication
+- **[github.com/prometheus/client_golang](https://github.com/prometheus/client_golang)** - Prometheus metrics collection
+- **[gopkg.in/yaml.v3](https://gopkg.in/yaml.v3)** - YAML configuration parsing
+
+### Database Drivers
+
+- **[github.com/mattn/go-sqlite3](https://github.com/mattn/go-sqlite3)** - SQLite driver for embedded database mode
+- **[github.com/lib/pq](https://github.com/lib/pq)** - PostgreSQL driver for production deployments
+- **[github.com/go-sql-driver/mysql](https://github.com/go-sql-driver/mysql)** - MySQL driver (alternative to PostgreSQL)
+
+### Kubernetes Support
+
+- **[k8s.io/client-go](https://github.com/kubernetes/client-go)** - Kubernetes API client for game pod management
+- **[k8s.io/api](https://github.com/kubernetes/api)** - Kubernetes API types
+- **[k8s.io/apimachinery](https://github.com/kubernetes/apimachinery)** - Kubernetes API machinery
+
+### Development Tools
+
+- **Go 1.24+** - Required for building (uses modern Go features)
+- **Make** - Build automation (optional but recommended)
+- **golangci-lint** - Code linting (optional, for `make lint`)
+- **govulncheck** - Vulnerability scanning (optional, for `make vuln`)
+- **air** - Live reload for development (optional, for `make dev`)
+
+### Runtime Dependencies
+
+- **NetHack** - The default configured game
+  - macOS: `brew install nethack`
+  - Ubuntu/Debian: `sudo apt-get install nethack`
+  - Other games can be configured in `configs/development/local.yaml`
+- **SQLite3** - Automatically handled by Go driver for development mode
+- **PostgreSQL 12+** - Required only for production deployments with external database mode
+
+### Optional Dependencies
+
+- **Docker** - For containerized deployments (coming soon)
+- **Kubernetes** - For orchestrated game pod management (planned)
+- **Prometheus** - For metrics collection (metrics endpoint at `:8083/metrics`)
+- **Grafana** - For metrics visualization (optional)
+
+### Installing Dependencies
+
+Most Go dependencies are automatically managed via `go.mod`:
+
+```bash
+# Install all Go dependencies
+make deps
+# or
+go mod download
+```
+
+For development tools:
+
+```bash
+# Install linting tools
+go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+
+# Install vulnerability scanner
+go install golang.org/x/vuln/cmd/govulncheck@latest
+
+# Install live reload tool
+go install github.com/air-verse/air@latest
+```
+
 ## 🏗️ Architecture
 
 DungeonGate uses a microservices architecture with the following services:
@@ -216,6 +383,7 @@ external:
   reader_use_writer: true  # Use same endpoint for reads and writes
 ```
 
+
 ## 🚀 Getting Started
 
 ### Prerequisites
@@ -275,29 +443,6 @@ make dev                     # Start with auto-reload
 ```
 
 ### Build Commands
-
-#### First Time Setup
-
-  1. Install NetHack(if not already installed):
-   - macOS with homebrew
-    ```bash
-    brew install nethack
-    ```
-  - Ubuntu/Debian
-    ```bash
-    sudo apt-get install nethack
-    ```
-    
-  2. Update Game Path in configs/development/local.yaml:
-  games:
-    - id: "nethack"
-      binary:
-        path: "/usr/games/nethack"  # Update this to your NetHack path
-
-  3. Create Required Directories:
-  mkdir -p data/sqlite
-  mkdir -p /tmp/nethack-saves
-
 
 **Legacy build method:**
 ```bash
