@@ -1405,9 +1405,19 @@ func (s *SSHServer) handlePlayGame(ctx context.Context, sessionCtx *SSHSessionCo
 	s.writeToSession(sessionCtx, fmt.Sprintf("Starting %s...\r\n", selectedGame.Name))
 
 	// Create game session
+	var userID int
+	var username string
+	if sessionCtx.IsAuthenticated && sessionCtx.AuthenticatedUser != nil {
+		userID = sessionCtx.AuthenticatedUser.ID
+		username = sessionCtx.AuthenticatedUser.Username
+	} else {
+		userID = 0 // Anonymous user
+		username = sessionCtx.Username // Use the session username
+	}
+	
 	gameSession, err := s.sessionService.CreateSession(ctx, &CreateSessionRequest{
-		UserID:       sessionCtx.AuthenticatedUser.ID,
-		Username:     sessionCtx.AuthenticatedUser.Username,
+		UserID:       userID,
+		Username:     username,
 		GameID:       selectedGame.ID,
 		TerminalSize: fmt.Sprintf("%dx%d", sessionCtx.WindowSize.Width, sessionCtx.WindowSize.Height),
 		Encoding:     "utf-8",
@@ -1854,6 +1864,10 @@ func (s *SSHServer) runSpectatorSession(ctx context.Context, sessionCtx *SSHSess
 	// Create a channel to handle user input for exiting
 	exitChan := make(chan struct{})
 
+	// Clear screen and show spectator mode message
+	s.writeToSession(sessionCtx, "\033[H\033[2J")
+	s.writeToSession(sessionCtx, "Entering spectator mode. Press Ctrl+C to exit.\r\n\r\n")
+
 	// Start goroutine to handle user input (Ctrl+C to exit)
 	go func() {
 		buffer := make([]byte, 1)
@@ -1879,6 +1893,10 @@ func (s *SSHServer) runSpectatorSession(ctx context.Context, sessionCtx *SSHSess
 			}
 		}
 	}()
+
+	// Note: The actual game data is being written directly to sessionCtx.Channel
+	// by the SSHSpectatorConnection.Write() method, so we just need to wait
+	// for the user to exit
 
 	// Wait for exit signal or context cancellation
 	select {
@@ -2074,9 +2092,11 @@ func (s *SSHServer) handleBanner(conn ssh.ConnMetadata) string {
 
 // loadOrGenerateHostKey loads or generates SSH host key
 func (s *SSHServer) loadOrGenerateHostKey() (ssh.Signer, error) {
-	keyPath := "/etc/ssh/ssh_host_rsa_key"
-	if s.config != nil && s.config.SSH != nil && s.config.SSH.HostKeyPath != "" {
-		keyPath = s.config.SSH.HostKeyPath
+	// Use configured path, which already has a default value from config
+	keyPath := s.config.SSH.HostKeyPath
+	if keyPath == "" {
+		// This should never happen as config provides defaults, but just in case
+		keyPath = "./ssh_host_rsa_key"
 	}
 
 	// Try to load existing key
@@ -2320,9 +2340,19 @@ func (s *SSHServer) startNetHackWithSave(ctx context.Context, sessionCtx *SSHSes
 	}
 
 	// Create game session
+	var userID int
+	var username string
+	if sessionCtx.IsAuthenticated && sessionCtx.AuthenticatedUser != nil {
+		userID = sessionCtx.AuthenticatedUser.ID
+		username = sessionCtx.AuthenticatedUser.Username
+	} else {
+		userID = 0 // Anonymous user
+		username = sessionCtx.Username // Use the session username
+	}
+	
 	gameSession, err := s.sessionService.CreateSession(ctx, &CreateSessionRequest{
-		UserID:       sessionCtx.AuthenticatedUser.ID,
-		Username:     sessionCtx.AuthenticatedUser.Username,
+		UserID:       userID,
+		Username:     username,
 		GameID:       gameWithSave.ID,
 		TerminalSize: fmt.Sprintf("%dx%d", sessionCtx.WindowSize.Width, sessionCtx.WindowSize.Height),
 		Encoding:     "utf-8",

@@ -53,8 +53,8 @@ session_management:
 
 database:
   # Switch between "embedded" for SQLite or "external" for PostgreSQL
-  mode: "embedded"  # Change to "external" to use PostgreSQL
-  type: "sqlite"    # sqlite for embedded mode, postgresql for external mode
+  mode: "external"  # Change to "external" to use PostgreSQL
+  type: "postgres"    # sqlite for embedded mode, postgresql for external mode
   
   # Embedded database configuration (SQLite)
   embedded:

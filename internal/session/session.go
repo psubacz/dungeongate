@@ -63,7 +63,7 @@ func (s *Service) CreateSession(ctx context.Context, req *CreateSessionRequest) 
 		TerminalSize:  req.TerminalSize,
 		Encoding:      req.Encoding,
 		LastActivity:  time.Now(),
-		StreamEnabled: s.config.Encryption.Enabled,
+		StreamEnabled: true, // Always enable streaming for spectators
 		Encrypted:     s.config.Encryption.Enabled,
 		Spectators:    make([]*Spectator, 0), // Legacy field for JSON serialization
 		Registry:      registry,              // Immutable spectator registry
@@ -88,6 +88,7 @@ func (s *Service) CreateSession(ctx context.Context, req *CreateSessionRequest) 
 	s.sessionsMux.Unlock()
 
 	log.Printf("Created session %s for user %s playing %s", sessionID, req.Username, req.GameID)
+	log.Printf("Total active sessions: %d", len(s.sessions))
 
 	// TODO: Store session in database
 	// TODO: Set up session monitoring
@@ -118,6 +119,7 @@ func (s *Service) GetActiveSessions(ctx context.Context) ([]*Session, error) {
 	s.sessionsMux.RLock()
 	defer s.sessionsMux.RUnlock()
 
+	log.Printf("GetActiveSessions: Total sessions in registry: %d", len(s.sessions))
 	var activeSessions []*Session
 
 	// Iterate through all sessions and collect active ones
@@ -388,6 +390,13 @@ func (s *Service) WriteToSession(ctx context.Context, sessionID string, data []b
 	// Broadcast to spectators using immutable stream frames
 	if session.StreamManager != nil && session.StreamEnabled {
 		session.StreamManager.SendFrame(dataToStream)
+		// Debug logging for spectator broadcasting
+		if currentRegistry := session.Registry.Load(); currentRegistry != nil {
+			spectatorCount := len(currentRegistry.GetSpectators())
+			if spectatorCount > 0 {
+				log.Printf("Broadcasting %d bytes to %d spectators for session %s", len(dataToStream), spectatorCount, sessionID)
+			}
+		}
 	}
 
 	return nil
