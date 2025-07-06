@@ -13,8 +13,8 @@ import (
 	"github.com/dungeongate/pkg/config"
 	"github.com/dungeongate/pkg/database"
 	"github.com/dungeongate/pkg/encryption"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/dungeongate/pkg/ttyrec"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 // Service handles session management operations
@@ -276,7 +276,8 @@ func (s *Service) AddSpectatorWithConnection(ctx context.Context, sessionID stri
 	}
 
 	// Atomically update spectator registry (immutable pattern)
-	for {
+	const maxRetries = 10
+	for retry := 0; retry < maxRetries; retry++ {
 		oldRegistry := session.Registry.Load()
 		newRegistry := oldRegistry.AddSpectator(spectator)
 
@@ -296,7 +297,7 @@ func (s *Service) AddSpectatorWithConnection(ctx context.Context, sessionID stri
 					go func() {
 						// Small delay to ensure spectator is ready
 						time.Sleep(100 * time.Millisecond)
-						
+
 						// Send each frame with a small delay to avoid overwhelming
 						for i, frame := range recentFrames {
 							if spectator.Connection != nil && spectator.Connection.IsConnected() {
@@ -315,8 +316,13 @@ func (s *Service) AddSpectatorWithConnection(ctx context.Context, sessionID stri
 
 			return nil
 		}
-		// If swap failed, another goroutine updated the registry, retry
+		// If swap failed, another goroutine updated the registry, retry with exponential backoff
+		if retry < maxRetries-1 {
+			time.Sleep(time.Duration(1<<uint(retry)) * time.Millisecond)
+		}
 	}
+
+	return fmt.Errorf("failed to add spectator after %d retries due to high contention", maxRetries)
 }
 
 // RemoveSpectator removes a spectator from a session using immutable data sharing
