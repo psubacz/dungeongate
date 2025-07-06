@@ -41,6 +41,7 @@ type SSHServer struct {
 	ptyManager     *PTYManager
 
 	// Service clients
+	authClient AuthServiceClient
 	userClient UserServiceClient
 	gameClient GameServiceClient
 
@@ -115,7 +116,12 @@ func NewSSHServer(sessionService *Service, cfg *config.SessionServiceConfig) (*S
 		sessionService: sessionService,
 		connections:    make(map[string]*SSHConnection),
 		metrics:        &SSHMetrics{},
-		promMetrics:    metrics.NewSSHMetrics("dungeongate", "ssh"),
+	}
+	
+	// Only initialize Prometheus metrics if not in test mode
+	// In test mode, the metrics will be nil to avoid registration conflicts
+	if cfg != nil && cfg.Logging != nil && cfg.Logging.Level != "test" {
+		server.promMetrics = metrics.NewSSHMetrics("dungeongate", "ssh")
 	}
 
 	// Initialize PTY manager
@@ -134,6 +140,13 @@ func NewSSHServer(sessionService *Service, cfg *config.SessionServiceConfig) (*S
 	server.initializeClients()
 
 	return server, nil
+}
+
+// updatePromMetrics safely updates Prometheus metrics if they're initialized
+func (s *SSHServer) updatePromMetrics(fn func(*metrics.SSHMetrics)) {
+	if s.promMetrics != nil {
+		fn(s.promMetrics)
+	}
 }
 
 // configureSSH sets up SSH server configuration
@@ -175,11 +188,15 @@ func (s *SSHServer) configureSSH() error {
 // initializeClients initializes service clients
 func (s *SSHServer) initializeClients() {
 	// Set default services addresses if not configured
+	authServiceAddr := "localhost:9090"
 	userServiceAddr := "localhost:9091"
 	gameServiceAddr := "localhost:9092"
 
 	// Get configured addresses if available
 	if s.config != nil && s.config.Services != nil {
+		if s.config.Services.AuthService != "" {
+			authServiceAddr = s.config.Services.AuthService
+		}
 		if s.config.Services.UserService != "" {
 			userServiceAddr = s.config.Services.UserService
 		}
@@ -188,6 +205,7 @@ func (s *SSHServer) initializeClients() {
 		}
 	}
 
+	s.authClient = NewAuthServiceClient(authServiceAddr)
 	s.userClient = NewUserServiceClient(userServiceAddr)
 
 	// Use games from config if available
@@ -247,8 +265,10 @@ func (s *SSHServer) handleConnection(ctx context.Context, netConn net.Conn) {
 	s.metrics.mutex.Unlock()
 
 	// Update Prometheus metrics
-	s.promMetrics.ConnectionsTotal.Inc()
-	s.promMetrics.ConnectionsActive.Inc()
+	s.updatePromMetrics(func(m *metrics.SSHMetrics) {
+		m.ConnectionsTotal.Inc()
+		m.ConnectionsActive.Inc()
+	})
 	connectionStart := time.Now()
 
 	defer func() {
@@ -257,8 +277,10 @@ func (s *SSHServer) handleConnection(ctx context.Context, netConn net.Conn) {
 		s.metrics.mutex.Unlock()
 
 		// Update Prometheus metrics
-		s.promMetrics.ConnectionsActive.Dec()
-		s.promMetrics.ConnectionDuration.Observe(time.Since(connectionStart).Seconds())
+		s.updatePromMetrics(func(m *metrics.SSHMetrics) {
+			m.ConnectionsActive.Dec()
+			m.ConnectionDuration.Observe(time.Since(connectionStart).Seconds())
+		})
 	}()
 
 	// Perform SSH handshake
@@ -270,7 +292,9 @@ func (s *SSHServer) handleConnection(ctx context.Context, netConn net.Conn) {
 		s.metrics.mutex.Unlock()
 
 		// Update Prometheus metrics
-		s.promMetrics.ConnectionsFailed.Inc()
+		s.updatePromMetrics(func(m *metrics.SSHMetrics) {
+			m.ConnectionsFailed.Inc()
+		})
 		return
 	}
 	defer sshConn.Close()
@@ -361,8 +385,10 @@ func (s *SSHServer) handleChannel(ctx context.Context, newChannel ssh.NewChannel
 	s.metrics.mutex.Unlock()
 
 	// Update Prometheus metrics
-	s.promMetrics.SessionsTotal.Inc()
-	s.promMetrics.SessionsActive.Inc()
+	s.updatePromMetrics(func(m *metrics.SSHMetrics) {
+		m.SessionsTotal.Inc()
+		m.SessionsActive.Inc()
+	})
 	sessionStart := time.Now()
 
 	defer func() {
@@ -371,8 +397,10 @@ func (s *SSHServer) handleChannel(ctx context.Context, newChannel ssh.NewChannel
 		s.metrics.mutex.Unlock()
 
 		// Update Prometheus metrics
-		s.promMetrics.SessionsActive.Dec()
-		s.promMetrics.SessionDuration.Observe(time.Since(sessionStart).Seconds())
+		s.updatePromMetrics(func(m *metrics.SSHMetrics) {
+			m.SessionsActive.Dec()
+			m.SessionDuration.Observe(time.Since(sessionStart).Seconds())
+		})
 	}()
 
 	log.Printf("New session %s for user %s", sessionID, connection.Username)
@@ -433,7 +461,9 @@ func (s *SSHServer) handlePTYRequest(sessionCtx *SSHSessionContext, req *ssh.Req
 	sessionCtx.TerminalType = string(req.Payload[4 : 4+termLen])
 
 	// Track terminal type
-	s.promMetrics.TerminalTypes.WithLabelValues(sessionCtx.TerminalType).Inc()
+	s.updatePromMetrics(func(m *metrics.SSHMetrics) {
+		m.TerminalTypes.WithLabelValues(sessionCtx.TerminalType).Inc()
+	})
 
 	// Extract window dimensions
 	offset := 4 + int(termLen)
@@ -488,7 +518,9 @@ func (s *SSHServer) handleWindowChangeRequest(sessionCtx *SSHSessionContext, req
 		sessionCtx.WindowSize.Y = sessionCtx.WindowSize.Height
 
 		// Track terminal size change
-		s.promMetrics.TerminalSizeChanges.Inc()
+		s.updatePromMetrics(func(m *metrics.SSHMetrics) {
+			m.TerminalSizeChanges.Inc()
+		})
 
 		// Update PTY window size if active
 		if sessionCtx.ptySession != nil {

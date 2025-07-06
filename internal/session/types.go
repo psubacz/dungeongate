@@ -443,6 +443,21 @@ type CreateSessionRequest struct {
 	Encoding     string `json:"encoding"`
 }
 
+// LoginRequest represents a login request
+type LoginRequest struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+// LoginResponse represents a login response
+type LoginResponse struct {
+	Success      bool   `json:"success"`
+	Token        string `json:"token,omitempty"`
+	RefreshToken string `json:"refresh_token,omitempty"`
+	User         *User  `json:"user,omitempty"`
+	Message      string `json:"message,omitempty"`
+}
+
 // StartGameRequest represents a game start request
 type StartGameRequest struct {
 	UserID   int    `json:"user_id"`
@@ -482,6 +497,14 @@ type UserServiceClient interface {
 	DeleteUser(ctx context.Context, userID int) error
 	ListUsers(ctx context.Context, limit, offset int) ([]*User, error)
 	UpdateLastLogin(ctx context.Context, userID int) error
+}
+
+// AuthServiceClient interface for authentication service
+type AuthServiceClient interface {
+	Login(ctx context.Context, req *LoginRequest) (*LoginResponse, error)
+	Logout(ctx context.Context, token string) error
+	ValidateToken(ctx context.Context, token string) (*User, error)
+	RefreshToken(ctx context.Context, refreshToken string) (*LoginResponse, error)
 }
 
 // GameServiceClient interface for game service

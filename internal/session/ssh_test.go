@@ -533,7 +533,7 @@ func createTestConfig() *config.SessionServiceConfig {
 			TempPath:   "/tmp/test-sessions",
 		},
 		Logging: &config.LoggingConfig{
-			Level:  "debug",
+			Level:  "test",
 			Format: "text",
 			Output: "stdout",
 		},

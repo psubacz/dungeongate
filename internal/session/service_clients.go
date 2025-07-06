@@ -11,6 +11,117 @@ import (
 
 // Service client implementations
 
+// authServiceClient implements AuthServiceClient
+type authServiceClient struct {
+	address string
+}
+
+// NewAuthServiceClient creates a new auth service client
+func NewAuthServiceClient(address string) AuthServiceClient {
+	return &authServiceClient{
+		address: address,
+	}
+}
+
+func (c *authServiceClient) Login(ctx context.Context, req *LoginRequest) (*LoginResponse, error) {
+	log.Printf("Auth service login request: %s", req.Username)
+
+	// Mock implementation
+	switch req.Username {
+	case "admin":
+		if req.Password == "admin" {
+			return &LoginResponse{
+				Success: true,
+				Token:   "mock-token-admin",
+				User: &User{
+					ID:              1,
+					Username:        req.Username,
+					Email:           "admin@example.com",
+					IsAuthenticated: true,
+					IsActive:        true,
+					IsAdmin:         true,
+					CreatedAt:       time.Now(),
+					UpdatedAt:       time.Now(),
+				},
+				Message: "Login successful",
+			}, nil
+		}
+		return &LoginResponse{
+			Success: false,
+			Message: "Invalid password",
+		}, nil
+	case "user":
+		if req.Password == "password" {
+			return &LoginResponse{
+				Success: true,
+				Token:   "mock-token-user",
+				User: &User{
+					ID:              2,
+					Username:        req.Username,
+					Email:           "user@example.com",
+					IsAuthenticated: true,
+					IsActive:        true,
+					IsAdmin:         false,
+					CreatedAt:       time.Now(),
+					UpdatedAt:       time.Now(),
+				},
+				Message: "Login successful",
+			}, nil
+		}
+		return &LoginResponse{
+			Success: false,
+			Message: "Invalid password",
+		}, nil
+	default:
+		return &LoginResponse{
+			Success: false,
+			Message: "User not found",
+		}, nil
+	}
+}
+
+func (c *authServiceClient) Logout(ctx context.Context, token string) error {
+	log.Printf("Auth service logout request: %s", token)
+	return nil
+}
+
+func (c *authServiceClient) ValidateToken(ctx context.Context, token string) (*User, error) {
+	log.Printf("Auth service validate token request: %s", token)
+	
+	// Mock implementation
+	switch token {
+	case "mock-token-admin":
+		return &User{
+			ID:              1,
+			Username:        "admin",
+			Email:           "admin@example.com",
+			IsAuthenticated: true,
+			IsActive:        true,
+			IsAdmin:         true,
+			CreatedAt:       time.Now(),
+			UpdatedAt:       time.Now(),
+		}, nil
+	case "mock-token-user":
+		return &User{
+			ID:              2,
+			Username:        "user",
+			Email:           "user@example.com",
+			IsAuthenticated: true,
+			IsActive:        true,
+			IsAdmin:         false,
+			CreatedAt:       time.Now(),
+			UpdatedAt:       time.Now(),
+		}, nil
+	default:
+		return nil, fmt.Errorf("invalid token")
+	}
+}
+
+func (c *authServiceClient) RefreshToken(ctx context.Context, refreshToken string) (*LoginResponse, error) {
+	log.Printf("Auth service refresh token request: %s", refreshToken)
+	return nil, fmt.Errorf("not implemented")
+}
+
 // userServiceClient implements UserServiceClient
 type userServiceClient struct {
 	address string
