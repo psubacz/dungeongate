@@ -1,0 +1,55 @@
+# Shared Infrastructure Redis Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: shared-redis-config
+  namespace: dungeongate
+data:
+  redis.yaml: |
+    # Redis configuration for caching and sessions
+    redis:
+      # Connection settings
+      connection:
+        host: "${REDIS_HOST}"
+        port: "${REDIS_PORT}"
+        password: "${REDIS_PASSWORD}"
+        database: 0
+        timeout: 5s
+        
+      # Pool settings
+      pool:
+        max_connections: 100
+        min_connections: 10
+        max_idle_connections: 20
+        connection_max_lifetime: 30m
+        
+      # Cache settings
+      cache:
+        default_ttl: 15m
+        max_memory: "512MB"
+        eviction_policy: "allkeys-lru"
+        
+      # Session storage
+      sessions:
+        database: 1
+        ttl: 24h
+        prefix: "session:"
+        
+      # Pub/Sub for real-time features
+      pubsub:
+        enabled: true
+        channels:
+          - "game_events"
+          - "user_notifications"
+          - "system_alerts"
+          
+      # Monitoring
+      monitoring:
+        enabled: true
+        slow_log_threshold: 100ms
+        
+      # High availability
+      ha:
+        enabled: false
+        sentinel_hosts: []
+        master_name: "dungeongate-master"

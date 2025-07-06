@@ -1,0 +1,46 @@
+# Shared Infrastructure Messaging Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: shared-messaging-config
+  namespace: dungeongate
+data:
+  messaging.yaml: |
+    # Message broker configuration
+    messaging:
+      # Message broker type (redis, nats, kafka)
+      type: "redis"
+      
+      # Redis Pub/Sub
+      redis:
+        host: "${REDIS_HOST}"
+        port: "${REDIS_PORT}"
+        password: "${REDIS_PASSWORD}"
+        database: 2
+        
+      # NATS (alternative)
+      nats:
+        urls: ["nats://nats:4222"]
+        cluster_name: "dungeongate"
+        
+      # Message channels
+      channels:
+        game_events: "game.events"
+        user_notifications: "user.notifications"
+        system_alerts: "system.alerts"
+        session_updates: "session.updates"
+        
+      # Message retention
+      retention:
+        default_ttl: 24h
+        max_messages: 10000
+        
+      # Publishing settings
+      publishing:
+        timeout: 5s
+        retry_attempts: 3
+        
+      # Subscription settings
+      subscription:
+        buffer_size: 1000
+        ack_timeout: 30s

@@ -1,0 +1,13 @@
+Welcome back to $SERVERID, $USERNAME!
+
+Authenticated User: $USERNAME
+Date: $DATE | Time: $TIME
+
+Menu Options:
+  [p] Play a game
+  [w] Watch games
+  [e] Edit profile
+  [l] List games
+  [r] View recordings
+  [s] Statistics
+  [q] Quit

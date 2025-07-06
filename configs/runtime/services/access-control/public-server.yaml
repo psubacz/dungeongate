@@ -1,0 +1,46 @@
+# Public Server Configuration
+# Anyone can create an account and start playing
+
+server_access:
+  mode: public
+  
+  public:
+    allow_anonymous: true
+    max_users: 200
+    max_anonymous_users: 100
+    require_email_verification: false
+    
+registration:
+  required_fields:
+    username: true
+    email: false
+    password: true
+    
+  username:
+    min_length: 3
+    max_length: 32
+    allowed_chars: "alphanumeric_underscore"
+    
+  password:
+    min_length: 6
+    require_uppercase: false
+    require_lowercase: false
+    require_numbers: false
+    require_symbols: false
+    
+rate_limiting:
+  registration_attempts:
+    max_per_ip: 10
+    window: "1h"
+    
+  login_attempts:
+    max_per_ip: 20
+    window: "1h"
+    
+security:
+  ip_restrictions:
+    enabled: false
+    
+logging:
+  log_access_attempts: true
+  log_failed_registrations: true

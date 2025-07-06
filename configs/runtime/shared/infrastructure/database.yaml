@@ -1,0 +1,58 @@
+# Shared Infrastructure Database Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: shared-database-config
+  namespace: dungeongate
+data:
+  database.yaml: |
+    # Database configuration for all services
+    database:
+      # Primary database (PostgreSQL for production, SQLite for development)
+      primary:
+        type: "postgresql"  # Can be overridden to "sqlite" for dev
+        host: "${DB_HOST}"
+        port: "${DB_PORT}"
+        database: "${DB_NAME}"
+        username: "${DB_USER}"
+        password: "${DB_PASSWORD}"
+        ssl_mode: "require"
+        
+        # Connection pool settings
+        pool:
+          max_connections: 100
+          min_connections: 10
+          max_idle_connections: 20
+          connection_max_lifetime: 30m
+          
+        # Development fallback (SQLite)
+        sqlite:
+          path: "/data/dungeongate.db"
+          cache_size: 10000
+          journal_mode: "wal"
+          
+      # Redis for caching and sessions
+      redis:
+        host: "${REDIS_HOST}"
+        port: "${REDIS_PORT}"
+        password: "${REDIS_PASSWORD}"
+        database: 0
+        
+        # Connection pool
+        pool:
+          max_connections: 50
+          min_connections: 5
+          
+      # Backup configuration
+      backup:
+        enabled: true
+        schedule: "0 2 * * *"  # Daily at 2 AM
+        retention_days: 30
+        compression: true
+        encryption: true
+        
+      # Migration settings
+      migrations:
+        enabled: true
+        auto_migrate: false  # Manual migration for production
+        table: "schema_migrations"

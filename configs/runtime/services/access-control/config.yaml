@@ -1,0 +1,135 @@
+# Server Access Control Configuration
+
+# Server access mode determines how users can join the server
+# Options: public, semi-public, private
+server_access:
+  mode: public
+  
+  # Public mode settings
+  public:
+    allow_anonymous: true
+    max_users: 100
+    max_anonymous_users: 50
+    require_email_verification: false
+    
+  # Semi-public mode settings  
+  semi_public:
+    require_invite_key: true
+    max_users: 50
+    max_anonymous_users: 0
+    invite_key_expiration: "168h" # 7 days
+    allow_self_signup: false
+    
+  # Private mode settings
+  private:
+    require_preloaded_key: true
+    max_users: 20
+    max_anonymous_users: 0
+    allow_key_reuse: false
+    
+# Key management settings
+key_management:
+  # Invite key settings (for semi-public mode)
+  invite_keys:
+    enabled: true
+    default_expiration: "168h" # 7 days
+    max_uses_per_key: 1
+    allow_custom_expiration: true
+    require_admin_approval: false
+    
+  # Preloaded key settings (for private mode)
+  preloaded_keys:
+    enabled: true
+    allow_expiration: true
+    default_role: "user"
+    require_unique_username: true
+    
+# User registration settings
+registration:
+  # Fields required during registration
+  required_fields:
+    username: true
+    email: false
+    password: true
+    invite_key: false # Set automatically based on mode
+    access_key: false # Set automatically based on mode
+    
+  # Username validation
+  username:
+    min_length: 3
+    max_length: 32
+    allowed_chars: "alphanumeric_underscore"
+    reserved_names: ["admin", "root", "system", "anonymous", "guest"]
+    
+  # Password validation
+  password:
+    min_length: 8
+    require_uppercase: false
+    require_lowercase: false
+    require_numbers: false
+    require_symbols: false
+    
+  # Email validation
+  email:
+    required: false
+    verify_on_signup: false
+    allow_disposable: true
+    
+# Rate limiting
+rate_limiting:
+  registration_attempts:
+    max_per_ip: 5
+    window: "1h"
+    
+  login_attempts:
+    max_per_ip: 10
+    window: "1h"
+    
+  key_validation_attempts:
+    max_per_ip: 3
+    window: "1h"
+    
+# Security settings
+security:
+  # IP-based restrictions
+  ip_restrictions:
+    enabled: false
+    whitelist: []
+    blacklist: []
+    
+  # Geographic restrictions
+  geo_restrictions:
+    enabled: false
+    allowed_countries: []
+    blocked_countries: []
+    
+  # User agent restrictions
+  user_agent_restrictions:
+    enabled: false
+    required_patterns: []
+    blocked_patterns: []
+    
+# Logging and monitoring
+logging:
+  log_access_attempts: true
+  log_key_usage: true
+  log_failed_registrations: true
+  log_ip_addresses: true
+  
+monitoring:
+  alert_on_failed_attempts: true
+  alert_threshold: 10
+  alert_window: "1h"
+  
+# Database settings for access control
+database:
+  # Table names
+  tables:
+    invite_keys: "invite_keys"
+    preloaded_keys: "preloaded_keys"
+    access_logs: "access_logs"
+    
+  # Cleanup settings
+  cleanup:
+    expired_keys: "24h" # How often to clean up expired keys
+    old_logs: "168h" # How long to keep access logs
