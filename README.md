@@ -3,11 +3,13 @@
 ```bash
  ____                                      ___        _
 |  _ \ _   _ _ __   __ _  ___  ___  _ __  / __|  __ _| |_ ___
-| | | | | | | '_ \ / _` |/ _ \/ _ \| '_ \| |___ / _` | __/ _ \
+| | | | | | | ._ \ / _. |/ _ \/ _ \| ._ \| |___ / _. | __/ _ \
 | |_| | |_| | | | | (_| |  __/ (_) | | | | |__ | (_| |  ||  _/
 |____/ \__,_|_| |_|\__, |\___|\____|_| |_|____/ \__,_|\__\___|
                    |___/
 ```
+
+> This repo barely works and various states of working, borked, and not working. Be advised.
 
 **A SSH-based gateway to terminal gaming adventures written in Go**
 
@@ -16,12 +18,30 @@ DungeonGate is a over-engineered microservices-based middleware inspired by [dga
 Supported games
 - NetHack
 
+
 ## 🚀 Quick Start
+
+### 0. **Install NetHack** (if not already installed):
+```bash
+# macOS
+brew install nethack
+
+# Ubuntu/Debian
+sudo apt-get install nethack
+```
 
 ### 1. Run with Make (Easiest)
 
 - Review the config options in `configs/development/local.yaml` and make changes to your liking. You can find more information about the options in `docs/CONFIG.md`. The `local.yaml` defaults to a local sqlite database and requires nethack to be installed locally.
 
+```yaml
+games:
+  - id: "nethack"
+    binary:
+      path: "/usr/games/nethack"  # Update this to your NetHack path
+```
+
+- then run:
 ```bash
 make test-run
 ```
@@ -55,39 +75,6 @@ make build
 ./build/dungeongate-session-service -config=configs/development/local.yaml
 ```
 
-### Configuration
-
-The `configs/development/local.yaml` file controls:
-- **SSH Port**: 2222 (non-privileged for development)
-- **HTTP Port**: 8083 (for metrics)
-- **Database**: SQLite at `./data/sqlite/dungeongate-dev.db`
-- **SSH Host Key**: `host_key_path` - Path to SSH host key (auto-generated if missing)
-- **Games**: NetHack configuration (binary path, environment, etc.)
-
-### First Time Setup
-
-1. **Install NetHack** (if not already installed):
-```bash
-# macOS
-brew install nethack
-
-# Ubuntu/Debian
-sudo apt-get install nethack
-```
-
-2. **Update Game Path** in `configs/development/local.yaml`:
-```yaml
-games:
-  - id: "nethack"
-    binary:
-      path: "/usr/games/nethack"  # Update this to your NetHack path
-```
-
-3. **Create Required Directories**:
-```bash
-mkdir -p data/sqlite
-mkdir -p /tmp/nethack-saves
-```
 
 ### What You'll See
 
@@ -191,9 +178,6 @@ DungeonGate uses a microservices architecture with the following services:
 - **User Service** - Manages user registration, authentication, and profiles  
 - **Auth Service** - Authentication, authorization, automated password reset, misc admin functions (planned)
 - **Game Service** - Game management, loading, saving, and configuration (planned)
-- **Log Service** - Genernal Logging for tracing and debugging
-
-These decoupled services are deployed 
 
 ## 📁 Project Structure
 
@@ -217,31 +201,6 @@ dungeongate/
 ├── migrations/            # Database migration files
 └── scripts/              # Build and deployment scripts
 ```
-
-## ✅ Currently Implemented
-
-### Session Service (SSH Server)
-- **Password-free SSH access** - Anonymous users can connect directly without password prompts
-- **Dynamic banner system** - Customizable banners with template variables and terminal width adaptation
-- **Real-time Spectating** - Watch active game sessions with immutable data streaming architecture
-- **PTY Management** - Full pseudo-terminal support with session multiplexing
-- **Terminal Recording** - TTY recording functionality for session playback
-
-### Database Layer
-- **Dual-mode database support**:
-  - **Embedded mode**: SQLite for development and small deployments
-  - **External mode**: PostgreSQL for production with read/write separation
-- **Flexible connection management** - Same endpoint for both reader/writer or separate endpoints
-- **Health monitoring** with automatic failover support
-- **Connection pooling** with configurable limits and lifecycle management
-- **Database metrics** and query logging for performance monitoring
-
-### Configuration System
-- **Environment-specific configs** - Separate development, testing, and production configurations
-- **Environment variable support** - Secure handling of secrets and credentials
-- **Versioning support** - Configurable application version display
-- **Menu and banner configuration** - Customizable banner paths and menu options
-- **Validation with defaults** - Robust configuration parsing with sensible fallbacks
 
 ## 🔧 Configuration
 
@@ -397,6 +356,7 @@ external:
 - SSH client for testing
 - Make (optional, but recommended)
 - For external databases: PostgreSQL 12+ or MySQL 8.0+
+- nethack installed (if running locally, the game service docker file should do this automatically)
 
 ### Development Setup
 
@@ -507,39 +467,6 @@ You'll see the dynamic banner and can:
 - Browse available games (option `g`)
 - Watch active games (option `w`)
 
-## 🔮 Planned Features
-
-### User Service Enhancements
-- [ ] **Email verification** workflow
-- [ ] **Password reset** functionality via email
-- [ ] **User profile management** API endpoints
-- [ ] **Role-based access control** (admin, moderator, user)
-
-### Auth Service
-- [ ] **Centralized JWT authentication**
-- [ ] **OAuth integration** (GitHub, Google, Discord)
-- [ ] **Two-factor authentication** support
-- [ ] **Session management** across services
-
-### Game Service  
-- [ ] **Game configuration management** via API
-- [ ] **Game binary management** and updates
-- [ ] **Score tracking** and global leaderboards
-- [ ] **Game statistics** and player analytics
-
-### Session Service Enhancements
-- [x] **Basic spectating** with real-time terminal streaming ✅
-- [ ] **TTY recording** with full playback support
-- [ ] **Advanced spectating** with chat and multiple viewers
-- [ ] **Session persistence** across network disconnections
-- [ ] **Load balancing** for distributed session instances
-
-### Infrastructure & Operations
-- [ ] **Docker containers** and Kubernetes manifests
-- [ ] **Comprehensive monitoring** with Prometheus/Grafana
-- [ ] **Centralized logging** with structured logs
-- [ ] **Performance profiling** and optimization
-- [ ] **Automated health checks** and alerting
 
 ## 🧪 Testing
 
@@ -561,6 +488,8 @@ Test database configurations:
 
 ## 📊 Metrics and Monitoring
 
+> In various states of not working.
+
 The session service provides comprehensive metrics:
 
 ### SSH Metrics
@@ -581,20 +510,7 @@ The session service provides comprehensive metrics:
 - File descriptor usage
 - Network I/O statistics
 
-## 🔒 Security Features
-
-Todo
-
 ## 🤝 Contributing
-
-This project is actively under development. Current focus areas:
-
-1. **✅ Enhanced user registration system** - Completed
-2. **✅ Dynamic banner and menu system** - Completed
-3. **✅ Database dual-mode configuration** - Completed
-4. **🔄 User authentication completion** - In progress
-5. **📋 Game service development** - Planned
-6. **📋 Authentication service architecture** - Planned
 
 ### Development Workflow
 
@@ -603,12 +519,13 @@ This project is actively under development. Current focus areas:
 3. Make your changes and test thoroughly
 4. Run the linter: `make lint`
 5. Run tests: `make test`
-6. Commit your changes: `git commit -m 'Add amazing feature'`
+6. Commit your changes: `git commit -m 'i did a think...'`
 7. Push to the branch: `git push origin feature/amazing-feature`
 8. Open a Pull Request
 
 ## 📝 License
 
+GNU GENERAL PUBLIC LICENSE, Version 3, 29 June 2007
 
 ## 🙏 Acknowledgments
 
@@ -616,11 +533,3 @@ This project is actively under development. Current focus areas:
 - **Modern Go ecosystem** for excellent tooling and libraries
 - **Claude AI** for development assistance and architectural guidance
 - **SSH and terminal gaming community** for inspiration and requirements
-
----
-
-**Ready to dive into terminal gaming? Connect via SSH and start your adventure!**
-
-```bash
-ssh -p 2222 your-dungeongate-server.com
-```
