@@ -21,84 +21,117 @@ Supported games
 
 ## 🚀 Quick Start
 
-### 0. **Install NetHack** (if not already installed):
+### Prerequisites
+
+- **Go 1.24+** - For building the application
+- **NetHack** - The terminal game we'll be hosting
+- **Make** - Build automation (optional but recommended)
+
+### Install NetHack
+
 ```bash
 # macOS
 brew install nethack
 
 # Ubuntu/Debian
 sudo apt-get install nethack
+
+# Arch Linux
+sudo pacman -S nethack
 ```
 
-### 1. Run with Make (Easiest)
+### Setup and Run
 
-- Review the config options in `configs/development/local.yaml` and make changes to your liking. You can find more information about the options in `docs/CONFIG.md`. The `local.yaml` defaults to a local sqlite database and requires nethack to be installed locally.
+1. **Clone and setup the project:**
+```bash
+git clone https://github.com/psubacz/dungeongate.git
+cd dungeongate
+make deps  # Install Go dependencies
+```
 
+2. **Configure NetHack path** (if needed):
+Edit `configs/development/local.yaml` and update the NetHack binary path:
 ```yaml
 games:
   - id: "nethack"
     binary:
-      path: "/usr/games/nethack"  # Update this to your NetHack path
+      path: "/opt/homebrew/bin/nethack"  # Update to your NetHack path
 ```
 
-- then run:
+3. **Build and run:**
 ```bash
 make test-run
 ```
 
 This will:
-- Build the session service
-- Copy the development config to `/tmp/dungeongate-session-service.yaml`
-- Start the SSH server on port 2222
+- Build the session service binary
+- Start the SSH server on port 2222 (non-privileged)
+- Use SQLite database in `./data/sqlite/`
+- Enable anonymous access for testing
 
-> Note: If you have ran DungeonGate previous or changed the host key, you will need to remove it from your known hosts file.
-
-### 2. Connect via SSH
+### Connect and Play
 
 ```bash
 ssh -p 2222 localhost
 ```
 
-### 3. View Metrics
+You'll see a welcome banner with menu options:
+- **[l]** Login (if you have an account)
+- **[r]** Register a new account
+- **[w]** Watch active games
+- **[g]** List available games
+- **[q]** Quit
+
+After registering/logging in, you get additional options:
+- **[p]** Play a game
+- **[e]** Edit profile
+- **[s]** View statistics
+
+### View Metrics
 
 Open your browser to: http://localhost:8083/metrics
 
-### Manual Run
+### Development Commands
 
-1. **Build the Service**
+Essential commands for development:
+
 ```bash
-make build
+make deps      # Install Go dependencies
+make build     # Build the session service binary
+make dev       # Run with auto-restart (requires air)
+make test      # Run all tests
+make fmt       # Format Go code
+make lint      # Run linter (requires golangci-lint)
+make vuln      # Check for vulnerabilities (requires govulncheck)
+make test-run  # Start SSH server on port 2222 for testing
 ```
 
-2. **Run with Config**
+### Testing the SSH Service
+
 ```bash
-./build/dungeongate-session-service -config=configs/development/local.yaml
+make test-run          # Starts SSH server on port 2222
+ssh -p 2222 localhost  # Connect to test the service
 ```
-
-
-### What You'll See
-
-1. SSH connection shows a welcome banner
-2. Anonymous users see:
-   - **[l]** Login
-   - **[r]** Register
-   - **[w]** Watch games
-   - **[g]** List games
-   - **[q]** Quit
-3. After registering/logging in:
-   - **[p]** Play a game
-   - **[w]** Watch games
-   - **[e]** Edit profile
-   - Plus other options
 
 ### Troubleshooting
 
-If port 2222 is in use:
+**Port 2222 in use:**
 ```bash
 lsof -ti:2222 | xargs kill -9
 ```
 
-If you get permission errors, make sure the data directories exist and are writable.
+**SSH host key conflicts:**
+Remove the localhost entry from your `~/.ssh/known_hosts` file if you get host key warnings.
+
+**Permission errors:**
+Ensure data directories exist and are writable:
+```bash
+mkdir -p ./data/sqlite ./data/ttyrec
+chmod 755 ./data/sqlite ./data/ttyrec
+```
+
+**NetHack not found:**
+Update the game path in `configs/development/local.yaml` to match your NetHack installation.
 
 ## 📦 Dependencies
 
@@ -141,7 +174,7 @@ If you get permission errors, make sure the data directories exist and are writa
 
 ### Optional Dependencies
 
-- **Docker** - For containerized deployments (coming soon)
+- **podman** - For containerized deployments (planned)
 - **Kubernetes** - For orchestrated game pod management (planned)
 - **Prometheus** - For metrics collection (metrics endpoint at `:8083/metrics`)
 - **Grafana** - For metrics visualization (optional)
@@ -348,124 +381,56 @@ external:
 ```
 
 
-## 🚀 Getting Started
-
-### Prerequisites
-- Go 1.21 or higher
-- Git for version control
-- SSH client for testing
-- Make (optional, but recommended)
-- For external databases: PostgreSQL 12+ or MySQL 8.0+
-- nethack installed (if running locally, the game service docker file should do this automatically)
-
-### Development Setup
-
-1. **Clone the repository:**
-```bash
-git clone https://github.com/psubacz/dungeongate.git
-cd dungeongate
-```
-
-2. **Setup development environment:**
-```bash
-make setup                    # Setup directories, keys, and configs
-# or: ./scripts/build-and-test.sh setup
-```
-
-3. **Build and verify:**
-```bash
-make verify                   # Build, test, and verify code quality
-# or: ./scripts/build-and-test.sh verify
-```
-
-4. **Start the server:**
-```bash
-make test-run                # Start SSH server on port 2222
-# or: ./scripts/build-and-test.sh start
-```
-
-5. **Test SSH connection (in another terminal):**
-```bash
-ssh -p 2222 localhost        # Connect to the test server
-# Use 'w' to watch games, 'r' to register, etc.
-```
+## 🔧 Advanced Setup
 
 ### Development Workflow
 
+For advanced development and testing:
+
 ```bash
 # Daily development cycle
-make verify                   # Format, lint, and test
-make test-run                # Start test server
-make ssh-test-connection     # Test SSH functionality
+make deps                    # Install dependencies
+make test                    # Run all tests
+make fmt                     # Format code
+make lint                    # Run linter
+make test-run               # Start test server
 
-# Specific testing
-make test-ssh                # Test SSH functionality
-make test-spectating         # Test spectating system
-make test-integration        # Run integration tests
+# Live development with auto-reload
+make dev                     # Requires air for live reload
 
-# Live development
-make dev                     # Start with auto-reload
+# Manual build and run
+make build                   # Build binary to ./build/
+./build/dungeongate-session-service -config=configs/development/local.yaml
 ```
 
-### Build Commands
+### External Database Setup
 
-**Legacy build method:**
+For production deployments with PostgreSQL:
+
+1. **Setup PostgreSQL database:**
 ```bash
-make build
+createdb dungeongate
+psql dungeongate < migrations/001_initial_schema.sql
 ```
 
-4. **Run the SSH service:**
+2. **Update configuration:**
+```yaml
+# configs/production/config.yaml
+database:
+  mode: "external"
+  external:
+    type: "postgresql"
+    writer_endpoint: "localhost:5432"
+    reader_use_writer: true
+    database: "dungeongate"
+    username: "your_user"
+    password: "your_password"
+```
+
+3. **Run with production config:**
 ```bash
-make test-run
+./build/dungeongate-session-service -config=configs/production/config.yaml
 ```
-
-5. **Connect via SSH:**
-```bash
-ssh -p 2222 localhost
-```
-
-### Development Commands
-
-Essential commands for development:
-
-```bash
-# Install dependencies
-make deps
-
-# Build the session service
-make build
-
-# Run development server with auto-restart
-make dev
-
-# Run tests
-make test
-
-# Start SSH service on port 2222
-make test-run
-
-# Format Go code
-make fmt
-
-# Run linter
-make lint
-
-# Check for vulnerabilities
-make vuln
-```
-
-### Testing the Service
-
-Connect to the development SSH server:
-```bash
-ssh -p 2222 localhost
-```
-
-You'll see the dynamic banner and can:
-- Register a new account (option `r`)
-- Login with existing credentials (option `l`)
-- Browse available games (option `g`)
-- Watch active games (option `w`)
 
 
 ## 🧪 Testing
