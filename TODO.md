@@ -35,6 +35,9 @@
 - Container files for each service
 - look into golang object-pooling to reduce allocation churn
 - game autosave on exit or ctrl-c from game. make it a user option. enabled by default. store option in database
+- add a admin account flag to user profile.
+- add `hidden` admin menu for ssh native administation: account management, update and hot reloading configs (if not in k8s)
+- look into adding a status webpage
 
 ## Hard Tasks 🔴
 
