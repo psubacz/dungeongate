@@ -18,9 +18,8 @@
 ## In Progress 🚧
 
 ### Core Functionality Implementation
-- Logging to file
-- Container files
-- Stream gameplay debugging
+- Logging to file, template in `pkg/log/log.go`
+- Stream gameplay clear buffers once user exits, only need live game play
 - Stream game windows for game messages
 - Implement configuation limits for number of connections to ssh for resource constrained systems (number of connecttions and games allowed per server)
 - update watch menu to look better
@@ -36,3 +35,9 @@
 - look into https://alt.org/nethack/ integration?
 - server scoring per user
 - global server scores
+- login failure. notify user that user name doest exist
+- login failure. notify user that password is incorrect
+- autosave on exit or ctrl-c fromm game. make it a user option. enabled by default
+- edit message when exiting that game was saved and display the hash of the save.
+- Container files for each service
+- helm charts
