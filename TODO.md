@@ -18,6 +18,8 @@
 ## In Progress 🚧
 
 ### Core Functionality Implementation
+- Logging to file
+- Container files
 - Stream gameplay debugging
 - Stream game windows for game messages
 - Implement configuation limits for number of connections to ssh for resource constrained systems (number of connecttions and games allowed per server)
