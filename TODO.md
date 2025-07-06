@@ -10,36 +10,40 @@
 - ✅ External database made optional (SQLite default, PostgreSQL optional)
 - ✅ Namespace isolation configuration structure designed
 
-## In Progress 🚧
+## Easy Tasks 🟢
 
-### Microservice Implementation
-- Auth Service implementation (currently stub with health endpoint only)
+- update watch menu to look better
+- login failure. notify user that user name doest exist
+- login failure. notify user that password is incorrect
+- edit message when exiting that game was saved and display the hash of the save
+- Increase login attempts when failure to login
+- Look into inactivity time and automatic logout
+- Stream gameplay clear buffers once user exits, only need live game play
+- Stream game windows for game messages
+- Logging to file, template in `pkg/log/log.go`
+- Logging implementation
+
+## Medium Tasks 🟡
+
 - User Service implementation (partial - service layer exists, needs HTTP handlers)
+- Implement configuration limits for number of connections to ssh for resource constrained systems (number of connections and games allowed per server)
+- Semi-public mode which requires accounts and pre account creation
+- Prometheus metrics, not all are displaying as expected
+- Add dashboard template configuration for common metrics
+- server scoring per user
+- global server scores
+- Container files for each service
+- look into golang object-pooling to reduce allocation churn
+- game autosave on exit or ctrl-c from game. make it a user option. enabled by default. store option in database
+
+## Hard Tasks 🔴
+
+- Auth Service implementation (currently stub with health endpoint only)
 - Game Service implementation (currently stub with health endpoint only)
 - Stream encryption implementation (currently stub returning unencrypted data)
 - Namespace isolation implementation (Linux syscalls and container integration)
-
-### Core Functionality Implementation
-- Logging to file, template in `pkg/log/log.go`
-- Stream gameplay clear buffers once user exits, only need live game play
-- Stream game windows for game messages
-- Implement configuation limits for number of connections to ssh for resource constrained systems (number of connecttions and games allowed per server)
-- update watch menu to look better
-- Increase login attempts when failure to login
-- Look into inactivity time and automatic logout
-- Automated password reset and account recovery (should require an sshkey or email.)
-- Semi-public mode which requires accounts
-- Logging implementation
-- Prometheus metrics, not all are displaying as expected. 
-- Add dashboard template configuration for common metrics
 - Game isolation when multiple players are using the
-- Shared game state for nethack "bones" accoss multiple server/containers of nethack
+- Shared game state for nethack "bones" across multiple server/containers of nethack
+- Automated password reset and account recovery (should require an sshkey or email)
 - look into https://alt.org/nethack/ integration?
-- server scoring per user
-- global server scores
-- login failure. notify user that user name doest exist
-- login failure. notify user that password is incorrect
-- autosave on exit or ctrl-c fromm game. make it a user option. enabled by default
-- edit message when exiting that game was saved and display the hash of the save.
-- Container files for each service
 - helm charts
