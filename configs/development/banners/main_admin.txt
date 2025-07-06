@@ -1,0 +1,13 @@
+Welcome back to $SERVERID, $USERNAME!
+
+WARNING: Admin Menu
+
+Authenticated User: $USERNAME
+Date: $DATE | Time: $TIME
+
+Menu Options:
+  [u] Unlock User Account
+  [d] Delete User Account
+  [r] Reset User Account Password
+  [s] Statistics
+  [q] Quit

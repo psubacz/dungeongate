@@ -19,11 +19,12 @@ import (
 
 // Service handles session management operations
 type Service struct {
-	db          *database.Connection
-	encryptor   *encryption.Encryptor
-	recorder    *ttyrec.Recorder
-	config      *config.SessionServiceConfig
-	userService *user.Service
+	db             *database.Connection
+	encryptor      *encryption.Encryptor
+	recorder       *ttyrec.Recorder
+	config         *config.SessionServiceConfig
+	userService    *user.Service
+	authMiddleware *AuthMiddleware
 
 	// Session tracking using immutable data patterns
 	sessions    map[string]*Session
@@ -39,6 +40,19 @@ func NewService(db *database.Connection, encryptor *encryption.Encryptor, record
 		config:      cfg,
 		userService: userService,
 		sessions:    make(map[string]*Session),
+	}
+}
+
+// NewServiceWithAuth creates a new session service with authentication middleware
+func NewServiceWithAuth(db *database.Connection, encryptor *encryption.Encryptor, recorder *ttyrec.Recorder, cfg *config.SessionServiceConfig, userService *user.Service, authMiddleware *AuthMiddleware) *Service {
+	return &Service{
+		db:             db,
+		encryptor:      encryptor,
+		recorder:       recorder,
+		config:         cfg,
+		userService:    userService,
+		authMiddleware: authMiddleware,
+		sessions:       make(map[string]*Session),
 	}
 }
 
@@ -525,19 +539,19 @@ func NewHTTPHandler(service *Service) http.Handler {
 
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		_, _ = w.Write([]byte("OK"))
 	})
 
 	mux.HandleFunc("/sessions", func(w http.ResponseWriter, r *http.Request) {
 		// TODO: Implement session endpoints
 		w.WriteHeader(http.StatusNotImplemented)
-		w.Write([]byte("Session endpoints not implemented"))
+		_, _ = w.Write([]byte("Session endpoints not implemented"))
 	})
 
 	mux.HandleFunc("/spectate", func(w http.ResponseWriter, r *http.Request) {
 		// TODO: Implement spectator endpoints
 		w.WriteHeader(http.StatusNotImplemented)
-		w.Write([]byte("Spectator endpoints not implemented"))
+		_, _ = w.Write([]byte("Spectator endpoints not implemented"))
 	})
 
 	// WebSocket endpoint for browser spectating (stubbed)
@@ -552,14 +566,14 @@ func NewHTTPHandler(service *Service) http.Handler {
 
 		// For now, return a placeholder response
 		w.WriteHeader(http.StatusNotImplemented)
-		w.Write([]byte("WebSocket spectating not yet implemented"))
+		_, _ = w.Write([]byte("WebSocket spectating not yet implemented"))
 		log.Printf("WebSocket spectate request for session %s (not implemented)", sessionID)
 	})
 
 	mux.HandleFunc("/playback", func(w http.ResponseWriter, r *http.Request) {
 		// TODO: Implement playback endpoints
 		w.WriteHeader(http.StatusNotImplemented)
-		w.Write([]byte("Playback endpoints not implemented"))
+		_, _ = w.Write([]byte("Playback endpoints not implemented"))
 	})
 
 	// Prometheus metrics endpoint

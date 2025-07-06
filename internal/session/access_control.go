@@ -529,6 +529,6 @@ func generateAccessLogID() string {
 // generateRandomString generates a random hexadecimal string
 func generateRandomString(length int) string {
 	bytes := make([]byte, length/2)
-	rand.Read(bytes)
+	_, _ = rand.Read(bytes)
 	return hex.EncodeToString(bytes)
 }

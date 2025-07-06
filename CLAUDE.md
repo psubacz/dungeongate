@@ -9,23 +9,34 @@ DungeonGate microservices-based platform for hosting terminal games like NetHack
 
 ### Essential Commands
 - `make deps` - Install Go dependencies
-- `make build` - Build the session service binary
+- `make deps-tools` - Install development tools (air, golangci-lint, govulncheck)
+- `make build` - Build session service binary
+- `make build-auth` - Build auth service binary
+- `make build-all` - Build all service binaries
 - `make dev` - Run development server with auto-restart (requires `air`)
 - `make test` - Run all tests
 - `make test-run` - Run SSH service on port 2222 for testing
+- `make test-run-all` - Run both auth and session services for full testing
 - `make fmt` - Format Go code
 - `make lint` - Run linter (requires `golangci-lint`)
 - `make vuln` - Check for vulnerabilities (requires `govulncheck`)
+- `make verify` - Run all verification checks (format, vet, lint, test)
 
-### Testing the SSH Service
+### Testing the Services
 ```bash
+# Test session service only (limited functionality without auth)
 make test-run          # Starts SSH server on port 2222
 ssh -p 2222 localhost  # Connect to test the service
+
+# Test complete system with authentication
+make test-run-all      # Starts both auth service (port 8082) and session service (port 2222)
+ssh -p 2222 localhost  # Connect with full authentication support
 ```
 
 ### Development Configuration
 The development setup uses:
 - **SQLite database** at `./data/sqlite/dungeongate-dev.db`
+- **Auth Service** on port 8082 (gRPC) and 8081 (HTTP)
 - **SSH server** on port 2222 (non-privileged)
 - **HTTP API** on port 8083
 - **Configuration**: `./configs/development/local.yaml`
@@ -34,13 +45,15 @@ The development setup uses:
 
 ### Core Services (Microservices Design)
 - **Session Service** (primary, currently implemented): SSH server, PTY management, terminal sessions
-- **User Service** (partial): User registration, authentication, profiles
-- **Auth Service** (planned): Centralized authentication and authorization  
+- **Auth Service** (implemented): Centralized authentication and authorization via gRPC
+- **User Service** (partial): User registration and profile management
 - **Game Service** (planned): Game management and configuration
 
 ### Key Directories
-- `cmd/session-service/` - Main application entry point
+- `cmd/session-service/` - Session service entry point
+- `cmd/auth-service/` - Auth service entry point
 - `internal/session/` - SSH server implementation, PTY bridging, session management
+- `internal/auth/` - Authentication service implementation, gRPC server and client
 - `internal/user/` - User registration and management
 - `pkg/config/` - Configuration management
 - `pkg/database/` - Database abstraction layer with dual-mode support (SQLite/PostgreSQL)
@@ -60,9 +73,9 @@ The project supports dual-mode database operation:
 - ✅ Menu system and navigation
 - ✅ Game launching with PTY bridging
 - ✅ Database layer with SQLite/PostgreSQL support
-- 🚧 User authentication (in progress)
+- ✅ Auth service with gRPC authentication
+- ✅ User authentication via centralized auth service
 - 🚧 Database schema validation (in progress)
-- 📋 Auth service (planned)
 - 📋 Game service (planned)
 
 ## Key Implementation Details
@@ -73,6 +86,14 @@ The project supports dual-mode database operation:
 - Uses PTY allocation for terminal sessions
 - Implements spectating functionality
 - Auto-generates SSH host keys if needed
+
+### Authentication System
+- **Centralized Auth Service**: All authentication handled via dedicated gRPC service
+- **No Fallback**: Session service waits for auth service to be available (no local auth fallback)
+- **Resilient Design**: Service spins with user feedback when auth service is unavailable
+- **JWT Tokens**: Secure token-based authentication with configurable expiration
+- **User Management**: Registration, login, and profile management through auth service
+- **Service Communication**: gRPC for inter-service communication with proper error handling
 
 ### User Registration
 - Step-by-step flow within SSH terminal
@@ -94,6 +115,55 @@ The project includes comprehensive test configurations:
 - SSH service testing: `make test-run` then `ssh -p 2222 localhost`
 - Database testing configs in `configs/testing/`
 
+### Specialized Testing Commands
+
+**Test Categories:**
+- `make test-short` - Run quick tests only
+- `make test-race` - Run tests with race detection
+- `make test-coverage` - Generate coverage reports
+- `make test-comprehensive` - Run all core test suites
+
+**Component-Specific Tests:**
+- `make test-ssh` - SSH server functionality tests
+- `make test-auth` - Authentication system tests
+- `make test-auth-simple` - Core authentication logic tests
+- `make test-auth-functional` - Authentication flow tests
+- `make test-spectating` - Spectating system tests
+- `make test-spectating-full` - Comprehensive spectating tests
+
+**Performance Testing:**
+- `make benchmark` - Run performance benchmarks
+- `make benchmark-ssh` - SSH-specific benchmarks
+- `make benchmark-spectating` - Spectating system benchmarks
+
+**SSH Connection Testing:**
+- `make ssh-test-connection` - Test SSH connection to running server
+- `make ssh-check-server` - Check if SSH server is running
+
+## Docker and Deployment
+
+### Docker Commands
+- `make docker-build-session` - Build session service Docker image
+- `make docker-build-auth` - Build auth service Docker image
+- `make docker-build-all` - Build all Docker images
+- `make docker-compose-up` - Start all services with docker-compose
+- `make docker-compose-dev` - Start development environment
+- `make docker-compose-down` - Stop and remove all containers
+- `make docker-compose-logs` - Show logs from all services
+- `make docker-test` - Test Docker images
+- `make docker-clean` - Clean up Docker resources
+
+### Database Management
+- `make db-migrate` - Run database migrations
+- `make db-migrate-down` - Rollback database migrations
+- `make db-reset` - Reset database (DESTRUCTIVE)
+
+### Release and Build Variants
+- `make build-debug` - Build with debug symbols
+- `make build-race` - Build with race detection
+- `make release-build` - Build release binaries for multiple platforms
+- `make release-check` - Run all checks for release
+
 ## Dependencies
 
 Key Go modules:
@@ -104,11 +174,52 @@ Key Go modules:
 - `google.golang.org/grpc` - gRPC for microservices communication
 - `gopkg.in/yaml.v3` - YAML configuration parsing
 
+### Development Tools
+- `air` - Live reload for Go applications
+- `golangci-lint` - Go linting tool
+- `govulncheck` - Vulnerability scanning for Go
+
+## Quality Assurance
+
+### Code Quality Commands
+- `make fmt` - Format Go code
+- `make fmt-check` - Check if code is formatted
+- `make lint` - Run linter
+- `make lint-fix` - Run linter with auto-fix
+- `make vet` - Run go vet
+- `make vuln` - Check for security vulnerabilities
+- `make verify` - Run all verification checks (format, vet, lint, test)
+
+### Environment Management
+- `make setup` - Setup development environment
+- `make setup-test-env` - Setup test environment
+- `make clean` - Clean build artifacts
+- `make clean-all` - Clean everything including test data
+- `make clean-test-env` - Clean test environment
+
+### Information Commands
+- `make help` - Display help with all available commands
+- `make version` - Show version information
+- `make info` - Show project information
+- `make deps-check` - Check dependency status
+
 ## Development Notes
 
-- The project is actively developed with focus on completing the user service
-- Current work involves SSH-based user registration and authentication
-- Database implementation is designed but needs validation
-- Uses modern Go practices and microservices architecture
-- Security features include rate limiting, brute force protection (disabled in dev)
-- TTY recording is implemented for session playback and spectating
+- **Microservices Architecture**: Session and Auth services communicate via gRPC
+- **Authentication**: Centralized through dedicated auth service (no fallback authentication)
+- **Resilience**: Session service waits for auth service availability rather than failing
+- **Database**: Dual-mode support (SQLite for dev, PostgreSQL for production)
+- **Security**: JWT tokens, rate limiting, brute force protection (disabled in dev)
+- **TTY Recording**: Implemented for session playback and spectating
+- **Modern Go**: Uses modern Go practices with proper error handling and context management
+- **Comprehensive Testing**: Specialized test suites for SSH, authentication, and spectating systems
+- **Docker Support**: Full containerization with development and production configurations
+- **Release Management**: Multi-platform build support and automated release checks
+- **Code Conventions**: Functions prefixed with `_` are unused or stubbed (not fully implemented); functions prefixed with `__` are deprecated
+
+## Service Dependencies
+
+- **Session Service** requires **Auth Service** for user authentication
+- Session service will wait (with user feedback) if auth service is unavailable
+- Both services share the same database for user data consistency
+- gRPC communication ensures type safety and performance between services

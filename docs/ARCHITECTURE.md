@@ -15,7 +15,7 @@ DungeonGate is a microservices-based platform for hosting terminal games, built 
 │  │             │  │             │  │                         │  │
 │  │ • SSH       │→→│ • Session   │→→│ • Session Service ✅    │  │
 │  │ • Terminal  │  │   Service   │  │ • User Service ✅       │  │
-│  │             │  │ • Load      │  │ • Auth Service 🔄       │  │
+│  │             │  │ • Load      │  │ • Auth Service ✅       │  │
 │  │             │  │   Balancer  │  │ • Game Service 📋       │  │
 │  └─────────────┘  └─────────────┘  └─────────────────────────┘  │
 └─────────────────────────────────────────────────────────────────┘
@@ -59,15 +59,23 @@ Handles user registration, authentication, and profile management.
 - Profile management
 - Authentication integration
 
-### Auth Service (Planned)
+### Auth Service (Implemented)
 
-Centralized authentication and authorization service.
+Centralized authentication and authorization service providing gRPC-based authentication for all services.
 
-**Planned Features:**
-- JWT token management
-- Multi-factor authentication
-- Session validation
-- Role-based access control
+**Key Features:**
+- JWT token management with configurable expiration
+- User registration and login workflows
+- Session validation and user profile management
+- gRPC service communication with proper error handling
+- Database integration for user storage
+- Rate limiting and brute force protection (configurable)
+
+**Architecture Patterns:**
+- **gRPC Communication**: Type-safe inter-service communication
+- **JWT Token Management**: Secure token generation and validation
+- **Service Resilience**: Session service waits for auth service availability
+- **No Fallback Design**: Centralized authentication without local fallbacks
 
 ### Game Service (Planned)
 
@@ -182,6 +190,51 @@ for {
 - Query logging and performance metrics
 - Migration support
 
+## 🔧 Build and Development Architecture
+
+### Comprehensive Build System
+
+The project uses a sophisticated Makefile-based build system with 40+ targets organized into categories:
+
+**Build Targets:**
+- `make build` / `make build-auth` / `make build-all` - Service compilation
+- `make build-debug` / `make build-race` - Specialized builds
+- `make release-build` - Multi-platform release binaries
+
+**Quality Assurance:**
+- `make fmt` / `make lint` / `make vet` - Code quality checks
+- `make vuln` - Security vulnerability scanning
+- `make verify` - Comprehensive verification pipeline
+
+**Testing Framework:**
+- `make test` / `make test-coverage` - Basic and coverage testing
+- `make test-ssh` / `make test-auth` / `make test-spectating` - Component-specific tests
+- `make test-comprehensive` - Full test suite execution
+- `make benchmark` / `make benchmark-ssh` - Performance testing
+
+**Development Environment:**
+- `make dev` - Auto-reloading development server
+- `make test-run` / `make test-run-all` - Test environment management
+- `make deps` / `make deps-tools` - Dependency management
+
+**Docker Integration:**
+- `make docker-build-all` - Multi-service containerization
+- `make docker-compose-up` / `make docker-compose-dev` - Environment orchestration
+- `make docker-test` - Container testing
+
+### Development Tools Integration
+
+**Static Analysis:**
+- `golangci-lint` - Comprehensive Go linting
+- `govulncheck` - Security vulnerability scanning
+- `air` - Live reload for development
+
+**Testing Infrastructure:**
+- Specialized test suites for each major component
+- Performance benchmarking with scaling analysis
+- SSH connection testing and server monitoring
+- Database migration and management tools
+
 ## 🔧 Configuration Architecture
 
 ### Environment-Specific Configs
@@ -214,12 +267,27 @@ database:
 
 ### Development Deployment
 
+**Local Development:**
 ```bash
-# Single-process deployment
-./dungeongate-session-service -config=./configs/development/local.yaml
+# Auto-reloading development server
+make dev
+
+# Manual service execution
+make test-run-all  # Both auth and session services
+make test-run      # Session service only
 ```
 
-### Production Deployment (Planned)
+**Docker Development:**
+```bash
+# Development environment with docker-compose
+make docker-compose-dev
+
+# Build and test Docker images
+make docker-build-all
+make docker-test
+```
+
+### Production Deployment
 
 ```yaml
 # Kubernetes deployment

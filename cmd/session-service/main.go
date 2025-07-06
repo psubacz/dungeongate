@@ -74,8 +74,23 @@ func main() {
 		log.Fatalf("Failed to initialize user service: %v", err)
 	}
 
-	// Setup session service
-	sessionService := session.NewService(db, encryptor, recorder, cfg, userService)
+	// Setup auth middleware if enabled
+	var authMiddleware *session.AuthMiddleware
+	if cfg.Auth != nil && cfg.Auth.Enabled {
+		authMiddleware, err = session.NewAuthMiddleware(cfg.Auth.ServiceAddress, cfg.Auth.Enabled)
+		if err != nil {
+			log.Printf("Warning: Failed to initialize auth middleware: %v", err)
+			log.Printf("Falling back to direct user service authentication")
+		}
+	}
+
+	// Setup session service with or without auth middleware
+	var sessionService *session.Service
+	if authMiddleware != nil {
+		sessionService = session.NewServiceWithAuth(db, encryptor, recorder, cfg, userService, authMiddleware)
+	} else {
+		sessionService = session.NewService(db, encryptor, recorder, cfg, userService)
+	}
 
 	// Setup context for graceful shutdown
 	ctx, cancel := context.WithCancel(context.Background())

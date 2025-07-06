@@ -213,7 +213,7 @@ OPTIONS=color,autopickup,pickup_types:$
 OPTIONS=!time,showexp,showscore
 OPTIONS=hilite_pet,boulder:0
 `
-			os.WriteFile(nethackrc, []byte(rcContent), 0644)
+			_ = os.WriteFile(nethackrc, []byte(rcContent), 0644)
 		}
 	}
 

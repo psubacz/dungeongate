@@ -1,0 +1,82 @@
+# Build artifacts
+build/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+coverage/
+
+# Go workspace file
+go.work
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Test data (except required test fixtures)
+test-data/
+data/
+*.db
+
+# Git
+.git/
+.gitignore
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# CI/CD
+.github/
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# Development files
+.air.toml
+.env
+.env.*
+
+# Node modules (if any)
+node_modules/
+
+# Python cache (if any)
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Local configuration overrides
+configs/local/
+configs/development/local*
+configs/*/local*

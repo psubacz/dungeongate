@@ -344,6 +344,17 @@ func TestSSHServiceIntegration(t *testing.T) {
 		Password: "admin",
 	}
 
+	// Use sshServer to avoid unused variable error
+	if sshServer == nil {
+		t.Error("SSH server should not be nil")
+		return
+	}
+
+	if sshServer.authClient == nil {
+		t.Error("Auth client should not be nil")
+		return
+	}
+
 	loginResp, err := sshServer.authClient.Login(ctx, loginReq)
 	if err != nil {
 		t.Errorf("Auth client login failed: %v", err)
@@ -354,6 +365,11 @@ func TestSSHServiceIntegration(t *testing.T) {
 	}
 
 	// Test user client
+	if sshServer.userClient == nil {
+		t.Error("User client should not be nil")
+		return
+	}
+
 	user, err := sshServer.userClient.GetUser(ctx, "admin")
 	if err != nil {
 		t.Errorf("User client get user failed: %v", err)
@@ -364,6 +380,11 @@ func TestSSHServiceIntegration(t *testing.T) {
 	}
 
 	// Test game client
+	if sshServer.gameClient == nil {
+		t.Error("Game client should not be nil")
+		return
+	}
+
 	games, err := sshServer.gameClient.ListGames(ctx)
 	if err != nil {
 		t.Errorf("Game client list games failed: %v", err)
@@ -371,11 +392,6 @@ func TestSSHServiceIntegration(t *testing.T) {
 
 	if games == nil {
 		t.Error("Games list is nil")
-	}
-
-	// Use sshServer to avoid unused variable error
-	if sshServer == nil {
-		t.Error("SSH server should not be nil")
 	}
 }
 
@@ -684,36 +700,6 @@ func BenchmarkSSHHostKeyGeneration(b *testing.B) {
 
 // Test helper functions
 
-// waitForPort waits for a port to be available
-func waitForPort(port int, timeout time.Duration) error {
-	deadline := time.Now().Add(timeout)
-
-	for time.Now().Before(deadline) {
-		conn, err := net.DialTimeout("tcp", fmt.Sprintf("localhost:%d", port), 100*time.Millisecond)
-		if err == nil {
-			conn.Close()
-			return nil
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
-
-	return fmt.Errorf("port %d not available within timeout", port)
-}
-
-// createSSHClient creates an SSH client for testing
-func createSSHClient(host string, port int, username, password string) (*ssh.Client, error) {
-	config := &ssh.ClientConfig{
-		User: username,
-		Auth: []ssh.AuthMethod{
-			ssh.Password(password),
-		},
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
-		Timeout:         5 * time.Second,
-	}
-
-	addr := fmt.Sprintf("%s:%d", host, port)
-	return ssh.Dial("tcp", addr, config)
-}
 
 // TestSSHEndToEnd tests SSH end-to-end functionality
 func TestSSHEndToEnd(t *testing.T) {

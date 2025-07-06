@@ -117,7 +117,7 @@ func NewSSHServer(sessionService *Service, cfg *config.SessionServiceConfig) (*S
 		connections:    make(map[string]*SSHConnection),
 		metrics:        &SSHMetrics{},
 	}
-	
+
 	// Only initialize Prometheus metrics if not in test mode
 	// In test mode, the metrics will be nil to avoid registration conflicts
 	if cfg != nil && cfg.Logging != nil && cfg.Logging.Level != "test" {
@@ -209,7 +209,7 @@ func (s *SSHServer) initializeClients() {
 	s.userClient = NewUserServiceClient(userServiceAddr)
 
 	// Use games from config if available
-	if s.config.Games != nil && len(s.config.Games) > 0 {
+	if len(s.config.Games) > 0 {
 		s.gameClient = NewGameServiceClientWithConfig(gameServiceAddr, s.config.Games)
 	} else {
 		s.gameClient = NewGameServiceClient(gameServiceAddr)
@@ -330,7 +330,7 @@ func (s *SSHServer) handleConnection(ctx context.Context, netConn net.Conn) {
 	// Handle channels
 	for newChannel := range chans {
 		if newChannel.ChannelType() != "session" {
-			newChannel.Reject(ssh.UnknownChannelType, "unknown channel type")
+			_ = newChannel.Reject(ssh.UnknownChannelType, "unknown channel type")
 			continue
 		}
 
@@ -374,7 +374,7 @@ func (s *SSHServer) handleChannel(ctx context.Context, newChannel ssh.NewChannel
 
 		// Clean up PTY if allocated
 		if sessionCtx.ptySession != nil {
-			s.ptyManager.ReleasePTY(sessionID)
+			_ = s.ptyManager.ReleasePTY(sessionID)
 		}
 	}()
 
@@ -433,7 +433,7 @@ func (s *SSHServer) handleSessionRequests(ctx context.Context, sessionCtx *SSHSe
 			case "env":
 				s.handleEnvRequest(sessionCtx, req)
 			default:
-				req.Reply(false, nil)
+				_ = req.Reply(false, nil)
 			}
 
 		case <-ctx.Done():
@@ -447,14 +447,14 @@ func (s *SSHServer) handleSessionRequests(ctx context.Context, sessionCtx *SSHSe
 // handlePTYRequest handles PTY allocation request
 func (s *SSHServer) handlePTYRequest(sessionCtx *SSHSessionContext, req *ssh.Request) {
 	if len(req.Payload) < 4 {
-		req.Reply(false, nil)
+		_ = req.Reply(false, nil)
 		return
 	}
 
 	// Parse PTY request
 	termLen := req.Payload[3]
 	if len(req.Payload) < 4+int(termLen)+16 {
-		req.Reply(false, nil)
+		_ = req.Reply(false, nil)
 		return
 	}
 
@@ -478,18 +478,18 @@ func (s *SSHServer) handlePTYRequest(sessionCtx *SSHSessionContext, req *ssh.Req
 		sessionCtx.SessionID, sessionCtx.TerminalType,
 		sessionCtx.WindowSize.Width, sessionCtx.WindowSize.Height)
 
-	req.Reply(true, nil)
+	_ = req.Reply(true, nil)
 }
 
 // handleShellRequest handles shell request
 func (s *SSHServer) handleShellRequest(sessionCtx *SSHSessionContext, req *ssh.Request) {
-	req.Reply(true, nil)
+	_ = req.Reply(true, nil)
 }
 
 // handleExecRequest handles command execution request
 func (s *SSHServer) handleExecRequest(sessionCtx *SSHSessionContext, req *ssh.Request) {
 	if len(req.Payload) < 4 {
-		req.Reply(false, nil)
+		_ = req.Reply(false, nil)
 		return
 	}
 
@@ -497,7 +497,7 @@ func (s *SSHServer) handleExecRequest(sessionCtx *SSHSessionContext, req *ssh.Re
 		uint32(req.Payload[2])<<8 | uint32(req.Payload[3])
 
 	if len(req.Payload) < 4+int(cmdLen) {
-		req.Reply(false, nil)
+		_ = req.Reply(false, nil)
 		return
 	}
 
@@ -506,7 +506,7 @@ func (s *SSHServer) handleExecRequest(sessionCtx *SSHSessionContext, req *ssh.Re
 	log.Printf("Command execution request for session %s: %s",
 		sessionCtx.SessionID, sessionCtx.Command)
 
-	req.Reply(true, nil)
+	_ = req.Reply(true, nil)
 }
 
 // handleWindowChangeRequest handles window size change
@@ -524,19 +524,19 @@ func (s *SSHServer) handleWindowChangeRequest(sessionCtx *SSHSessionContext, req
 
 		// Update PTY window size if active
 		if sessionCtx.ptySession != nil {
-			sessionCtx.ptySession.ResizeWindow(sessionCtx.WindowSize.Height, sessionCtx.WindowSize.Width)
+			_ = sessionCtx.ptySession.ResizeWindow(sessionCtx.WindowSize.Height, sessionCtx.WindowSize.Width)
 		}
 
 		log.Printf("Window size changed for session %s: %dx%d",
 			sessionCtx.SessionID, sessionCtx.WindowSize.Width, sessionCtx.WindowSize.Height)
 	}
-	req.Reply(true, nil)
+	_ = req.Reply(true, nil)
 }
 
 // handleEnvRequest handles environment variable request
 func (s *SSHServer) handleEnvRequest(sessionCtx *SSHSessionContext, req *ssh.Request) {
 	if len(req.Payload) < 8 {
-		req.Reply(false, nil)
+		_ = req.Reply(false, nil)
 		return
 	}
 
@@ -546,7 +546,7 @@ func (s *SSHServer) handleEnvRequest(sessionCtx *SSHSessionContext, req *ssh.Req
 		uint32(req.Payload[6])<<8 | uint32(req.Payload[7])
 
 	if len(req.Payload) < 8+int(nameLen)+int(valueLen) {
-		req.Reply(false, nil)
+		_ = req.Reply(false, nil)
 		return
 	}
 
@@ -558,7 +558,7 @@ func (s *SSHServer) handleEnvRequest(sessionCtx *SSHSessionContext, req *ssh.Req
 	log.Printf("Environment variable set for session %s: %s=%s",
 		sessionCtx.SessionID, name, value)
 
-	req.Reply(true, nil)
+	_ = req.Reply(true, nil)
 }
 
 // startMainMenu starts the main menu
@@ -695,7 +695,8 @@ func (s *SSHServer) addBannerFooter(bannerText string) string {
 
 	footer := fmt.Sprintf(`
 
-  ## Powered by DungeonGate %s
+	
+  ## Powered by ᚠ ᚢ ᚦ ᚨ ᚱ ᚷ ᚹ ᛞ ᛉ ᛏ   DungeonGate   ᛃ ᛇ ᛒ ᛗ ᛚ ᛝ %s
   ## See https://github.com/psubacz/dungeongate`, version)
 
 	return bannerText + footer
@@ -1099,7 +1100,7 @@ func (s *SSHServer) handleLogin(ctx context.Context, sessionCtx *SSHSessionConte
 	for attempts < maxLoginAttempts {
 		s.clearScreen(sessionCtx)
 		s.writeToSession(sessionCtx, "=== Login ===\r\n\r\n")
-		
+
 		if attempts > 0 {
 			s.writeToSession(sessionCtx, fmt.Sprintf("Login attempt %d of %d\r\n\r\n", attempts+1, maxLoginAttempts))
 		}
@@ -1122,81 +1123,80 @@ func (s *SSHServer) handleLogin(ctx context.Context, sessionCtx *SSHSessionConte
 		authStart := time.Now()
 		s.promMetrics.AuthAttemptsTotal.WithLabelValues("password", username).Inc()
 
-		// REPLACE THIS: Direct call to user service instead of auth client
-		if s.sessionService.userService != nil {
-			authenticatedUser, err := s.sessionService.userService.AuthenticateUser(ctx, username, password)
-			if err != nil {
-				// Handle specific error types for better user feedback
-				var errorMessage string
-				var metricLabel string
-				var shouldRetry = true
-				
-				switch err.Error() {
-				case "username_not_found":
-					errorMessage = "Username not found. Please check your username and try again.\r\n"
-					metricLabel = "username_not_found"
-				case "invalid_password":
-					errorMessage = "Incorrect password. Please try again.\r\n"
-					metricLabel = "invalid_password"
-				case "account_locked":
-					errorMessage = "Account is temporarily locked due to too many failed login attempts. Please try again later.\r\n"
-					metricLabel = "account_locked"
-					shouldRetry = false // Don't allow retry for locked accounts
-				default:
-					errorMessage = "Login failed. Please try again.\r\n"
-					metricLabel = "other_error"
-				}
-				
-				s.promMetrics.AuthFailuresTotal.WithLabelValues("password", metricLabel).Inc()
-				s.promMetrics.AuthDuration.Observe(time.Since(authStart).Seconds())
-				s.writeToSession(sessionCtx, errorMessage)
-				
-				if !shouldRetry {
-					s.waitForKeypress(sessionCtx)
-					return true
-				}
-				
-				attempts++
-				if attempts < maxLoginAttempts {
-					s.writeToSession(sessionCtx, "\r\nPress any key to try again...")
-					s.waitForKeypress(sessionCtx)
-					continue
-				} else {
-					s.writeToSession(sessionCtx, "\r\nMaximum login attempts exceeded.\r\n")
-					s.waitForKeypress(sessionCtx)
-					return true
-				}
+		// Wait for auth service to be available - spin until it comes back
+		for s.sessionService.authMiddleware == nil {
+			s.writeToSession(sessionCtx, "Authentication service is starting up, please wait...\r\n")
+			time.Sleep(2 * time.Second)
+			
+			// Check if connection is still alive
+			if sessionCtx.Channel == nil {
+				return true // Connection was closed
 			}
-
-			// Login successful - Convert to session User type
-			sessionCtx.IsAuthenticated = true
-			sessionCtx.AuthenticatedUser = &User{
-				ID:              authenticatedUser.ID,
-				Username:        authenticatedUser.Username,
-				Email:           authenticatedUser.Email,
-				IsAuthenticated: true,
-				IsActive:        authenticatedUser.IsActive,
-				IsAdmin:         (authenticatedUser.Flags & user.UserFlagAdmin) != 0,
-				CreatedAt:       authenticatedUser.CreatedAt,
-				UpdatedAt:       authenticatedUser.UpdatedAt,
-				LastLogin: func() time.Time {
-					if authenticatedUser.LastLogin != nil {
-						return *authenticatedUser.LastLogin
-					}
-					return time.Time{}
-				}(),
-			}
-			sessionCtx.Username = authenticatedUser.Username
-
-			// Track successful authentication
-			s.promMetrics.AuthDuration.Observe(time.Since(authStart).Seconds())
-
-			s.writeToSession(sessionCtx, "Login successful - Press any key to continue!\r\n")
-			s.waitForKeypress(sessionCtx)
-			return true
 		}
 
-		s.writeToSession(sessionCtx, "User service not available.\r\n")
+		// Auth service is now available
+		// Get client IP from connection
+		clientIP := "unknown"
+		if sessionCtx.ConnectionID != "" {
+			s.connectionsMux.RLock()
+			if conn, exists := s.connections[sessionCtx.ConnectionID]; exists {
+				clientIP = conn.RemoteAddr
+			}
+			s.connectionsMux.RUnlock()
+		}
+		authenticatedUser, err := s.sessionService.authMiddleware.AuthenticateUser(ctx, username, password, clientIP)
+		if err != nil {
+			// Handle specific error types for better user feedback
+			var errorMessage string
+			var metricLabel string
+			var shouldRetry = true
+
+			switch {
+			case strings.Contains(err.Error(), "user_not_found") || strings.Contains(err.Error(), "username_not_found"):
+				errorMessage = "Username not found. Please check your username and try again.\r\n"
+				metricLabel = "username_not_found"
+			case strings.Contains(err.Error(), "invalid_credentials") || strings.Contains(err.Error(), "invalid_password"):
+				errorMessage = "Incorrect password. Please try again.\r\n"
+				metricLabel = "invalid_password"
+			case strings.Contains(err.Error(), "account_locked"):
+				errorMessage = "Account is temporarily locked due to too many failed login attempts. Please try again later.\r\n"
+				metricLabel = "account_locked"
+				shouldRetry = false // Don't allow retry for locked accounts
+			default:
+				errorMessage = "Login failed. Please try again.\r\n"
+				metricLabel = "other_error"
+			}
+
+			s.promMetrics.AuthFailuresTotal.WithLabelValues("password", metricLabel).Inc()
+			s.promMetrics.AuthDuration.Observe(time.Since(authStart).Seconds())
+			s.writeToSession(sessionCtx, errorMessage)
+
+			if !shouldRetry {
+				s.waitForKeypress(sessionCtx)
+				return true
+			}
+
+			attempts++
+			if attempts < maxLoginAttempts {
+				s.writeToSession(sessionCtx, "\r\nPress any key to try again...")
+				s.waitForKeypress(sessionCtx)
+				continue
+			} else {
+				s.writeToSession(sessionCtx, "\r\nMaximum login attempts exceeded.\r\n")
+				s.waitForKeypress(sessionCtx)
+				return true
+			}
+		}
+
+		// Login successful - User is already in the correct format from auth middleware
+		sessionCtx.IsAuthenticated = true
+		sessionCtx.AuthenticatedUser = authenticatedUser
+		sessionCtx.Username = authenticatedUser.Username
+
+		// Track successful authentication
+		s.promMetrics.AuthDuration.Observe(time.Since(authStart).Seconds())
+
+		s.writeToSession(sessionCtx, "Login successful - Press any key to continue!\r\n")
 		s.waitForKeypress(sessionCtx)
 		return true
 	}
@@ -1204,7 +1204,6 @@ func (s *SSHServer) handleLogin(ctx context.Context, sessionCtx *SSHSessionConte
 	// This should never be reached
 	return true
 }
-
 
 // handleRegisterEnhanced handles enhanced user registration with validation
 func (s *SSHServer) handleRegisterEnhanced(ctx context.Context, sessionCtx *SSHSessionContext) bool {
@@ -1364,55 +1363,6 @@ func (s *SSHServer) handleRegisterEnhanced(ctx context.Context, sessionCtx *SSHS
 	}
 }
 
-// handleRegister handles user registration
-func (s *SSHServer) handleRegister(ctx context.Context, sessionCtx *SSHSessionContext) bool {
-	s.clearScreen(sessionCtx)
-	s.writeToSession(sessionCtx, "=== Register ===\r\n\r\n")
-
-	s.writeToSession(sessionCtx, "Choose a username: ")
-	username, err := s.readLineInput(sessionCtx)
-	if err != nil {
-		return false
-	}
-
-	s.writeToSession(sessionCtx, "Choose a password: ")
-	password, err := s.readPasswordInput(sessionCtx)
-	if err != nil {
-		s.writeToSession(sessionCtx, "Registration cancelled.\r\n")
-		s.waitForKeypress(sessionCtx)
-		return true
-	}
-
-	s.writeToSession(sessionCtx, "Confirm password: ")
-	confirmPassword, err := s.readPasswordInput(sessionCtx)
-	if err != nil {
-		s.writeToSession(sessionCtx, "Registration cancelled.\r\n")
-		s.waitForKeypress(sessionCtx)
-		return true
-	}
-
-	if password != confirmPassword {
-		s.writeToSession(sessionCtx, "Passwords don't match. Please try again.\r\n")
-		s.waitForKeypress(sessionCtx)
-		return true
-	}
-
-	// Register with user service
-	_, err = s.userClient.CreateUser(ctx, &CreateUserRequest{
-		Username: username,
-		Password: password,
-	})
-	if err != nil {
-		s.writeToSession(sessionCtx, fmt.Sprintf("Registration failed: %v\r\n", err))
-		s.waitForKeypress(sessionCtx)
-		return true
-	}
-
-	s.writeToSession(sessionCtx, "Registration successful! You can now login.\r\n")
-	s.waitForKeypress(sessionCtx)
-
-	return true
-}
 
 // handlePlayGame handles game selection and launching
 func (s *SSHServer) handlePlayGame(ctx context.Context, sessionCtx *SSHSessionContext) bool {
@@ -1546,7 +1496,7 @@ func (s *SSHServer) startGameInPTY(ctx context.Context, sessionCtx *SSHSessionCo
 
 	// Start game process
 	if err := ptySession.StartCommand(command, args); err != nil {
-		s.ptyManager.ReleasePTY(sessionCtx.SessionID)
+		_ = s.ptyManager.ReleasePTY(sessionCtx.SessionID)
 		s.promMetrics.GameSessionErrors.WithLabelValues(game.ID, "start_failed").Inc()
 		s.promMetrics.GamesActive.WithLabelValues(game.ID, game.Name).Dec()
 		return fmt.Errorf("failed to start game: %w", err)
@@ -1657,7 +1607,7 @@ func (s *SSHServer) bridgeGameIO(ctx context.Context, sessionCtx *SSHSessionCont
 				// Check for exit signals
 				if n == 1 && buffer[0] == 3 { // Ctrl+C
 					s.writeToSession(sessionCtx, "\r\nExiting game...\r\n")
-					ptySession.SendSignal(syscall.SIGTERM)
+					_ = ptySession.SendSignal(syscall.SIGTERM)
 					done <- nil
 					return
 				}
@@ -1730,7 +1680,7 @@ func (s *SSHServer) bridgeGameIO(ctx context.Context, sessionCtx *SSHSessionCont
 	if sessionCtx.ptySession != nil {
 		sessionCtx.ptySession.Close()
 		// Also release the PTY from the manager
-		s.ptyManager.ReleasePTY(sessionCtx.SessionID)
+		_ = s.ptyManager.ReleasePTY(sessionCtx.SessionID)
 		sessionCtx.ptySession = nil
 	}
 
@@ -2084,7 +2034,7 @@ func (s *SSHServer) handleStatistics(ctx context.Context, sessionCtx *SSHSession
 	metrics := s.sessionService.GetMetrics()
 	sshMetrics := s.GetMetrics()
 
-	s.writeToSession(sessionCtx, fmt.Sprintf("System Statistics:\r\n"))
+	s.writeToSession(sessionCtx, "System Statistics:\r\n")
 	s.writeToSession(sessionCtx, fmt.Sprintf("  Active Sessions: %d\r\n", metrics.ActiveSessions))
 	s.writeToSession(sessionCtx, fmt.Sprintf("  Total Sessions: %d\r\n", metrics.TotalSessions))
 	s.writeToSession(sessionCtx, fmt.Sprintf("  Active Spectators: %d\r\n", metrics.ActiveSpectators))
@@ -2092,7 +2042,7 @@ func (s *SSHServer) handleStatistics(ctx context.Context, sessionCtx *SSHSession
 	s.writeToSession(sessionCtx, fmt.Sprintf("  Bytes Transferred: %d\r\n", metrics.BytesTransferred))
 	s.writeToSession(sessionCtx, fmt.Sprintf("  Uptime: %d seconds\r\n", metrics.UptimeSeconds))
 
-	s.writeToSession(sessionCtx, fmt.Sprintf("\r\nSSH Statistics:\r\n"))
+	s.writeToSession(sessionCtx, "\r\nSSH Statistics:\r\n")
 	s.writeToSession(sessionCtx, fmt.Sprintf("  Total Connections: %d\r\n", sshMetrics.TotalConnections))
 	s.writeToSession(sessionCtx, fmt.Sprintf("  Active Connections: %d\r\n", sshMetrics.ActiveConnections))
 	s.writeToSession(sessionCtx, fmt.Sprintf("  Failed Connections: %d\r\n", sshMetrics.FailedConnections))
@@ -2168,7 +2118,7 @@ func (s *SSHServer) clearScreen(sessionCtx *SSHSessionContext) {
 // waitForKeypress waits for a keypress
 func (s *SSHServer) waitForKeypress(sessionCtx *SSHSessionContext) {
 	buffer := make([]byte, 1)
-	sessionCtx.Channel.Read(buffer)
+	_, _ = sessionCtx.Channel.Read(buffer)
 	sessionCtx.LastActivity = time.Now()
 }
 
@@ -2552,7 +2502,6 @@ func (s *SSHServer) handleResetSave(ctx context.Context, sessionCtx *SSHSessionC
 	s.waitForKeypress(sessionCtx)
 	return true
 }
-
 
 // getMaxLoginAttempts returns the maximum login attempts from config
 // getMaxLoginAttempts returns the maximum login attempts from config

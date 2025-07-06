@@ -23,6 +23,7 @@ type SessionServiceConfig struct {
 	Metrics           *MetricsConfig           `yaml:"metrics"`
 	Health            *HealthConfig            `yaml:"health"`
 	Security          *SecurityConfig          `yaml:"security"`
+	Auth              *AuthServiceConfig       `yaml:"auth"`
 	User              *UserConfig              `yaml:"user"`
 	Games             []*GameConfig            `yaml:"games"`
 }
@@ -132,6 +133,20 @@ type SessionSecurityConfig struct {
 	RequireEncryption  bool `yaml:"require_encryption"`
 	SessionTokenLength int  `yaml:"session_token_length"`
 	SecureRandom       bool `yaml:"secure_random"`
+}
+
+// AuthServiceConfig represents authentication service configuration
+type AuthServiceConfig struct {
+	Enabled                bool   `yaml:"enabled"`
+	ServiceAddress         string `yaml:"service_address"`
+	JWTSecret              string `yaml:"jwt_secret"`
+	JWTIssuer              string `yaml:"jwt_issuer"`
+	AccessTokenExpiration  string `yaml:"access_token_expiration"`
+	RefreshTokenExpiration string `yaml:"refresh_token_expiration"`
+	MaxLoginAttempts       int    `yaml:"max_login_attempts"`
+	LockoutDuration        string `yaml:"lockout_duration"`
+	RequireTokenForAPI     bool   `yaml:"require_token_for_api"`
+	RequireTokenForSSH     bool   `yaml:"require_token_for_ssh"`
 }
 
 // LoadSessionServiceConfig loads session service configuration

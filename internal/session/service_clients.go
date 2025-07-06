@@ -87,7 +87,7 @@ func (c *authServiceClient) Logout(ctx context.Context, token string) error {
 
 func (c *authServiceClient) ValidateToken(ctx context.Context, token string) (*User, error) {
 	log.Printf("Auth service validate token request: %s", token)
-	
+
 	// Mock implementation
 	switch token {
 	case "mock-token-admin":
@@ -285,7 +285,7 @@ func (c *gameServiceClient) ListGames(ctx context.Context) ([]*Game, error) {
 	log.Printf("Game service list games request")
 
 	// If games are configured, use them
-	if c.games != nil && len(c.games) > 0 {
+	if len(c.games) > 0 {
 		games := make([]*Game, 0, len(c.games))
 		for _, cfg := range c.games {
 			if cfg.Enabled {

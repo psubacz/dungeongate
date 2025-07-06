@@ -320,7 +320,7 @@ func (ps *PTYSession) handleOutput() {
 			return
 		default:
 			// Set read timeout
-			ps.PTY.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
+			_ = ps.PTY.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
 
 			n, err := ps.PTY.Read(buffer)
 			if err != nil {
@@ -479,12 +479,12 @@ func (ps *PTYSession) Close() error {
 		log.Printf("Terminating process %d for PTY session %s", ps.ProcessPID, ps.SessionID)
 
 		// Send SIGTERM first
-		ps.Command.Process.Signal(syscall.SIGTERM)
+		_ = ps.Command.Process.Signal(syscall.SIGTERM)
 
 		// Wait for graceful termination
 		done := make(chan bool, 1)
 		go func() {
-			ps.Command.Wait()
+			_ = ps.Command.Wait()
 			done <- true
 		}()
 
@@ -493,8 +493,8 @@ func (ps *PTYSession) Close() error {
 			log.Printf("Process %d terminated gracefully", ps.ProcessPID)
 		case <-time.After(5 * time.Second):
 			log.Printf("Force killing process %d", ps.ProcessPID)
-			ps.Command.Process.Kill()
-			ps.Command.Wait()
+			_ = ps.Command.Process.Kill()
+			_ = ps.Command.Wait()
 		}
 	}
 
