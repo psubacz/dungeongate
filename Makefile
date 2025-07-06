@@ -135,6 +135,11 @@ test-auth-functional: ## Run authentication flow tests
 	@echo "$(GREEN)Running authentication flow tests...$(NC)"
 	$(GOTEST) -v -timeout=$(TEST_TIMEOUT) -run "TestAuth.*FallbackLogic|TestAuth.*ErrorHandling|TestMax.*Logic|TestSession.*Setup|TestFallback.*Flow" ./internal/session/...
 
+.PHONY: test-cover
+test-cover: ## Run tests and show coverage percentages
+	@echo "$(GREEN)Running tests with coverage...$(NC)"
+	$(GOTEST) -cover ./...
+
 .PHONY: test-coverage
 test-coverage: ## Run tests with coverage report
 	@echo "$(GREEN)Running tests with coverage...$(NC)"
