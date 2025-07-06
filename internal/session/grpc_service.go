@@ -8,15 +8,14 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 // Enhanced service clients with proper gRPC implementation
 
 type userServiceClientEnhanced struct {
 	address string
-	conn    *grpc.ClientConn
+	// conn field removed - not currently used
 }
 
 func NewUserServiceClientEnhanced(address string) UserServiceClient {
@@ -93,7 +92,7 @@ func (c *userServiceClientEnhanced) UpdateLastLogin(ctx context.Context, userID 
 
 type gameServiceClientEnhanced struct {
 	address string
-	conn    *grpc.ClientConn
+	// conn field removed - not currently used
 }
 
 func NewGameServiceClientEnhanced(address string) GameServiceClient {
@@ -169,7 +168,7 @@ func NewGRPCClientManager(authAddr, userAddr, gameAddr string) *GRPCClientManage
 }
 
 func (m *GRPCClientManager) ConnectAuth(address string) error {
-	conn, err := grpc.Dial(address, grpc.WithInsecure())
+	conn, err := grpc.NewClient(address, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return fmt.Errorf("failed to connect to auth service: %w", err)
 	}
@@ -178,7 +177,7 @@ func (m *GRPCClientManager) ConnectAuth(address string) error {
 }
 
 func (m *GRPCClientManager) ConnectUser(address string) error {
-	conn, err := grpc.Dial(address, grpc.WithInsecure())
+	conn, err := grpc.NewClient(address, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return fmt.Errorf("failed to connect to user service: %w", err)
 	}
@@ -187,7 +186,7 @@ func (m *GRPCClientManager) ConnectUser(address string) error {
 }
 
 func (m *GRPCClientManager) ConnectGame(address string) error {
-	conn, err := grpc.Dial(address, grpc.WithInsecure())
+	conn, err := grpc.NewClient(address, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return fmt.Errorf("failed to connect to game service: %w", err)
 	}
@@ -217,33 +216,6 @@ func (m *GRPCClientManager) Close() error {
 
 // Error handling for gRPC
 
-func handleGRPCError(err error) error {
-	if err == nil {
-		return nil
-	}
-
-	st, ok := status.FromError(err)
-	if !ok {
-		return err
-	}
-
-	switch st.Code() {
-	case codes.NotFound:
-		return fmt.Errorf("resource not found: %s", st.Message())
-	case codes.PermissionDenied:
-		return fmt.Errorf("permission denied: %s", st.Message())
-	case codes.Unauthenticated:
-		return fmt.Errorf("authentication required: %s", st.Message())
-	case codes.InvalidArgument:
-		return fmt.Errorf("invalid argument: %s", st.Message())
-	case codes.Unavailable:
-		return fmt.Errorf("service unavailable: %s", st.Message())
-	case codes.DeadlineExceeded:
-		return fmt.Errorf("request timeout: %s", st.Message())
-	default:
-		return fmt.Errorf("service error: %s", st.Message())
-	}
-}
 
 // Service health checking
 

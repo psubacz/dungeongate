@@ -209,7 +209,7 @@ func (s *SSHServer) initializeClients() {
 	s.userClient = NewUserServiceClient(userServiceAddr)
 
 	// Use games from config if available
-	if s.config.Games != nil && len(s.config.Games) > 0 {
+	if len(s.config.Games) > 0 {
 		s.gameClient = NewGameServiceClientWithConfig(gameServiceAddr, s.config.Games)
 	} else {
 		s.gameClient = NewGameServiceClient(gameServiceAddr)
@@ -330,7 +330,7 @@ func (s *SSHServer) handleConnection(ctx context.Context, netConn net.Conn) {
 	// Handle channels
 	for newChannel := range chans {
 		if newChannel.ChannelType() != "session" {
-			newChannel.Reject(ssh.UnknownChannelType, "unknown channel type")
+			_ = newChannel.Reject(ssh.UnknownChannelType, "unknown channel type")
 			continue
 		}
 
@@ -374,7 +374,7 @@ func (s *SSHServer) handleChannel(ctx context.Context, newChannel ssh.NewChannel
 
 		// Clean up PTY if allocated
 		if sessionCtx.ptySession != nil {
-			s.ptyManager.ReleasePTY(sessionID)
+			_ = s.ptyManager.ReleasePTY(sessionID)
 		}
 	}()
 
@@ -433,7 +433,7 @@ func (s *SSHServer) handleSessionRequests(ctx context.Context, sessionCtx *SSHSe
 			case "env":
 				s.handleEnvRequest(sessionCtx, req)
 			default:
-				req.Reply(false, nil)
+				_ = req.Reply(false, nil)
 			}
 
 		case <-ctx.Done():
@@ -447,14 +447,14 @@ func (s *SSHServer) handleSessionRequests(ctx context.Context, sessionCtx *SSHSe
 // handlePTYRequest handles PTY allocation request
 func (s *SSHServer) handlePTYRequest(sessionCtx *SSHSessionContext, req *ssh.Request) {
 	if len(req.Payload) < 4 {
-		req.Reply(false, nil)
+		_ = req.Reply(false, nil)
 		return
 	}
 
 	// Parse PTY request
 	termLen := req.Payload[3]
 	if len(req.Payload) < 4+int(termLen)+16 {
-		req.Reply(false, nil)
+		_ = req.Reply(false, nil)
 		return
 	}
 
@@ -478,18 +478,18 @@ func (s *SSHServer) handlePTYRequest(sessionCtx *SSHSessionContext, req *ssh.Req
 		sessionCtx.SessionID, sessionCtx.TerminalType,
 		sessionCtx.WindowSize.Width, sessionCtx.WindowSize.Height)
 
-	req.Reply(true, nil)
+	_ = req.Reply(true, nil)
 }
 
 // handleShellRequest handles shell request
 func (s *SSHServer) handleShellRequest(sessionCtx *SSHSessionContext, req *ssh.Request) {
-	req.Reply(true, nil)
+	_ = req.Reply(true, nil)
 }
 
 // handleExecRequest handles command execution request
 func (s *SSHServer) handleExecRequest(sessionCtx *SSHSessionContext, req *ssh.Request) {
 	if len(req.Payload) < 4 {
-		req.Reply(false, nil)
+		_ = req.Reply(false, nil)
 		return
 	}
 
@@ -497,7 +497,7 @@ func (s *SSHServer) handleExecRequest(sessionCtx *SSHSessionContext, req *ssh.Re
 		uint32(req.Payload[2])<<8 | uint32(req.Payload[3])
 
 	if len(req.Payload) < 4+int(cmdLen) {
-		req.Reply(false, nil)
+		_ = req.Reply(false, nil)
 		return
 	}
 
@@ -506,7 +506,7 @@ func (s *SSHServer) handleExecRequest(sessionCtx *SSHSessionContext, req *ssh.Re
 	log.Printf("Command execution request for session %s: %s",
 		sessionCtx.SessionID, sessionCtx.Command)
 
-	req.Reply(true, nil)
+	_ = req.Reply(true, nil)
 }
 
 // handleWindowChangeRequest handles window size change
@@ -524,19 +524,19 @@ func (s *SSHServer) handleWindowChangeRequest(sessionCtx *SSHSessionContext, req
 
 		// Update PTY window size if active
 		if sessionCtx.ptySession != nil {
-			sessionCtx.ptySession.ResizeWindow(sessionCtx.WindowSize.Height, sessionCtx.WindowSize.Width)
+			_ = sessionCtx.ptySession.ResizeWindow(sessionCtx.WindowSize.Height, sessionCtx.WindowSize.Width)
 		}
 
 		log.Printf("Window size changed for session %s: %dx%d",
 			sessionCtx.SessionID, sessionCtx.WindowSize.Width, sessionCtx.WindowSize.Height)
 	}
-	req.Reply(true, nil)
+	_ = req.Reply(true, nil)
 }
 
 // handleEnvRequest handles environment variable request
 func (s *SSHServer) handleEnvRequest(sessionCtx *SSHSessionContext, req *ssh.Request) {
 	if len(req.Payload) < 8 {
-		req.Reply(false, nil)
+		_ = req.Reply(false, nil)
 		return
 	}
 
@@ -546,7 +546,7 @@ func (s *SSHServer) handleEnvRequest(sessionCtx *SSHSessionContext, req *ssh.Req
 		uint32(req.Payload[6])<<8 | uint32(req.Payload[7])
 
 	if len(req.Payload) < 8+int(nameLen)+int(valueLen) {
-		req.Reply(false, nil)
+		_ = req.Reply(false, nil)
 		return
 	}
 
@@ -558,7 +558,7 @@ func (s *SSHServer) handleEnvRequest(sessionCtx *SSHSessionContext, req *ssh.Req
 	log.Printf("Environment variable set for session %s: %s=%s",
 		sessionCtx.SessionID, name, value)
 
-	req.Reply(true, nil)
+	_ = req.Reply(true, nil)
 }
 
 // startMainMenu starts the main menu
@@ -1363,55 +1363,6 @@ func (s *SSHServer) handleRegisterEnhanced(ctx context.Context, sessionCtx *SSHS
 	}
 }
 
-// handleRegister handles user registration
-func (s *SSHServer) handleRegister(ctx context.Context, sessionCtx *SSHSessionContext) bool {
-	s.clearScreen(sessionCtx)
-	s.writeToSession(sessionCtx, "=== Register ===\r\n\r\n")
-
-	s.writeToSession(sessionCtx, "Choose a username: ")
-	username, err := s.readLineInput(sessionCtx)
-	if err != nil {
-		return false
-	}
-
-	s.writeToSession(sessionCtx, "Choose a password: ")
-	password, err := s.readPasswordInput(sessionCtx)
-	if err != nil {
-		s.writeToSession(sessionCtx, "Registration cancelled.\r\n")
-		s.waitForKeypress(sessionCtx)
-		return true
-	}
-
-	s.writeToSession(sessionCtx, "Confirm password: ")
-	confirmPassword, err := s.readPasswordInput(sessionCtx)
-	if err != nil {
-		s.writeToSession(sessionCtx, "Registration cancelled.\r\n")
-		s.waitForKeypress(sessionCtx)
-		return true
-	}
-
-	if password != confirmPassword {
-		s.writeToSession(sessionCtx, "Passwords don't match. Please try again.\r\n")
-		s.waitForKeypress(sessionCtx)
-		return true
-	}
-
-	// Register with user service
-	_, err = s.userClient.CreateUser(ctx, &CreateUserRequest{
-		Username: username,
-		Password: password,
-	})
-	if err != nil {
-		s.writeToSession(sessionCtx, fmt.Sprintf("Registration failed: %v\r\n", err))
-		s.waitForKeypress(sessionCtx)
-		return true
-	}
-
-	s.writeToSession(sessionCtx, "Registration successful! You can now login.\r\n")
-	s.waitForKeypress(sessionCtx)
-
-	return true
-}
 
 // handlePlayGame handles game selection and launching
 func (s *SSHServer) handlePlayGame(ctx context.Context, sessionCtx *SSHSessionContext) bool {
@@ -1545,7 +1496,7 @@ func (s *SSHServer) startGameInPTY(ctx context.Context, sessionCtx *SSHSessionCo
 
 	// Start game process
 	if err := ptySession.StartCommand(command, args); err != nil {
-		s.ptyManager.ReleasePTY(sessionCtx.SessionID)
+		_ = s.ptyManager.ReleasePTY(sessionCtx.SessionID)
 		s.promMetrics.GameSessionErrors.WithLabelValues(game.ID, "start_failed").Inc()
 		s.promMetrics.GamesActive.WithLabelValues(game.ID, game.Name).Dec()
 		return fmt.Errorf("failed to start game: %w", err)
@@ -1656,7 +1607,7 @@ func (s *SSHServer) bridgeGameIO(ctx context.Context, sessionCtx *SSHSessionCont
 				// Check for exit signals
 				if n == 1 && buffer[0] == 3 { // Ctrl+C
 					s.writeToSession(sessionCtx, "\r\nExiting game...\r\n")
-					ptySession.SendSignal(syscall.SIGTERM)
+					_ = ptySession.SendSignal(syscall.SIGTERM)
 					done <- nil
 					return
 				}
@@ -1729,7 +1680,7 @@ func (s *SSHServer) bridgeGameIO(ctx context.Context, sessionCtx *SSHSessionCont
 	if sessionCtx.ptySession != nil {
 		sessionCtx.ptySession.Close()
 		// Also release the PTY from the manager
-		s.ptyManager.ReleasePTY(sessionCtx.SessionID)
+		_ = s.ptyManager.ReleasePTY(sessionCtx.SessionID)
 		sessionCtx.ptySession = nil
 	}
 
@@ -2083,7 +2034,7 @@ func (s *SSHServer) handleStatistics(ctx context.Context, sessionCtx *SSHSession
 	metrics := s.sessionService.GetMetrics()
 	sshMetrics := s.GetMetrics()
 
-	s.writeToSession(sessionCtx, fmt.Sprintf("System Statistics:\r\n"))
+	s.writeToSession(sessionCtx, "System Statistics:\r\n")
 	s.writeToSession(sessionCtx, fmt.Sprintf("  Active Sessions: %d\r\n", metrics.ActiveSessions))
 	s.writeToSession(sessionCtx, fmt.Sprintf("  Total Sessions: %d\r\n", metrics.TotalSessions))
 	s.writeToSession(sessionCtx, fmt.Sprintf("  Active Spectators: %d\r\n", metrics.ActiveSpectators))
@@ -2091,7 +2042,7 @@ func (s *SSHServer) handleStatistics(ctx context.Context, sessionCtx *SSHSession
 	s.writeToSession(sessionCtx, fmt.Sprintf("  Bytes Transferred: %d\r\n", metrics.BytesTransferred))
 	s.writeToSession(sessionCtx, fmt.Sprintf("  Uptime: %d seconds\r\n", metrics.UptimeSeconds))
 
-	s.writeToSession(sessionCtx, fmt.Sprintf("\r\nSSH Statistics:\r\n"))
+	s.writeToSession(sessionCtx, "\r\nSSH Statistics:\r\n")
 	s.writeToSession(sessionCtx, fmt.Sprintf("  Total Connections: %d\r\n", sshMetrics.TotalConnections))
 	s.writeToSession(sessionCtx, fmt.Sprintf("  Active Connections: %d\r\n", sshMetrics.ActiveConnections))
 	s.writeToSession(sessionCtx, fmt.Sprintf("  Failed Connections: %d\r\n", sshMetrics.FailedConnections))
@@ -2167,7 +2118,7 @@ func (s *SSHServer) clearScreen(sessionCtx *SSHSessionContext) {
 // waitForKeypress waits for a keypress
 func (s *SSHServer) waitForKeypress(sessionCtx *SSHSessionContext) {
 	buffer := make([]byte, 1)
-	sessionCtx.Channel.Read(buffer)
+	_, _ = sessionCtx.Channel.Read(buffer)
 	sessionCtx.LastActivity = time.Now()
 }
 

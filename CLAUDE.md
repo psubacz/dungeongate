@@ -215,6 +215,7 @@ Key Go modules:
 - **Comprehensive Testing**: Specialized test suites for SSH, authentication, and spectating systems
 - **Docker Support**: Full containerization with development and production configurations
 - **Release Management**: Multi-platform build support and automated release checks
+- **Code Conventions**: Functions prefixed with `_` are unused or stubbed (not fully implemented); functions prefixed with `__` are deprecated
 
 ## Service Dependencies
 

@@ -362,16 +362,6 @@ func (s *Service) usernameExists(ctx context.Context, username string) (bool, er
 	return count > 0, nil
 }
 
-// emailExists checks if email already exists
-func (s *Service) emailExists(ctx context.Context, email string) (bool, error) {
-	var count int
-	query := "SELECT COUNT(*) FROM users WHERE email = ?"
-	err := s.db.QueryRowContext(ctx, query, email).Scan(&count)
-	if err != nil {
-		return false, err
-	}
-	return count > 0, nil
-}
 
 // hashPassword hashes a password using Argon2
 func (s *Service) hashPassword(password string) (string, string, error) {
@@ -463,7 +453,10 @@ func (s *Service) AuthenticateUser(ctx context.Context, username, password strin
 	}
 
 	// Update last login
-	s.updateLastLogin(ctx, user.ID)
+	if err := s.updateLastLogin(ctx, user.ID); err != nil {
+		// Log error but don't fail authentication
+		fmt.Printf("Error updating last login: %v\n", err)
+	}
 
 	return &user, nil
 }

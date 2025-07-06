@@ -220,19 +220,19 @@ func NewHTTPHandler(service *Service) http.Handler {
 
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		_, _ = w.Write([]byte("OK"))
 	})
 
 	mux.HandleFunc("/games", func(w http.ResponseWriter, r *http.Request) {
 		// TODO: Implement game endpoints
 		w.WriteHeader(http.StatusNotImplemented)
-		w.Write([]byte("Game endpoints not implemented"))
+		_, _ = w.Write([]byte("Game endpoints not implemented"))
 	})
 
 	mux.HandleFunc("/sessions", func(w http.ResponseWriter, r *http.Request) {
 		// TODO: Implement session endpoints
 		w.WriteHeader(http.StatusNotImplemented)
-		w.Write([]byte("Session endpoints not implemented"))
+		_, _ = w.Write([]byte("Session endpoints not implemented"))
 	})
 
 	return mux
@@ -432,26 +432,6 @@ func (s *Service) startKubernetesPod(ctx context.Context, session *GameSession, 
 	return fmt.Errorf("Kubernetes pod runtime not yet implemented")
 }
 
-// stopGameContainer stops a game container
-func (s *Service) stopGameContainer(ctx context.Context, session *GameSession) error {
-	if session.ContainerID == "" {
-		return fmt.Errorf("no container ID found for session %s", session.ID)
-	}
-
-	switch s.config.GameEngine.ContainerRuntime.Runtime {
-	case "docker":
-		cmd := exec.CommandContext(ctx, "docker", "stop", session.ContainerID)
-		return cmd.Run()
-	case "podman":
-		cmd := exec.CommandContext(ctx, "podman", "stop", session.ContainerID)
-		return cmd.Run()
-	case "kubernetes":
-		// Implementation for Kubernetes pod deletion
-		return fmt.Errorf("Kubernetes pod stopping not yet implemented")
-	default:
-		return fmt.Errorf("unsupported container runtime: %s", s.config.GameEngine.ContainerRuntime.Runtime)
-	}
-}
 
 // Event streaming methods
 

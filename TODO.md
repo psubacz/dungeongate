@@ -59,8 +59,7 @@
 
 ## Hard Tasks 🔴
 
-- time for a hard issue from the TODOs. Auth Service implementation (currently stub with health endpoint only). It looks like alot of functions are intermigled with session (like in ssh.go) and need to be decoupled. 
-- Game Service implementation (currently stub with health endpoint only)
+- Game Service implementation (currently stub with health endpoint only). as part of microservice architecture. I want to breakout functionality out of session and into internal/games. lets make this for games running, playing, saving, loading, etc...
 - Stream encryption implementation (currently stub returning unencrypted data)
 - Namespace isolation implementation (Linux syscalls and container integration)
 - Game isolation when multiple players are using the

@@ -539,19 +539,19 @@ func NewHTTPHandler(service *Service) http.Handler {
 
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		_, _ = w.Write([]byte("OK"))
 	})
 
 	mux.HandleFunc("/sessions", func(w http.ResponseWriter, r *http.Request) {
 		// TODO: Implement session endpoints
 		w.WriteHeader(http.StatusNotImplemented)
-		w.Write([]byte("Session endpoints not implemented"))
+		_, _ = w.Write([]byte("Session endpoints not implemented"))
 	})
 
 	mux.HandleFunc("/spectate", func(w http.ResponseWriter, r *http.Request) {
 		// TODO: Implement spectator endpoints
 		w.WriteHeader(http.StatusNotImplemented)
-		w.Write([]byte("Spectator endpoints not implemented"))
+		_, _ = w.Write([]byte("Spectator endpoints not implemented"))
 	})
 
 	// WebSocket endpoint for browser spectating (stubbed)
@@ -566,14 +566,14 @@ func NewHTTPHandler(service *Service) http.Handler {
 
 		// For now, return a placeholder response
 		w.WriteHeader(http.StatusNotImplemented)
-		w.Write([]byte("WebSocket spectating not yet implemented"))
+		_, _ = w.Write([]byte("WebSocket spectating not yet implemented"))
 		log.Printf("WebSocket spectate request for session %s (not implemented)", sessionID)
 	})
 
 	mux.HandleFunc("/playback", func(w http.ResponseWriter, r *http.Request) {
 		// TODO: Implement playback endpoints
 		w.WriteHeader(http.StatusNotImplemented)
-		w.Write([]byte("Playback endpoints not implemented"))
+		_, _ = w.Write([]byte("Playback endpoints not implemented"))
 	})
 
 	// Prometheus metrics endpoint

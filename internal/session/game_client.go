@@ -7,6 +7,7 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 
 	"github.com/dungeongate/pkg/config"
@@ -23,15 +24,11 @@ type GameServiceGRPCClient struct {
 func NewGameServiceGRPCClient(address string) (*GameServiceGRPCClient, error) {
 	// Set up connection options
 	opts := []grpc.DialOption{
-		grpc.WithInsecure(), // TODO: Add TLS in production
-		grpc.WithBlock(),
+		grpc.WithTransportCredentials(insecure.NewCredentials()), // TODO: Add TLS in production
 	}
 
 	// Connect to the game service
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	conn, err := grpc.DialContext(ctx, address, opts...)
+	conn, err := grpc.NewClient(address, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to game service at %s: %w", address, err)
 	}
@@ -103,8 +100,9 @@ type GameSessionInfo struct {
 // StartGame starts a new game session
 func (c *GameServiceGRPCClient) StartGame(ctx context.Context, req *StartGameRequest) (*StartGameResponse, error) {
 	// Create context with timeout
-	ctx, cancel := context.WithTimeout(ctx, c.timeout)
+	timeoutCtx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
+	_ = timeoutCtx // TODO: Use this context when implementing gRPC call
 
 	// This would normally call the gRPC service
 	// For now, we'll simulate the response
@@ -130,8 +128,9 @@ func (c *GameServiceGRPCClient) StartGame(ctx context.Context, req *StartGameReq
 // StopGame stops a game session
 func (c *GameServiceGRPCClient) StopGame(ctx context.Context, req *StopGameRequest) (*StopGameResponse, error) {
 	// Create context with timeout
-	ctx, cancel := context.WithTimeout(ctx, c.timeout)
+	timeoutCtx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
+	_ = timeoutCtx // TODO: Use this context when implementing gRPC call
 
 	// TODO: Replace with actual gRPC call when protobuf is generated
 	// client := games.NewGameServiceClient(c.conn)
@@ -148,8 +147,9 @@ func (c *GameServiceGRPCClient) StopGame(ctx context.Context, req *StopGameReque
 // GetGameSession gets information about a game session
 func (c *GameServiceGRPCClient) GetGameSession(ctx context.Context, sessionID string) (*GameSessionInfo, error) {
 	// Create context with timeout
-	ctx, cancel := context.WithTimeout(ctx, c.timeout)
+	timeoutCtx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
+	_ = timeoutCtx // TODO: Use this context when implementing gRPC call
 
 	// TODO: Replace with actual gRPC call when protobuf is generated
 	// client := games.NewGameServiceClient(c.conn)
@@ -173,8 +173,9 @@ func (c *GameServiceGRPCClient) GetGameSession(ctx context.Context, sessionID st
 // ListActiveGames lists all active game sessions
 func (c *GameServiceGRPCClient) ListActiveGames(ctx context.Context, userID string) ([]*GameSessionInfo, error) {
 	// Create context with timeout
-	ctx, cancel := context.WithTimeout(ctx, c.timeout)
+	timeoutCtx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
+	_ = timeoutCtx // TODO: Use this context when implementing gRPC call
 
 	// TODO: Replace with actual gRPC call when protobuf is generated
 	// client := games.NewGameServiceClient(c.conn)
@@ -203,8 +204,9 @@ func (c *GameServiceGRPCClient) ListActiveGames(ctx context.Context, userID stri
 // HealthCheck performs a health check on the game service
 func (c *GameServiceGRPCClient) HealthCheck(ctx context.Context) (bool, error) {
 	// Create context with timeout
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	timeoutCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
+	_ = timeoutCtx // TODO: Use this context when implementing gRPC call
 
 	// TODO: Replace with actual gRPC call when protobuf is generated
 	// client := games.NewGameServiceClient(c.conn)
@@ -233,15 +235,11 @@ func (c *GameServiceGRPCClient) Reconnect() error {
 
 	// Set up connection options
 	opts := []grpc.DialOption{
-		grpc.WithInsecure(), // TODO: Add TLS in production
-		grpc.WithBlock(),
+		grpc.WithTransportCredentials(insecure.NewCredentials()), // TODO: Add TLS in production
 	}
 
 	// Connect to the game service
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	conn, err := grpc.DialContext(ctx, c.address, opts...)
+	conn, err := grpc.NewClient(c.address, opts...)
 	if err != nil {
 		return fmt.Errorf("failed to reconnect to game service at %s: %w", c.address, err)
 	}

@@ -58,9 +58,9 @@ deps: ## Install and update Go dependencies
 .PHONY: deps-tools
 deps-tools: ## Install development tools
 	@echo "$(GREEN)Installing development tools...$(NC)"
-	@which air > /dev/null || $(GOGET) -u github.com/air-verse/air@latest
-	@which golangci-lint > /dev/null || $(GOGET) -u github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-	@which govulncheck > /dev/null || $(GOGET) -u golang.org/x/vuln/cmd/govulncheck@latest
+	@which air > /dev/null || go install github.com/air-verse/air@latest
+	@which golangci-lint > /dev/null || go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+	@which govulncheck > /dev/null || go install golang.org/x/vuln/cmd/govulncheck@latest
 
 ##@ Build
 
