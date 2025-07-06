@@ -24,7 +24,7 @@
 - Logging implementation
 
 ## Medium Tasks 🟡
-
+- implment whitelist/blacklist options for incoming connections
 - User Service implementation (partial - service layer exists, needs HTTP handlers)
 - Implement configuration limits for number of connections to ssh for resource constrained systems (number of connections and games allowed per server)
 - Semi-public mode which requires accounts and pre account creation
