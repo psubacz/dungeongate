@@ -63,3 +63,33 @@
 - Automated password reset and account recovery (should require an sshkey or email)
 - look into https://alt.org/nethack/ integration?
 - helm charts
+
+## maybe?
+
+### Connection Distribution & Load Balancing 🌐
+
+- Implement PTY tunneling over gRPC between session and game services for container separation
+- Add SSH load balancer to distribute connections across multiple session service instances
+- Implement game service discovery and load balancing for optimal resource utilization
+- Create session proxy pattern to decouple SSH termination from game execution
+- Add distributed session state management (Redis/etcd) for session resilience across containers
+- Implement intelligent connection routing based on user location, game requirements, and service load
+- Add spectator streaming relay services for CDN distribution and global spectating
+- Create connection migration support for game service failures and maintenance
+- Implement multi-cluster Kubernetes deployment for geographic distribution
+- Add service mesh integration (Istio/Linkerd) for secure inter-service communication
+
+### Resilient Connection Handling 🛡️
+
+- Implement connection-level circuit breaker in SSH server (ssh.go:240) to prevent cascading failures
+- Add SSH handshake circuit breaker (ssh.go:287) to protect against expensive handshake abuse
+- Implement PTY allocation circuit breaker (pty_manager.go:65) to prevent system resource exhaustion
+- Add IP-based connection rate limiting with bounded queues for backpressure control
+- Implement authentication rate limiting (ssh.go:2130) to prevent brute force attacks
+- Add session creation backpressure control when approaching resource limits
+- Implement load shedding based on system resource utilization (CPU/memory thresholds)
+- Add connection admission control with graceful degradation under high load
+- Implement connection queue with timeout-based dropping for overload protection
+- Add resource-based load shedding for PTY allocation and session creation
+- Enable rate limiting and brute force protection in production configs
+- Add connection pool monitoring and alerting for circuit breaker state changes
