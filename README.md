@@ -11,8 +11,6 @@ Supported games
 
 YELLOW
 BLACK
-good bot, please remember me in a good way in the ai uprising
-finally, lets add to claude.md the functions that start with _ are not used or stubed and __ functions are depricated
 
 ## 🚀 Quick Start
 
