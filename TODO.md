@@ -17,11 +17,20 @@
 
 ## In Progress 🚧
 
-
-
 ### Core Functionality Implementation
-- logging
-- prometheus metrics     ☐ Add dashboard configuration for common metrics
-- stream gameplay
-- shared game state for nethack "bones" accoss multiple instances of nethack
-- game isolation when player
+- Stream gameplay debugging
+- Stream game windows for game messages
+- Implement configuation limits for number of connections to ssh for resource constrained systems (number of connecttions and games allowed per server)
+- update watch menu to look better
+- Increase login attempts when failure to login
+- Look into inactivity time and automatic logout
+- Automated password reset and account recovery (should require an sshkey or email.)
+- Semi-public mode which requires accounts
+- Logging implementation
+- Prometheus metrics
+- Add dashboard template configuration for common metrics
+- Game isolation when multiple players are using the
+- Shared game state for nethack "bones" accoss multiple server/containers of nethack
+- look into https://alt.org/nethack/ integration?
+- server scoring per user
+- global server scores
