@@ -14,24 +14,39 @@ A modern SSH-based gateway for terminal gaming, providing secure access to rogue
 
 1. **Clone and setup the project:**
 ```bash
-cd /Users/caboose/Desktop/dungeongate
-chmod +x build-ssh.sh
-./build-ssh.sh setup
+git clone <repository-url>
+cd dungeongate
 ```
 
-2. **Build the service:**
+2. **Install dependencies and tools:**
 ```bash
-./build-ssh.sh build
+make deps          # Install Go dependencies
+make deps-tools    # Install development tools
 ```
 
-3. **Start the service:**
+3. **Build the services:**
 ```bash
-./build-ssh.sh start
+make build-all     # Build all services
+# Or build individually:
+make build         # Session service
+make build-auth    # Auth service
 ```
 
-4. **Test SSH connection (in another terminal):**
+4. **Start the services:**
 ```bash
-./build-ssh.sh ssh
+# Development with auto-reload:
+make dev
+
+# Manual service management:
+make test-run-all  # Both auth and session services
+make test-run      # Session service only
+```
+
+5. **Test SSH connection:**
+```bash
+ssh -p 2222 localhost
+# Or use the built-in test:
+make ssh-test-connection
 ```
 
 ### Default Test Accounts
@@ -69,13 +84,13 @@ chmod +x build-ssh.sh
 
 ### Key Features
 
-- **Full SSH Protocol Support**: SSH-2.0 compliant server
-- **Terminal Management**: PTY allocation and terminal I/O handling
-- **Game Integration**: Launch and manage terminal games
-- **Session Recording**: TTY recording for playback
-- **Real-time Spectating**: Watch other players' games with immutable data streaming
-- **Authentication**: Flexible authentication backends
-- **Microservices**: Clean separation of concerns
+- **Full SSH Protocol Support**: SSH-2.0 compliant server with proper terminal emulation and signal handling
+- **Terminal Management**: PTY allocation and terminal I/O handling with automatic window resizing and UTF-8 support
+- **Game Integration**: Launch and manage terminal games with configurable commands and environment variables
+- **Session Recording**: TTY recording for playback with gzip compression and configurable storage
+- **Real-time Spectating**: Watch other players' games with immutable data streaming, ring buffering for session history, and support for multiple simultaneous spectators
+- **Authentication**: Flexible authentication backends with JWT tokens and centralized auth service integration
+- **Microservices**: Clean separation of concerns with gRPC communication between auth and session services
 
 ## 🔧 Configuration
 
@@ -259,40 +274,63 @@ The service exposes both HTTP and gRPC APIs:
 
 ### Testing
 
-Run the test suite:
+Comprehensive testing with Make targets:
 
 ```bash
-# Run all tests
-./build-ssh.sh test
+# Basic testing
+make test                    # Run all tests
+make test-coverage          # Generate coverage reports
+make test-comprehensive     # Run all test suites
 
-# Run specific test
-go test -v ./internal/session -run TestSSHServer
+# Component-specific testing
+make test-ssh               # SSH server tests
+make test-auth              # Authentication tests
+make test-spectating        # Spectating system tests
 
-# Run benchmarks
-go test -v ./internal/session -bench=.
+# Performance testing
+make benchmark              # General benchmarks
+make benchmark-ssh          # SSH-specific benchmarks
+make benchmark-spectating   # Spectating benchmarks
 
-# Run with coverage
-go test -v ./internal/session -cover
+# SSH connection testing
+make ssh-check-server       # Check if SSH server is running
+make ssh-test-connection    # Test SSH connection
 ```
 
-### Build Scripts
+### Build System
 
-The project includes a comprehensive build script:
+The project uses a comprehensive Makefile with 40+ targets:
 
 ```bash
-./build-ssh.sh [command]
+# Essential commands
+make deps                    # Install Go dependencies
+make deps-tools             # Install development tools
+make build-all              # Build all services
+make dev                    # Run with auto-reload
 
-Commands:
-  setup     - Initial setup (directories, keys, config)
-  build     - Build the service binary
-  test      - Run unit tests
-  start     - Start service in development mode
-  stop      - Stop the running service
-  restart   - Restart the service
-  ssh       - Test SSH connection
-  health    - Check service health
-  logs      - Show service logs
-  clean     - Clean build artifacts
+# Quality assurance
+make fmt                    # Format code
+make lint                   # Run linter
+make verify                 # Run all checks
+
+# Testing
+make test                   # Run all tests
+make test-comprehensive     # Full test suite
+make benchmark              # Performance tests
+
+# Environment management
+make setup-test-env         # Setup test environment
+make clean                  # Clean build artifacts
+make clean-all              # Clean everything
+
+# Docker integration
+make docker-build-all       # Build Docker images
+make docker-compose-up      # Start services
+make docker-compose-dev     # Development environment
+
+# Information
+make help                   # Display all available commands
+make info                   # Show project information
 ```
 
 ## 📊 Monitoring
@@ -337,50 +375,86 @@ Structured logging with configurable levels:
 
 ```bash
 # Quick start
-./build-ssh.sh setup
-./build-ssh.sh start
+make deps && make build-all
+make test-run-all          # Start both services
+
+# Alternative: Development with auto-reload
+make dev                   # Auto-reloading development server
 
 # Connect via SSH
-ssh -p 2222 admin@localhost
+ssh -p 2222 localhost
+# Or test connection:
+make ssh-test-connection
 ```
 
 ### Production Deployment
 
 1. **Build for production:**
 ```bash
-go build -ldflags="-s -w" -o dungeongate-session-service ./cmd/session-service
+make release-build         # Multi-platform binaries
+make release-check         # Run all release checks
 ```
 
-2. **Install systemd service:**
+2. **Docker deployment:**
 ```bash
-sudo cp dungeongate-session-service /usr/local/bin/
-sudo cp configs/systemd/dungeongate-session.service /etc/systemd/system/
-sudo systemctl enable dungeongate-session
-sudo systemctl start dungeongate-session
+make docker-build-all      # Build all Docker images
+make docker-compose-up     # Start production services
 ```
 
-3. **Configure firewall:**
+3. **Manual installation:**
 ```bash
-sudo ufw allow 22/tcp    # SSH
-sudo ufw allow 8083/tcp  # HTTP API (if needed)
+# Copy binaries
+sudo cp build/dungeongate-session-service /usr/local/bin/
+sudo cp build/dungeongate-auth-service /usr/local/bin/
+
+# Install systemd services
+sudo cp configs/systemd/*.service /etc/systemd/system/
+sudo systemctl enable dungeongate-session dungeongate-auth
+sudo systemctl start dungeongate-session dungeongate-auth
+```
+
+4. **Configure firewall:**
+```bash
+sudo ufw allow 22/tcp      # SSH
+sudo ufw allow 8081/tcp    # Auth HTTP API
+sudo ufw allow 8082/tcp    # Auth gRPC
+sudo ufw allow 8083/tcp    # Session HTTP API
 ```
 
 ### Docker Deployment
 
-```dockerfile
-FROM golang:1.21-alpine AS builder
-WORKDIR /app
-COPY . .
-RUN go build -o dungeongate-session-service ./cmd/session-service
+Use the provided Docker integration:
 
-FROM alpine:latest
-RUN apk --no-cache add ca-certificates
-WORKDIR /root/
-COPY --from=builder /app/dungeongate-session-service .
-COPY configs/docker/session-service.yaml .
-EXPOSE 22 8083 9093
-CMD ["./dungeongate-session-service", "-config", "session-service.yaml"]
+```bash
+# Build Docker images
+make docker-build-all
+
+# Start development environment
+make docker-compose-dev
+
+# Start production environment
+make docker-compose-up
+
+# View logs
+make docker-compose-logs
+
+# Stop services
+make docker-compose-down
+
+# Clean up Docker resources
+make docker-clean
 ```
+
+Docker images are built for:
+- `dungeongate/session-service` - Session service
+- `dungeongate/auth-service` - Auth service
+
+Exposed ports:
+- `22` - SSH
+- `8081` - Auth HTTP API
+- `8082` - Auth gRPC
+- `8083` - Session HTTP API
+- `9093` - Session gRPC
 
 ## 🎯 Usage Examples
 
@@ -454,14 +528,17 @@ curl http://localhost:8085/metrics
 #### SSH Connection Refused
 
 ```bash
-# Check if service is running
-./build-ssh.sh health
+# Check if SSH server is running
+make ssh-check-server
+
+# Test SSH connection
+make ssh-test-connection
 
 # Check port availability
 lsof -i :2222
 
-# Check logs
-./build-ssh.sh logs
+# Start services if not running
+make test-run-all
 ```
 
 #### Permission Denied
@@ -558,24 +635,36 @@ curl -X POST http://localhost:8083/config/ssh/session_timeout \
 
 1. **Fork the repository**
 2. **Create feature branch**: `git checkout -b feature/ssh-improvements`
-3. **Setup development environment**: `./build-ssh.sh setup`
-4. **Make changes and test**: `./build-ssh.sh test`
+3. **Setup development environment**:
+   ```bash
+   make deps && make deps-tools
+   make setup-test-env
+   ```
+4. **Make changes and test**:
+   ```bash
+   make verify                # Run all quality checks
+   make test-comprehensive    # Run full test suite
+   make benchmark            # Test performance
+   ```
 5. **Submit pull request**
 
 ### Code Style
 
 - Follow Go conventions
-- Use `gofmt` for formatting
-- Add comprehensive tests
+- Use `make fmt` and `make lint` before committing
+- Run `make verify` to check all quality standards
+- Add comprehensive tests for new features
 - Document public APIs
 - Use structured logging
 
 ### Testing Guidelines
 
 - Write unit tests for all new features
+- Use component-specific test targets (`make test-ssh`, `make test-auth`, etc.)
 - Include integration tests for SSH functionality
+- Run `make test-comprehensive` before submitting
+- Use `make benchmark` to verify performance
 - Test with multiple terminal types
-- Verify memory usage and performance
 - Test error handling paths
 
 ## 📄 License

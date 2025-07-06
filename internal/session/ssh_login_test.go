@@ -46,13 +46,13 @@ func TestGetMaxLoginAttemptsWithDefault(t *testing.T) {
 			expected: 3,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			server := &SSHServer{
 				config: tt.config,
 			}
-			
+
 			result := server.getMaxLoginAttemptsWithDefault()
 			if result != tt.expected {
 				t.Errorf("Expected %d, got %d", tt.expected, result)

@@ -12,8 +12,10 @@ GOFMT=gofmt
 
 # Build parameters
 BINARY_NAME=dungeongate-session-service
+AUTH_BINARY_NAME=dungeongate-auth-service
 BUILD_DIR=build
 MAIN_PATH=./cmd/session-service
+AUTH_MAIN_PATH=./cmd/auth-service
 TEST_DATA_DIR=test-data
 CONFIG_DIR=configs
 
@@ -56,7 +58,7 @@ deps: ## Install and update Go dependencies
 .PHONY: deps-tools
 deps-tools: ## Install development tools
 	@echo "$(GREEN)Installing development tools...$(NC)"
-	@which air > /dev/null || $(GOGET) -u github.com/cosmtrek/air@latest
+	@which air > /dev/null || $(GOGET) -u github.com/air-verse/air@latest
 	@which golangci-lint > /dev/null || $(GOGET) -u github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 	@which govulncheck > /dev/null || $(GOGET) -u golang.org/x/vuln/cmd/govulncheck@latest
 
@@ -68,6 +70,16 @@ build: deps ## Build the session service binary
 	@mkdir -p $(BUILD_DIR)
 	$(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME) $(MAIN_PATH)
 	@echo "$(GREEN)Build completed: $(BUILD_DIR)/$(BINARY_NAME)$(NC)"
+
+.PHONY: build-auth
+build-auth: deps ## Build the auth service binary
+	@echo "$(GREEN)Building $(AUTH_BINARY_NAME)...$(NC)"
+	@mkdir -p $(BUILD_DIR)
+	$(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(AUTH_BINARY_NAME) $(AUTH_MAIN_PATH)
+	@echo "$(GREEN)Build completed: $(BUILD_DIR)/$(AUTH_BINARY_NAME)$(NC)"
+
+.PHONY: build-all
+build-all: build build-auth ## Build all service binaries
 
 .PHONY: build-debug
 build-debug: deps ## Build with debug symbols
@@ -108,6 +120,21 @@ test-spectating: ## Run spectating system tests
 	@echo "$(GREEN)Running spectating tests...$(NC)"
 	$(GOTEST) -v -timeout=$(TEST_TIMEOUT) -run "Spectating|Spectator|Registry|Stream" ./internal/session/...
 
+.PHONY: test-auth
+test-auth: ## Run authentication tests
+	@echo "$(GREEN)Running authentication tests...$(NC)"
+	$(GOTEST) -v -timeout=$(TEST_TIMEOUT) -run "TestAuth|TestUser.*Conversion|TestError.*Mapping|TestMax.*Logic|TestSession.*Setup|TestFallback" ./internal/session/...
+
+.PHONY: test-auth-simple
+test-auth-simple: ## Run core authentication logic tests
+	@echo "$(GREEN)Running core authentication logic tests...$(NC)"
+	$(GOTEST) -v -timeout=$(TEST_TIMEOUT) -run "TestUser.*Conversion|TestAuth.*PathSelection|TestAuth.*RetryLogic|TestError.*Mapping" ./internal/session/...
+
+.PHONY: test-auth-functional
+test-auth-functional: ## Run authentication flow tests
+	@echo "$(GREEN)Running authentication flow tests...$(NC)"
+	$(GOTEST) -v -timeout=$(TEST_TIMEOUT) -run "TestAuth.*FallbackLogic|TestAuth.*ErrorHandling|TestMax.*Logic|TestSession.*Setup|TestFallback.*Flow" ./internal/session/...
+
 .PHONY: test-coverage
 test-coverage: ## Run tests with coverage report
 	@echo "$(GREEN)Running tests with coverage...$(NC)"
@@ -120,6 +147,17 @@ test-coverage: ## Run tests with coverage report
 test-integration: build setup-test-env ## Run integration tests
 	@echo "$(GREEN)Running integration tests...$(NC)"
 	@./scripts/test-integration.sh
+
+.PHONY: test-comprehensive
+test-comprehensive: ## Run all core test suites (auth, SSH, spectating)
+	@echo "$(GREEN)Running comprehensive test suite...$(NC)"
+	@echo "$(YELLOW)1. Authentication tests...$(NC)"
+	@$(MAKE) test-auth
+	@echo "$(YELLOW)2. SSH tests...$(NC)"
+	@$(MAKE) test-ssh  
+	@echo "$(YELLOW)3. Spectating tests...$(NC)"
+	@$(MAKE) test-spectating
+	@echo "$(GREEN)All core test suites completed!$(NC)"
 
 .PHONY: benchmark
 benchmark: ## Run performance benchmarks
@@ -219,28 +257,76 @@ dev: deps-tools ## Run development server with auto-restart
 	air
 
 .PHONY: test-run
-test-run: build setup-test-env ## Run test server on port 2222
-	@echo "$(GREEN)Starting test server...$(NC)"
+test-run: build setup-test-env ## Run test session service on port 2222
+	@echo "$(GREEN)Starting test session service...$(NC)"
 	@cp $(TEST_CONFIG) /tmp/dungeongate-session-service.yaml
 	./$(BUILD_DIR)/$(BINARY_NAME) -config=/tmp/dungeongate-session-service.yaml
 
+.PHONY: test-run-auth
+test-run-auth: build-auth ## Run test auth service on port 8082
+	@echo "$(GREEN)Starting test auth service...$(NC)"
+	./$(BUILD_DIR)/$(AUTH_BINARY_NAME) -config=$(TEST_CONFIG)
+
+.PHONY: test-run-all
+test-run-all: build-all setup-test-env ## Run both session and auth services for testing
+	@echo "$(GREEN)Starting both test services...$(NC)"
+	@echo "$(YELLOW)Auth service will run on port 8082$(NC)"
+	@echo "$(YELLOW)Session service will run on port 2222$(NC)"
+	@echo "$(YELLOW)Use Ctrl+C to stop both services$(NC)"
+	@cp $(TEST_CONFIG) /tmp/dungeongate-session-service.yaml
+	@(./$(BUILD_DIR)/$(AUTH_BINARY_NAME) -config=$(TEST_CONFIG) &) && \
+	 sleep 2 && \
+	 ./$(BUILD_DIR)/$(BINARY_NAME) -config=/tmp/dungeongate-session-service.yaml
+
 ##@ Docker
 
-.PHONY: docker-build
-docker-build: ## Build Docker image
-	@echo "$(GREEN)Building Docker image...$(NC)"
-	docker build -t dungeongate/session-service:$(VERSION) .
+.PHONY: docker-build-session
+docker-build-session: ## Build session service Docker image
+	@echo "$(GREEN)Building session service Docker image...$(NC)"
+	docker build -f Dockerfile.session-service -t dungeongate/session-service:$(VERSION) .
 	docker tag dungeongate/session-service:$(VERSION) dungeongate/session-service:latest
 
-.PHONY: docker-run
-docker-run: ## Run Docker container
-	@echo "$(GREEN)Running Docker container...$(NC)"
-	docker run --rm -p 2222:22 -p 8083:8083 -p 9093:9093 dungeongate/session-service:latest
+.PHONY: docker-build-auth
+docker-build-auth: ## Build auth service Docker image
+	@echo "$(GREEN)Building auth service Docker image...$(NC)"
+	docker build -f Dockerfile.auth-service -t dungeongate/auth-service:$(VERSION) .
+	docker tag dungeongate/auth-service:$(VERSION) dungeongate/auth-service:latest
+
+.PHONY: docker-build-all
+docker-build-all: docker-build-session docker-build-auth ## Build all Docker images
+
+.PHONY: docker-compose-up
+docker-compose-up: ## Start all services with docker-compose
+	@echo "$(GREEN)Starting all services with docker-compose...$(NC)"
+	docker-compose up --build
+
+.PHONY: docker-compose-dev
+docker-compose-dev: ## Start development environment with docker-compose
+	@echo "$(GREEN)Starting development environment...$(NC)"
+	docker-compose -f docker-compose.dev.yml up --build
+
+.PHONY: docker-compose-down
+docker-compose-down: ## Stop and remove all containers
+	@echo "$(GREEN)Stopping all services...$(NC)"
+	docker-compose down
+	docker-compose -f docker-compose.dev.yml down
+
+.PHONY: docker-compose-logs
+docker-compose-logs: ## Show logs from all services
+	docker-compose logs -f
 
 .PHONY: docker-test
-docker-test: docker-build ## Test Docker image
-	@echo "$(GREEN)Testing Docker image...$(NC)"
+docker-test: docker-build-all ## Test Docker images
+	@echo "$(GREEN)Testing Docker images...$(NC)"
 	docker run --rm dungeongate/session-service:$(VERSION) --version
+	docker run --rm dungeongate/auth-service:$(VERSION) --version
+
+.PHONY: docker-clean
+docker-clean: ## Clean up Docker images and containers
+	@echo "$(GREEN)Cleaning up Docker resources...$(NC)"
+	docker-compose down --volumes --remove-orphans
+	docker-compose -f docker-compose.dev.yml down --volumes --remove-orphans
+	docker system prune -f
 
 ##@ Database
 

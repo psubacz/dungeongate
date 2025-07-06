@@ -1,0 +1,291 @@
+# Production Configuration for DungeonGate Session Service
+version: "0.4.0"
+
+server:
+  port: 8083
+  grpc_port: 9093
+  host: "0.0.0.0"
+  timeout: "30s"
+  max_connections: 1000
+
+ssh:
+  enabled: true
+  port: 2222
+  host: "0.0.0.0"
+  host_key_path: "/app/data/ssh_keys/host_key"
+  banner: "Welcome to DungeonGate!\r\n"
+  max_sessions: 100
+  session_timeout: "4h"
+  idle_timeout: "30m"
+  
+  auth:
+    password_auth: true
+    public_key_auth: true
+    allow_anonymous: false
+    
+  terminal:
+    default_size: "80x24"
+    max_size: "120x40"
+    supported_terminals: ["xterm", "xterm-256color", "screen", "tmux"]
+
+session_management:
+  terminal:
+    default_size: "80x24"
+    max_size: "120x40"
+    encoding: "utf-8"
+    
+  timeouts:
+    idle_timeout: "30m"
+    max_session_duration: "4h"
+    cleanup_interval: "5m"
+    
+  ttyrec:
+    enabled: true
+    compression: "gzip"
+    directory: "/app/data/ttyrec"
+    max_file_size: "100MB"
+    retention_days: 30
+    
+  spectating:
+    enabled: true
+    max_spectators_per_session: 5
+    spectator_timeout: "2h"
+
+database:
+  mode: "external"
+  type: "postgresql"
+  
+  external:
+    type: "postgresql"
+    writer_endpoint: "${DATABASE_HOST:postgres}:${DATABASE_PORT:5432}"
+    reader_use_writer: true
+    reader_endpoint: "${DATABASE_HOST:postgres}:${DATABASE_PORT:5432}"
+    database: "${DATABASE_NAME:dungeongate}"
+    username: "${DATABASE_USER:dungeongate}"
+    password: "${DATABASE_PASSWORD:dungeongate-secret}"
+    ssl_mode: "disable"
+    max_connections: 50
+    max_idle_conns: 20
+    conn_max_lifetime: "1h"
+    reader_max_connections: 30
+    reader_max_idle_conns: 10
+    migration_path: "/app/migrations"
+    schema: "public"
+    failover:
+      enabled: true
+      health_check_interval: "30s"
+      failover_timeout: "10s"
+      retry_interval: "5s"
+      max_retries: 3
+      reader_to_writer_fallback: true
+  
+  settings:
+    log_queries: false
+    timeout: "30s"
+    retry_attempts: 3
+    retry_delay: "1s"
+  
+  pool:
+    max_connections: 50
+    max_idle_connections: 20
+    connection_max_lifetime: "1h"
+
+menu:
+  banners:
+    main_anon: "/app/configs/production/banners/main_anon.txt"
+    main_user: "/app/configs/production/banners/main_user.txt"
+    watch_menu: "/app/configs/production/banners/watch_menu.txt"
+  options:
+    anonymous:
+      - key: "l"
+        label: "Login"
+        action: "login"
+      - key: "r"
+        label: "Register"
+        action: "register"
+      - key: "w"
+        label: "Watch games"
+        action: "watch"
+      - key: "g"
+        label: "List games"
+        action: "list_games"
+      - key: "q"
+        label: "Quit"
+        action: "quit"
+    authenticated:
+      - key: "p"
+        label: "Play a game"
+        action: "play"
+      - key: "w"
+        label: "Watch games"
+        action: "watch"
+      - key: "e"
+        label: "Edit profile"
+        action: "edit_profile"
+      - key: "l"
+        label: "List games"
+        action: "list_games"
+      - key: "r"
+        label: "View recordings"
+        action: "recordings"
+      - key: "s"
+        label: "Statistics"
+        action: "stats"
+      - key: "q"
+        label: "Quit"
+        action: "quit"
+
+encryption:
+  enabled: true
+  algorithm: "AES-256-GCM"
+  key_rotation_interval: "24h"
+
+services:
+  user_service: "localhost:9091"
+  game_service: "localhost:9092"
+  auth_service: "${AUTH_SERVICE_URL:auth-service:8082}"
+
+# Authentication service configuration
+auth:
+  enabled: true
+  service_address: "${AUTH_SERVICE_URL:auth-service:8082}"
+  jwt_secret: "${JWT_SECRET:production-jwt-secret-change-me}"
+  jwt_issuer: "dungeongate-production"
+  access_token_expiration: "15m"
+  refresh_token_expiration: "168h"  # 7 days
+  max_login_attempts: 5
+  lockout_duration: "30m"
+  require_token_for_api: true
+  require_token_for_ssh: false
+
+user:
+  login_attempts:
+    max_attempts: 5
+    lock_duration: "30m"
+    reset_window: "1h"
+    progressive: true
+
+storage:
+  ttyrec_path: "/app/data/ttyrec"
+  temp_path: "/app/data/tmp"
+
+logging:
+  level: "info"
+  format: "json"
+  output: "stdout"
+
+metrics:
+  enabled: true
+  port: 8085
+
+health:
+  enabled: true
+  path: "/health"
+
+security:
+  rate_limiting:
+    enabled: true
+    max_connections_per_ip: 10
+    connection_window: "1m"
+    
+  brute_force_protection:
+    enabled: true
+    max_failed_attempts: 10
+    lockout_duration: "15m"
+    
+  session_security:
+    require_encryption: true
+    session_token_length: 32
+    secure_random: true
+
+# Game configurations
+games:
+  - id: "nethack"
+    name: "NetHack"
+    short_name: "nh"
+    version: "3.7.0"
+    enabled: true
+    binary:
+      path: "/usr/games/nethack"
+      args: ["-u", "${USERNAME}"]
+      working_directory: "/var/games/nethack"
+      user: "games"
+      group: "games"
+      permissions: "0755"
+    files:
+      data_directory: "/var/games/nethack"
+      save_directory: "/var/games/nethack/save"
+      config_directory: "/var/games/nethack"
+      log_directory: "/var/log/nethack"
+      temp_directory: "/tmp/nethack"
+      shared_files: ["nhdat", "license", "recover"]
+      user_files: ["${USERNAME}.nh", "${USERNAME}.0", "${USERNAME}.bak"]
+      permissions:
+        data_directory: "0755"
+        save_directory: "0755"
+        user_files: "0644"
+        log_files: "0644"
+    settings:
+      max_players: 200
+      max_session_duration: "8h"
+      idle_timeout: "1h"
+      save_interval: "5m"
+      auto_save: true
+      spectating:
+        enabled: true
+        max_spectators_per_session: 10
+        spectator_timeout: "4h"
+      recording:
+        enabled: true
+        format: "ttyrec"
+        compression: "gzip"
+        max_file_size: "500MB"
+        retention_days: 90
+        auto_cleanup: true
+      options:
+        MAXNROFPLAYERS: "200"
+        SEDLEVEL: "5"
+        DUMPLOG: "1"
+        LIVELOG: "1"
+        XLOGFILE: "/var/games/nethack/xlogfile"
+        LIVELOGFILE: "/var/games/nethack/livelog"
+    environment:
+      NETHACKOPTIONS: "@/var/games/nethack/${USERNAME}.nethackrc"
+      HACKDIR: "/var/games/nethack"
+      TERM: "xterm-256color"
+      USER: "${USERNAME}"
+      HOME: "/var/games/nethack/${USERNAME}"
+      SHELL: "/bin/sh"
+    resources:
+      cpu_limit: "1000m"
+      memory_limit: "512Mi"
+      cpu_request: "200m"
+      memory_request: "128Mi"
+      disk_limit: "2Gi"
+      pids_limit: 100
+    container:
+      image: "dungeongate/nethack"
+      tag: "3.7.0"
+      registry: "ghcr.io"
+      pull_policy: "IfNotPresent"
+      volumes:
+        - name: "nethack-data"
+          host_path: "/var/games/nethack"
+          mount_path: "/var/games/nethack"
+          read_only: false
+        - name: "nethack-saves"
+          host_path: "/var/games/nethack/save"
+          mount_path: "/var/games/nethack/save"
+          read_only: false
+      environment:
+        GAME: "nethack"
+        USERNAME: "${USERNAME}"
+        TERM: "xterm-256color"
+      security_context:
+        run_as_user: 1000
+        run_as_group: 1000
+        read_only_root_filesystem: true
+        privileged: false
+      network_mode: "none"
+    networking:
+      mode: "isolated"

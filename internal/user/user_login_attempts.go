@@ -23,7 +23,7 @@ func (s *Service) incrementFailedLoginAttempts(ctx context.Context, userID int) 
 	if newAttempts >= maxAttempts {
 		lockDuration := s.getLockDuration()
 		lockUntil := time.Now().Add(lockDuration)
-		
+
 		updateQuery := `
 			UPDATE users 
 			SET failed_login_attempts = ?, 

@@ -106,7 +106,7 @@ type ValidationError struct {
 
 // Enhanced Service with flexible database configuration
 type Service struct {
-	db     *database.Connection
+	db            *database.Connection
 	config        *config.UserServiceConfig
 	sessionConfig *config.SessionServiceConfig
 }
@@ -114,7 +114,7 @@ type Service struct {
 // NewService creates a new user service with enhanced configuration
 func NewService(db *database.Connection, cfg *config.UserServiceConfig, sessionCfg *config.SessionServiceConfig) (*Service, error) {
 	service := &Service{
-		db:     db,
+		db:            db,
 		config:        cfg,
 		sessionConfig: sessionCfg,
 	}
@@ -473,7 +473,7 @@ func (s *Service) updateLastLogin(ctx context.Context, userID int) error {
 	query := `
 		UPDATE users 
 		SET last_login = CURRENT_TIMESTAMP, 
-			login_count = login_count + 1,
+			login_count = login_count + 1
 		WHERE id = ?
 	`
 	_, err := s.db.ExecContext(ctx, query, userID)

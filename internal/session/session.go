@@ -19,11 +19,12 @@ import (
 
 // Service handles session management operations
 type Service struct {
-	db          *database.Connection
-	encryptor   *encryption.Encryptor
-	recorder    *ttyrec.Recorder
-	config      *config.SessionServiceConfig
-	userService *user.Service
+	db             *database.Connection
+	encryptor      *encryption.Encryptor
+	recorder       *ttyrec.Recorder
+	config         *config.SessionServiceConfig
+	userService    *user.Service
+	authMiddleware *AuthMiddleware
 
 	// Session tracking using immutable data patterns
 	sessions    map[string]*Session
@@ -39,6 +40,19 @@ func NewService(db *database.Connection, encryptor *encryption.Encryptor, record
 		config:      cfg,
 		userService: userService,
 		sessions:    make(map[string]*Session),
+	}
+}
+
+// NewServiceWithAuth creates a new session service with authentication middleware
+func NewServiceWithAuth(db *database.Connection, encryptor *encryption.Encryptor, recorder *ttyrec.Recorder, cfg *config.SessionServiceConfig, userService *user.Service, authMiddleware *AuthMiddleware) *Service {
+	return &Service{
+		db:             db,
+		encryptor:      encryptor,
+		recorder:       recorder,
+		config:         cfg,
+		userService:    userService,
+		authMiddleware: authMiddleware,
+		sessions:       make(map[string]*Session),
 	}
 }
 

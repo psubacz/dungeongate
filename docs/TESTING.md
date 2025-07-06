@@ -1,83 +1,119 @@
 # DungeonGate Testing Guide
 
-This guide covers how to test the DungeonGate configuration and database setup during development.
+This guide covers the comprehensive testing framework for DungeonGate, including unit tests, integration tests, and performance benchmarks.
 
 ## Quick Start
 
-The fastest way to test your configuration:
+The fastest way to test the platform:
 
 ```bash
-# Test database connectivity
-go run test-build.go -config configs/testing/sqlite-embedded.yaml -test-db
+# Run all tests
+make test
 
-# Validate configuration only
-go run test-build.go -config configs/testing/sqlite-embedded.yaml -validate-only
+# Run tests with coverage
+make test-coverage
 
-# Run performance benchmark
-go run test-build.go -config configs/testing/sqlite-embedded.yaml -benchmark
+# Run comprehensive test suite
+make test-comprehensive
+
+# Start test server and connect
+make test-run
+ssh -p 2222 localhost
 ```
 
-## Test Build Script
+## Testing Framework Overview
 
-The `test-build.go` script provides several testing modes:
+DungeonGate uses a comprehensive Make-based testing system with specialized test suites:
 
-### Command Line Options
+### Test Categories
 
-- `-config <path>` - Path to configuration file (required)
-- `-test-db` - Test database connection and create tables
-- `-validate-only` - Only validate configuration, don't test connections
-- `-benchmark` - Run basic performance benchmarks
+**Basic Testing:**
+- `make test` - Run all unit tests
+- `make test-short` - Run quick tests only
+- `make test-race` - Run tests with race detection
+- `make test-coverage` - Generate coverage reports
+
+**Component-Specific Testing:**
+- `make test-ssh` - SSH server functionality
+- `make test-auth` - Authentication system
+- `make test-auth-simple` - Core authentication logic
+- `make test-auth-functional` - Authentication flows
+- `make test-spectating` - Spectating system
+- `make test-spectating-full` - Comprehensive spectating tests
+
+**Performance Testing:**
+- `make benchmark` - General performance benchmarks
+- `make benchmark-ssh` - SSH-specific benchmarks
+- `make benchmark-spectating` - Spectating system benchmarks
 
 ### What Gets Tested
 
-1. **Configuration Loading**
-   - YAML parsing and validation
-   - Environment variable expansion
-   - Configuration structure validation
+1. **SSH Server Implementation**
+   - SSH-2.0 protocol compliance
+   - PTY allocation and management
+   - Session handling and cleanup
+   - Connection multiplexing
 
-2. **Database Connectivity**
-   - Database connection establishment
-   - Connection health checks
-   - Table creation and verification
-   - Query routing (for external databases)
+2. **Authentication System**
+   - User registration and login flows
+   - JWT token generation and validation
+   - gRPC service communication
+   - Fallback and error handling
 
-3. **Performance Benchmarking**
-   - Database read performance
-   - Connection metrics
-   - Failover testing (external databases)
+3. **Spectating System**
+   - Real-time data streaming
+   - Atomic spectator registry operations
+   - Immutable data structures
+   - Concurrent spectator management
 
-## Configuration Modes
+4. **Database Operations**
+   - SQLite and PostgreSQL compatibility
+   - Connection pooling and health checks
+   - Query performance and optimization
+   - Transaction management
 
-### Embedded Database (SQLite)
+## Testing Environments
 
-Best for development and testing:
+### Development Testing
 
+**Session Service Only (Limited Auth):**
+```bash
+make test-run          # Start SSH server on port 2222
+ssh -p 2222 localhost  # Connect to test
+```
+
+**Full System with Authentication:**
+```bash
+make test-run-all      # Start auth + session services
+ssh -p 2222 localhost  # Connect with full auth support
+```
+
+### Database Testing
+
+The testing framework supports multiple database configurations:
+
+**SQLite (Default for Testing):**
 ```yaml
 database:
   mode: "embedded"
   embedded:
     type: "sqlite"
-    path: "./test-data/sqlite/users.db"
+    path: "./data/sqlite/dungeongate-dev.db"
     migration_path: "./migrations"
-    backup_enabled: false
     wal_mode: true
-    cache:
-      enabled: true
-      size: 16
-      ttl: "10m"
-      type: "memory"
 ```
 
-**Pros:**
-- No external dependencies
-- Fast setup and teardown
-- Perfect for CI/CD
-- Automatic directory creation
-
-**Cons:**
-- Single connection limit
-- No read/write separation
-- Not suitable for production
+**PostgreSQL (Production-like Testing):**
+```yaml
+database:
+  mode: "external"
+  external:
+    type: "postgresql"
+    writer_endpoint: "localhost:5432"
+    database: "dungeongate_test"
+    username: "test_user"
+    password: "${TEST_DB_PASSWORD}"
+```
 
 ### External Database (PostgreSQL/MySQL)
 
@@ -168,10 +204,9 @@ configuration validation failed: database mode is required
 ```
 **Solution:** Check your YAML syntax and ensure all required fields are present.
 
-### Debug Mode
+### Debug and Troubleshooting
 
-Enable debug logging for detailed information:
-
+**Enable Debug Mode:**
 ```yaml
 session_service:
   logging:
@@ -180,30 +215,53 @@ session_service:
     output: "stdout"
 ```
 
-## Test Data Management
-
-### Cleanup
-
-Test data is created in `./test-data/`. To clean up:
-
+**Common Debug Commands:**
 ```bash
-# Remove all test data
-rm -rf ./test-data/
+# Check server status
+make ssh-check-server
 
-# Remove only database files
-rm -f ./test-data/sqlite/*.db
+# Test connection
+make ssh-test-connection
+
+# Run with debug build
+make build-debug
+make run-debug
+
+# Check dependencies
+make deps-check
+
+# Show project info
+make info
 ```
 
-### Backup
+## Test Environment Management
 
-For persistent test data:
+### Environment Setup
 
 ```bash
-# Backup test database
-cp ./test-data/sqlite/users.db ./test-data/sqlite/users.db.backup
+# Setup test environment
+make setup-test-env
 
-# Restore from backup
-cp ./test-data/sqlite/users.db.backup ./test-data/sqlite/users.db
+# Clean test environment
+make clean-test-env
+
+# Full cleanup (build artifacts + test data)
+make clean-all
+```
+
+### Test Data Management
+
+Test data is managed automatically:
+
+```bash
+# Database migrations
+make db-migrate          # Run migrations
+make db-migrate-down     # Rollback migrations
+make db-reset            # Reset database (destructive)
+
+# SSH keys and test data
+make setup-test-env      # Creates test SSH keys and directories
+make clean-test-env      # Removes all test data
 ```
 
 ## Integration with CI/CD
@@ -211,7 +269,7 @@ cp ./test-data/sqlite/users.db.backup ./test-data/sqlite/users.db
 ### GitHub Actions Example
 
 ```yaml
-name: Test Configuration
+name: Test Suite
 on: [push, pull_request]
 
 jobs:
@@ -223,13 +281,20 @@ jobs:
         with:
           go-version: '1.21'
       
-      - name: Test Configuration
-        run: |
-          go run test-build.go -config configs/testing/sqlite-embedded.yaml -test-db
-          
-      - name: Benchmark Performance
-        run: |
-          go run test-build.go -config configs/testing/sqlite-embedded.yaml -benchmark
+      - name: Install Dependencies
+        run: make deps
+        
+      - name: Run Quality Checks
+        run: make verify
+        
+      - name: Run Test Suite
+        run: make test-comprehensive
+        
+      - name: Generate Coverage Report
+        run: make test-coverage
+        
+      - name: Run Benchmarks
+        run: make benchmark
 ```
 
 ### Docker Testing
@@ -238,27 +303,87 @@ jobs:
 FROM golang:1.21-alpine AS test
 WORKDIR /app
 COPY . .
-RUN go mod download
-RUN go run test-build.go -config configs/testing/sqlite-embedded.yaml -test-db
+RUN make deps
+RUN make test-comprehensive
+RUN make benchmark
+```
+
+```bash
+# Docker-based testing
+make docker-build-all
+make docker-test
 ```
 
 ## Performance Expectations
 
-### SQLite (Embedded)
-- **Read Operations:** 1000+ ops/sec
-- **Connection Setup:** < 100ms
-- **Table Creation:** < 50ms
+### Test Performance Targets
 
-### PostgreSQL (External)
-- **Read Operations:** 500+ ops/sec (network dependent)
+**SSH Server:**
+- **Concurrent Connections:** 1000+ simultaneous sessions
+- **Session Throughput:** 10,000+ operations/second
+- **Connection Setup:** < 100ms
+- **Memory per Session:** ~2MB
+
+**Spectating System:**
+- **Frame Processing:** ~100,000 frames/second
+- **Spectator Addition:** Sub-microsecond atomic operations
+- **Memory per Spectator:** ~1KB
+- **Concurrent Spectators:** Linear scaling
+
+**Database Operations:**
+- **SQLite Read Operations:** 1000+ ops/sec
+- **PostgreSQL Read Operations:** 500+ ops/sec (network dependent)
 - **Connection Setup:** < 200ms
 - **Failover Time:** < 5s
 
+### Benchmark Commands
+
+```bash
+# General benchmarks
+make benchmark
+
+# Component-specific benchmarks
+make benchmark-ssh
+make benchmark-spectating
+
+# Performance monitoring
+make info                    # Show system information
+make version                 # Show version and build info
+```
+
+## SSH Connection Testing
+
+### Manual Testing
+
+```bash
+# Check if SSH server is running
+make ssh-check-server
+
+# Test SSH connection
+make ssh-test-connection
+
+# Start server and test manually
+make test-run
+# In another terminal:
+ssh -p 2222 localhost
+```
+
+### Automated Testing
+
+```bash
+# Run all SSH tests
+make test-ssh
+
+# Run comprehensive SSH testing
+make test-comprehensive
+```
+
 ## Next Steps
 
-1. **Run the basic test** to ensure everything works
-2. **Create your own test configuration** for your specific setup
-3. **Integrate with your CI/CD pipeline**
-4. **Set up external database testing** when ready for production
+1. **Run the basic test suite** with `make test`
+2. **Test specific components** with component-specific make targets
+3. **Integrate with your CI/CD pipeline** using the provided examples
+4. **Set up Docker testing** for containerized environments
+5. **Configure external database testing** for production-like scenarios
 
-For more advanced configuration options, see `CONFIG.md`.
+For configuration options, see `CONFIG.md`. For architecture details, see `ARCHITECTURE.md`.

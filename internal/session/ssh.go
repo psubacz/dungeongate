@@ -117,7 +117,7 @@ func NewSSHServer(sessionService *Service, cfg *config.SessionServiceConfig) (*S
 		connections:    make(map[string]*SSHConnection),
 		metrics:        &SSHMetrics{},
 	}
-	
+
 	// Only initialize Prometheus metrics if not in test mode
 	// In test mode, the metrics will be nil to avoid registration conflicts
 	if cfg != nil && cfg.Logging != nil && cfg.Logging.Level != "test" {
@@ -695,7 +695,8 @@ func (s *SSHServer) addBannerFooter(bannerText string) string {
 
 	footer := fmt.Sprintf(`
 
-  ## Powered by DungeonGate %s
+	
+  ## Powered by ᚠ ᚢ ᚦ ᚨ ᚱ ᚷ ᚹ ᛞ ᛉ ᛏ   DungeonGate   ᛃ ᛇ ᛒ ᛗ ᛚ ᛝ %s
   ## See https://github.com/psubacz/dungeongate`, version)
 
 	return bannerText + footer
@@ -1099,7 +1100,7 @@ func (s *SSHServer) handleLogin(ctx context.Context, sessionCtx *SSHSessionConte
 	for attempts < maxLoginAttempts {
 		s.clearScreen(sessionCtx)
 		s.writeToSession(sessionCtx, "=== Login ===\r\n\r\n")
-		
+
 		if attempts > 0 {
 			s.writeToSession(sessionCtx, fmt.Sprintf("Login attempt %d of %d\r\n\r\n", attempts+1, maxLoginAttempts))
 		}
@@ -1122,81 +1123,80 @@ func (s *SSHServer) handleLogin(ctx context.Context, sessionCtx *SSHSessionConte
 		authStart := time.Now()
 		s.promMetrics.AuthAttemptsTotal.WithLabelValues("password", username).Inc()
 
-		// REPLACE THIS: Direct call to user service instead of auth client
-		if s.sessionService.userService != nil {
-			authenticatedUser, err := s.sessionService.userService.AuthenticateUser(ctx, username, password)
-			if err != nil {
-				// Handle specific error types for better user feedback
-				var errorMessage string
-				var metricLabel string
-				var shouldRetry = true
-				
-				switch err.Error() {
-				case "username_not_found":
-					errorMessage = "Username not found. Please check your username and try again.\r\n"
-					metricLabel = "username_not_found"
-				case "invalid_password":
-					errorMessage = "Incorrect password. Please try again.\r\n"
-					metricLabel = "invalid_password"
-				case "account_locked":
-					errorMessage = "Account is temporarily locked due to too many failed login attempts. Please try again later.\r\n"
-					metricLabel = "account_locked"
-					shouldRetry = false // Don't allow retry for locked accounts
-				default:
-					errorMessage = "Login failed. Please try again.\r\n"
-					metricLabel = "other_error"
-				}
-				
-				s.promMetrics.AuthFailuresTotal.WithLabelValues("password", metricLabel).Inc()
-				s.promMetrics.AuthDuration.Observe(time.Since(authStart).Seconds())
-				s.writeToSession(sessionCtx, errorMessage)
-				
-				if !shouldRetry {
-					s.waitForKeypress(sessionCtx)
-					return true
-				}
-				
-				attempts++
-				if attempts < maxLoginAttempts {
-					s.writeToSession(sessionCtx, "\r\nPress any key to try again...")
-					s.waitForKeypress(sessionCtx)
-					continue
-				} else {
-					s.writeToSession(sessionCtx, "\r\nMaximum login attempts exceeded.\r\n")
-					s.waitForKeypress(sessionCtx)
-					return true
-				}
+		// Wait for auth service to be available - spin until it comes back
+		for s.sessionService.authMiddleware == nil {
+			s.writeToSession(sessionCtx, "Authentication service is starting up, please wait...\r\n")
+			time.Sleep(2 * time.Second)
+			
+			// Check if connection is still alive
+			if sessionCtx.Channel == nil {
+				return true // Connection was closed
 			}
-
-			// Login successful - Convert to session User type
-			sessionCtx.IsAuthenticated = true
-			sessionCtx.AuthenticatedUser = &User{
-				ID:              authenticatedUser.ID,
-				Username:        authenticatedUser.Username,
-				Email:           authenticatedUser.Email,
-				IsAuthenticated: true,
-				IsActive:        authenticatedUser.IsActive,
-				IsAdmin:         (authenticatedUser.Flags & user.UserFlagAdmin) != 0,
-				CreatedAt:       authenticatedUser.CreatedAt,
-				UpdatedAt:       authenticatedUser.UpdatedAt,
-				LastLogin: func() time.Time {
-					if authenticatedUser.LastLogin != nil {
-						return *authenticatedUser.LastLogin
-					}
-					return time.Time{}
-				}(),
-			}
-			sessionCtx.Username = authenticatedUser.Username
-
-			// Track successful authentication
-			s.promMetrics.AuthDuration.Observe(time.Since(authStart).Seconds())
-
-			s.writeToSession(sessionCtx, "Login successful - Press any key to continue!\r\n")
-			s.waitForKeypress(sessionCtx)
-			return true
 		}
 
-		s.writeToSession(sessionCtx, "User service not available.\r\n")
+		// Auth service is now available
+		// Get client IP from connection
+		clientIP := "unknown"
+		if sessionCtx.ConnectionID != "" {
+			s.connectionsMux.RLock()
+			if conn, exists := s.connections[sessionCtx.ConnectionID]; exists {
+				clientIP = conn.RemoteAddr
+			}
+			s.connectionsMux.RUnlock()
+		}
+		authenticatedUser, err := s.sessionService.authMiddleware.AuthenticateUser(ctx, username, password, clientIP)
+		if err != nil {
+			// Handle specific error types for better user feedback
+			var errorMessage string
+			var metricLabel string
+			var shouldRetry = true
+
+			switch {
+			case strings.Contains(err.Error(), "user_not_found") || strings.Contains(err.Error(), "username_not_found"):
+				errorMessage = "Username not found. Please check your username and try again.\r\n"
+				metricLabel = "username_not_found"
+			case strings.Contains(err.Error(), "invalid_credentials") || strings.Contains(err.Error(), "invalid_password"):
+				errorMessage = "Incorrect password. Please try again.\r\n"
+				metricLabel = "invalid_password"
+			case strings.Contains(err.Error(), "account_locked"):
+				errorMessage = "Account is temporarily locked due to too many failed login attempts. Please try again later.\r\n"
+				metricLabel = "account_locked"
+				shouldRetry = false // Don't allow retry for locked accounts
+			default:
+				errorMessage = "Login failed. Please try again.\r\n"
+				metricLabel = "other_error"
+			}
+
+			s.promMetrics.AuthFailuresTotal.WithLabelValues("password", metricLabel).Inc()
+			s.promMetrics.AuthDuration.Observe(time.Since(authStart).Seconds())
+			s.writeToSession(sessionCtx, errorMessage)
+
+			if !shouldRetry {
+				s.waitForKeypress(sessionCtx)
+				return true
+			}
+
+			attempts++
+			if attempts < maxLoginAttempts {
+				s.writeToSession(sessionCtx, "\r\nPress any key to try again...")
+				s.waitForKeypress(sessionCtx)
+				continue
+			} else {
+				s.writeToSession(sessionCtx, "\r\nMaximum login attempts exceeded.\r\n")
+				s.waitForKeypress(sessionCtx)
+				return true
+			}
+		}
+
+		// Login successful - User is already in the correct format from auth middleware
+		sessionCtx.IsAuthenticated = true
+		sessionCtx.AuthenticatedUser = authenticatedUser
+		sessionCtx.Username = authenticatedUser.Username
+
+		// Track successful authentication
+		s.promMetrics.AuthDuration.Observe(time.Since(authStart).Seconds())
+
+		s.writeToSession(sessionCtx, "Login successful - Press any key to continue!\r\n")
 		s.waitForKeypress(sessionCtx)
 		return true
 	}
@@ -1204,7 +1204,6 @@ func (s *SSHServer) handleLogin(ctx context.Context, sessionCtx *SSHSessionConte
 	// This should never be reached
 	return true
 }
-
 
 // handleRegisterEnhanced handles enhanced user registration with validation
 func (s *SSHServer) handleRegisterEnhanced(ctx context.Context, sessionCtx *SSHSessionContext) bool {
@@ -2552,7 +2551,6 @@ func (s *SSHServer) handleResetSave(ctx context.Context, sessionCtx *SSHSessionC
 	s.waitForKeypress(sessionCtx)
 	return true
 }
-
 
 // getMaxLoginAttempts returns the maximum login attempts from config
 // getMaxLoginAttempts returns the maximum login attempts from config

@@ -1,22 +1,16 @@
 # DungeonGate
 
-```bash
- ____                                      ___        _
-|  _ \ _   _ _ __   __ _  ___  ___  _ __  / __|  __ _| |_ ___
-| | | | | | | ._ \ / _. |/ _ \/ _ \| ._ \| |___ / _. | __/ _ \
-| |_| | |_| | | | | (_| |  __/ (_) | | | | |__ | (_| |  ||  _/
-|____/ \__,_|_| |_|\__, |\___|\____|_| |_|____/ \__,_|\__\___|
-                   |___/
-```
-
 > This repo barely works and various states of working, borked, and not working. Be advised.
 
 **A SSH-based gateway to terminal gaming adventures written in Go**
 
-DungeonGate is a over-engineered microservices-based middleware inspired by [dgamelaunch](https://github.com/paxed/dgamelaunch) for hosting terminal games like NetHack. This software fronts terminal games with a network ssh front end that users can login to play or spectate games in progress.
+DungeonGate is a over-engineered microserviced application inspired by [dgamelaunch](https://github.com/paxed/dgamelaunch) for hosting terminal games like NetHack. This software fronts terminal games with a network ssh front end that users can login to play or spectate games in progress.
 
 Supported games
 - NetHack
+
+YELLOW
+BLACK
 
 
 ## 🚀 Quick Start
@@ -486,7 +480,7 @@ The session service provides comprehensive metrics:
 5. Run tests: `make test`
 6. Commit your changes: `git commit -m 'i did a think...'`
 7. Push to the branch: `git push origin feature/amazing-feature`
-8. Open a Pull Request
+8. Open a Pull Request. Add a feature description add the `make tests` output to the PR.
 
 ## 📝 License
 
@@ -503,6 +497,13 @@ DungeonGate is released under the [GNU GENERAL PUBLIC LICENSE](LICENSE).
 
 DungeonGate is developed and maintained by Peter Subacz. Feel free to reach out to me with any questions or feedback you may have.
 
-I developed this as a learning project after getting rained out of a few to many summer days with claude. I liked to play nethack in college, despite being bad at it. I just kept going as I learned more about golang and various tips and tricks of software development (like ring buffers, object pools, worker pools, encryption, containers, kubernetes). Now we have an entirely over-engineered piece of software to play terminal games.
+I developed this as a learning project after getting rained out of a few to many summer days with claude. I liked to play nethack in college, despite being bad at it. I just kept going as I learned more about golang and various tips and tricks of software development (like ring buffers, grpc with protobuf, object pools, worker pools, encryption, containers, etc...). Now we have an entirely over-engineered piece of software to play terminal games. Please Enjoy!
 
-![simpsons-i-think-are-neat](https://i.pinimg.com/originals/64/10/fc/6410fce49e0e0dedba1b3b71d71bee69.gif)
+```bash
+ ____                                      ___        _
+|  _ \ _   _ _ __   __ _  ___  ___  _ __  / __|  __ _| |_ ___
+| | | | | | | ._ \ / _. |/ _ \/ _ \| ._ \| |___ / _. | __/ _ \
+| |_| | |_| | | | | (_| |  __/ (_) | | | | |__ | (_| |  ||  _/
+|____/ \__,_|_| |_|\__, |\___|\____|_| |_|____/ \__,_|\__\___|
+                   |___/
+```

@@ -164,6 +164,20 @@ encryption:
 services:
   user_service: "localhost:9091"
   game_service: "localhost:9092"
+  auth_service: "localhost:8082"
+
+# Authentication service configuration
+auth:
+  enabled: true
+  service_address: "localhost:8082"
+  jwt_secret: "dev-secret-please-change-in-production"
+  jwt_issuer: "dungeongate-dev"
+  access_token_expiration: "15m"
+  refresh_token_expiration: "168h"  # 7 days
+  max_login_attempts: 3
+  lockout_duration: "15m"
+  require_token_for_api: false
+  require_token_for_ssh: false
 
 # User service configuration
 user:

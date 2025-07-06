@@ -87,7 +87,7 @@ func (c *authServiceClient) Logout(ctx context.Context, token string) error {
 
 func (c *authServiceClient) ValidateToken(ctx context.Context, token string) (*User, error) {
 	log.Printf("Auth service validate token request: %s", token)
-	
+
 	// Mock implementation
 	switch token {
 	case "mock-token-admin":

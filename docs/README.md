@@ -38,9 +38,12 @@ Welcome to the DungeonGate documentation. This directory contains comprehensive 
 - Banner and menu customization
 
 ### Development Tools
-- Build scripts and automation
-- Testing frameworks and procedures
-- Debugging and monitoring tools
+- **Build System**: Comprehensive Makefile with 40+ targets
+- **Testing Framework**: Specialized test suites for each component
+- **Quality Assurance**: Automated formatting, linting, and vulnerability scanning
+- **Docker Integration**: Development and production containerization
+- **Release Management**: Multi-platform builds and automated checks
+- **Performance Monitoring**: Benchmarking and profiling tools
 
 ## 🏗️ Architecture Overview
 
@@ -98,36 +101,143 @@ DungeonGate follows a microservices architecture pattern:
 1. **Prerequisites**: Go 1.21+, Git, SSH client
 2. **Clone Repository**: `git clone <repository-url>`
 3. **Install Dependencies**: `make deps`
-4. **Build Service**: `make build`
-5. **Start Development Server**: `make test-run`
-6. **Test Connection**: `ssh -p 2222 localhost`
+4. **Install Development Tools**: `make deps-tools`
+5. **Build Services**: `make build-all`
+6. **Start Development Server**: `make dev` (with auto-reload)
+7. **Test Connection**: `ssh -p 2222 localhost`
+
+### Alternative Development Workflows
+
+**Quick Testing (Session Service Only)**:
+```bash
+make test-run          # Start SSH server on port 2222
+ssh -p 2222 localhost  # Connect to test
+```
+
+**Full System Testing (Auth + Session)**:
+```bash
+make test-run-all      # Start both services
+ssh -p 2222 localhost  # Connect with full auth support
+```
+
+**Docker Development**:
+```bash
+make docker-compose-dev  # Start development environment
+make docker-compose-logs # View logs
+make docker-compose-down # Stop services
+```
 
 ### Testing the Platform
 
+**Basic Testing**:
 ```bash
-# Run unit tests
+# Run all tests
 make test
 
+# Run tests with coverage
+make test-coverage
+
+# Run comprehensive test suite
+make test-comprehensive
+```
+
+**Component-Specific Testing**:
+```bash
+# Test SSH functionality
+make test-ssh
+
+# Test authentication system
+make test-auth
+
+# Test spectating system
+make test-spectating
+```
+
+**Performance Testing**:
+```bash
+# Run benchmarks
+make benchmark
+
+# SSH-specific benchmarks
+make benchmark-ssh
+
+# Spectating benchmarks
+make benchmark-spectating
+```
+
+**Integration Testing**:
+```bash
 # Start test server
 make test-run
 
-# Test SSH functionality
-ssh -p 2222 localhost
+# Test SSH connection
+make ssh-test-connection
 
-# Test watch functionality
-# 1. Connect via SSH
-# 2. Select 'w' for watch
-# 3. Choose a test session
-# 4. Verify real-time streaming
+# Check server status
+make ssh-check-server
+```
+
+## 🔧 Development Commands Reference
+
+### Essential Commands
+```bash
+# Dependencies and setup
+make deps                 # Install Go dependencies
+make deps-tools          # Install development tools
+make deps-check          # Check dependency status
+
+# Building
+make build               # Build session service
+make build-auth          # Build auth service
+make build-all           # Build all services
+make build-debug         # Build with debug symbols
+make build-race          # Build with race detection
+
+# Development
+make dev                 # Run with auto-reload
+make test-run            # Run session service only
+make test-run-all        # Run both services
+```
+
+### Quality Assurance
+```bash
+# Code quality
+make fmt                 # Format code
+make lint                # Run linter
+make vet                 # Run go vet
+make vuln                # Check vulnerabilities
+make verify              # Run all checks
+
+# Testing
+make test                # Run all tests
+make test-coverage       # Generate coverage report
+make test-comprehensive  # Run all test suites
+```
+
+### Docker and Deployment
+```bash
+# Docker
+make docker-build-all    # Build all Docker images
+make docker-compose-up   # Start services
+make docker-compose-dev  # Start development environment
+
+# Database
+make db-migrate          # Run migrations
+make db-reset            # Reset database
+
+# Release
+make release-build       # Build release binaries
+make release-check       # Run release checks
 ```
 
 ### Contributing Guidelines
 
-1. **Code Style**: Follow Go conventions and run `gofmt`
-2. **Testing**: Write comprehensive unit and integration tests
+1. **Code Style**: Use `make fmt` and `make lint` before committing
+2. **Testing**: Run `make test-comprehensive` to ensure all tests pass
 3. **Documentation**: Update relevant documentation for new features
-4. **Performance**: Consider performance implications, especially for spectating features
-5. **Security**: Follow security best practices for SSH and authentication
+4. **Performance**: Use `make benchmark` to test performance implications
+5. **Security**: Run `make vuln` to check for security vulnerabilities
+6. **Quality**: Use `make verify` to run all quality checks
 
 ## 📊 Performance Characteristics
 

@@ -27,6 +27,7 @@
 - added messages when session or game servers it at capacity 
 
 ## Medium Tasks 🟡
+- add intialization functions to loop-fail gracefully if not all componetns are up: database connections, auth service, game service, user
 - implment whitelist/blacklist options for incoming connections
 - User Service implementation (partial - service layer exists, needs HTTP handlers)
 - Implement configuration limits for number of connections to ssh for resource constrained systems (number of connections and games allowed per server)
@@ -51,12 +52,14 @@
 - add a admin account flag to user profile.
 - add `hidden` admin menu for ssh native administation: account management, update and hot reloading configs (if not in k8s)
 - look into adding a status webpage
-- break out `internal/session/ssh.go` into smaller files
-- allow users to share a save file( or game config? need to see how seeds are generated). make it an option
+- Session.simplify: break out `internal/session/ssh.go` into smaller files
+- game.save: allow users to share a save file( or game config? need to see how seeds are generated). make it an option
+- Session.spectating: migrate to a simple pub-sub model between game and session.
+- Session.spectating: when a user stops playing, the spectators should return to lobby
 
 ## Hard Tasks 🔴
 
-- Auth Service implementation (currently stub with health endpoint only); need to seperate auth and session functions
+- time for a hard issue from the TODOs. Auth Service implementation (currently stub with health endpoint only). It looks like alot of functions are intermigled with session (like in ssh.go) and need to be decoupled. 
 - Game Service implementation (currently stub with health endpoint only)
 - Stream encryption implementation (currently stub returning unencrypted data)
 - Namespace isolation implementation (Linux syscalls and container integration)
