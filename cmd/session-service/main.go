@@ -69,7 +69,7 @@ func main() {
 	userConfig := &config.UserServiceConfig{
 		Database: cfg.Database,
 	}
-	userService, err := user.NewService(db, userConfig)
+	userService, err := user.NewService(db, userConfig, cfg)
 	if err != nil {
 		log.Fatalf("Failed to initialize user service: %v", err)
 	}

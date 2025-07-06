@@ -23,6 +23,7 @@ type SessionServiceConfig struct {
 	Metrics           *MetricsConfig           `yaml:"metrics"`
 	Health            *HealthConfig            `yaml:"health"`
 	Security          *SecurityConfig          `yaml:"security"`
+	User              *UserConfig              `yaml:"user"`
 	Games             []*GameConfig            `yaml:"games"`
 }
 

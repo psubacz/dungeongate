@@ -490,7 +490,7 @@ The session service provides comprehensive metrics:
 
 ## 📝 License
 
-GNU GENERAL PUBLIC LICENSE, Version 3, 29 June 2007
+DungeonGate is released under the [GNU GENERAL PUBLIC LICENSE](LICENSE).
 
 ## 🙏 Acknowledgments
 
@@ -498,3 +498,11 @@ GNU GENERAL PUBLIC LICENSE, Version 3, 29 June 2007
 - **Modern Go ecosystem** for excellent tooling and libraries
 - **Claude AI** for development assistance and architectural guidance
 - **SSH and terminal gaming community** for inspiration and requirements
+
+## About the Author
+
+DungeonGate is developed and maintained by Peter Subacz. Feel free to reach out to me with any questions or feedback you may have.
+
+I developed this as a learning project after getting rained out of a few to many summer days with claude. I liked to play nethack in college, despite being bad at it. I just kept going as I learned more about golang and various tips and tricks of software development (like ring buffers, object pools, worker pools, encryption, containers, kubernetes). Now we have an entirely over-engineered piece of software to play terminal games.
+
+![simpsons-i-think-are-neat](https://i.pinimg.com/originals/64/10/fc/6410fce49e0e0dedba1b3b71d71bee69.gif)

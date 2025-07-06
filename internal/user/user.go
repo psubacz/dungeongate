@@ -107,14 +107,16 @@ type ValidationError struct {
 // Enhanced Service with flexible database configuration
 type Service struct {
 	db     *database.Connection
-	config *config.UserServiceConfig
+	config        *config.UserServiceConfig
+	sessionConfig *config.SessionServiceConfig
 }
 
 // NewService creates a new user service with enhanced configuration
-func NewService(db *database.Connection, cfg *config.UserServiceConfig) (*Service, error) {
+func NewService(db *database.Connection, cfg *config.UserServiceConfig, sessionCfg *config.SessionServiceConfig) (*Service, error) {
 	service := &Service{
 		db:     db,
-		config: cfg,
+		config:        cfg,
+		sessionConfig: sessionCfg,
 	}
 
 	// Initialize database schema
@@ -404,7 +406,7 @@ func verifyPassword(password, saltHex, hashHex string) bool {
 	return subtle.ConstantTimeCompare(hash, providedHash) == 1
 }
 
-// AuthenticateUser authenticates a user
+// AuthenticateUser authenticates a user with enhanced error handling and attempt tracking
 func (s *Service) AuthenticateUser(ctx context.Context, username, password string) (*User, error) {
 	query := `
 		SELECT id, username, email, password_hash, salt, environment, flags,
@@ -426,7 +428,7 @@ func (s *Service) AuthenticateUser(ctx context.Context, username, password strin
 
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("user not found")
+			return nil, fmt.Errorf("username_not_found")
 		}
 		return nil, fmt.Errorf("failed to query user: %w", err)
 	}
@@ -439,9 +441,25 @@ func (s *Service) AuthenticateUser(ctx context.Context, username, password strin
 		user.LockedUntil = &lockedUntil.Time
 	}
 
+	// Check if account is locked
+	if user.AccountLocked && user.LockedUntil != nil && time.Now().Before(*user.LockedUntil) {
+		return nil, fmt.Errorf("account_locked")
+	}
+
 	// Verify password
 	if !verifyPassword(password, user.Salt, user.PasswordHash) {
-		return nil, fmt.Errorf("invalid password")
+		// Increment failed login attempts
+		if err := s.incrementFailedLoginAttempts(ctx, user.ID); err != nil {
+			// Log error but don't expose it to user
+			fmt.Printf("Error incrementing failed login attempts: %v\n", err)
+		}
+		return nil, fmt.Errorf("invalid_password")
+	}
+
+	// Password is correct - reset failed attempts and unlock account if needed
+	if err := s.resetFailedLoginAttempts(ctx, user.ID); err != nil {
+		// Log error but don't fail authentication
+		fmt.Printf("Error resetting failed login attempts: %v\n", err)
 	}
 
 	// Update last login
@@ -456,7 +474,6 @@ func (s *Service) updateLastLogin(ctx context.Context, userID int) error {
 		UPDATE users 
 		SET last_login = CURRENT_TIMESTAMP, 
 			login_count = login_count + 1,
-			failed_login_attempts = 0
 		WHERE id = ?
 	`
 	_, err := s.db.ExecContext(ctx, query, userID)

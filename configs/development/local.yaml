@@ -165,6 +165,14 @@ services:
   user_service: "localhost:9091"
   game_service: "localhost:9092"
 
+# User service configuration
+user:
+  login_attempts:
+    max_attempts: 3
+    lock_duration: "15m"
+    reset_window: "1h"
+    progressive: true
+
 storage:
   ttyrec_path: "/Users/caboose/Desktop/dungeongate/ttyrec"
   temp_path: "/Users/caboose/Desktop/dungeongate/tmp"
