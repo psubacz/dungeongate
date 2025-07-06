@@ -72,13 +72,23 @@ type StreamManager struct {
 	frameChannel chan *StreamFrame
 	stopChan     chan struct{}
 	wg           sync.WaitGroup
+
+	// Circular buffer for recent frames
+	recentFrames     []*StreamFrame
+	recentFramesLock sync.RWMutex
+	bufferSize       int
+	bufferIndex      int
 }
 
 // NewStreamManager creates a new stream manager for a session
 func NewStreamManager() *StreamManager {
+	const defaultBufferSize = 20 // Keep last 20 frames
 	return &StreamManager{
 		frameChannel: make(chan *StreamFrame, 1000), // Buffered channel for frames
 		stopChan:     make(chan struct{}),
+		bufferSize:   defaultBufferSize,
+		recentFrames: make([]*StreamFrame, defaultBufferSize),
+		bufferIndex:  0,
 	}
 }
 
@@ -128,6 +138,12 @@ func (sm *StreamManager) streamLoop(registry *atomic.Pointer[SpectatorRegistry])
 
 // distributeFrame sends a frame to all active spectators
 func (sm *StreamManager) distributeFrame(frame *StreamFrame, registry *atomic.Pointer[SpectatorRegistry]) {
+	// Store frame in circular buffer
+	sm.recentFramesLock.Lock()
+	sm.recentFrames[sm.bufferIndex] = frame
+	sm.bufferIndex = (sm.bufferIndex + 1) % sm.bufferSize
+	sm.recentFramesLock.Unlock()
+
 	// Load current immutable registry
 	currentRegistry := registry.Load()
 	if currentRegistry == nil {
@@ -148,6 +164,26 @@ func (sm *StreamManager) distributeFrame(frame *StreamFrame, registry *atomic.Po
 			}(spectator, frame)
 		}
 	}
+}
+
+// GetRecentFrames returns the recent frames from the circular buffer
+func (sm *StreamManager) GetRecentFrames() []*StreamFrame {
+	sm.recentFramesLock.RLock()
+	defer sm.recentFramesLock.RUnlock()
+
+	// Collect non-nil frames in order
+	frames := make([]*StreamFrame, 0, sm.bufferSize)
+
+	// Start from the oldest frame position
+	startIdx := sm.bufferIndex
+	for i := 0; i < sm.bufferSize; i++ {
+		idx := (startIdx + i) % sm.bufferSize
+		if sm.recentFrames[idx] != nil {
+			frames = append(frames, sm.recentFrames[idx])
+		}
+	}
+
+	return frames
 }
 
 // StreamFrame represents an immutable frame of terminal data
@@ -277,7 +313,15 @@ func (c *SSHSpectatorConnection) Write(frame *StreamFrame) error {
 	}
 
 	// Write immutable frame data directly
-	_, err := c.SessionCtx.Channel.Write(frame.Data)
+	n, err := c.SessionCtx.Channel.Write(frame.Data)
+	if err == nil && n > 0 {
+		// Debug: log first few bytes to see what's being sent
+		preview := frame.Data
+		if len(preview) > 50 {
+			preview = preview[:50]
+		}
+		log.Printf("Spectator %s: wrote %d bytes (preview: %q...)", c.SessionCtx.Username, n, preview)
+	}
 	return err
 }
 
@@ -353,7 +397,6 @@ func (c *WebSocketSpectatorConnection) IsConnected() bool {
 
 // Request/Response structures
 
-
 // CreateUserRequest represents a user creation request
 type CreateUserRequest struct {
 	Username string `json:"username"`
@@ -427,7 +470,6 @@ type ServiceMetrics struct {
 }
 
 // Service interfaces
-
 
 // UserServiceClient interface for user service
 type UserServiceClient interface {
@@ -777,7 +819,6 @@ func (l *SimpleLogger) Error(msg string, fields ...interface{}) {
 
 // Validation functions
 
-
 // ValidateCreateUserRequest validates a create user request
 func ValidateCreateUserRequest(req *CreateUserRequest) []*ValidationError {
 	var errors []*ValidationError
@@ -893,4 +934,3 @@ func VerifyPassword(password, hash string) bool {
 	// This would use bcrypt in a real implementation
 	return hash == fmt.Sprintf("hashed_%s", password)
 }
-

@@ -11,13 +11,16 @@
 
 **A SSH-based gateway to terminal gaming adventures written in Go**
 
-DungeonGate is a over-engineered microservices-based platform inspired by [dgamelaunch](https://github.com/paxed/dgamelaunch) for hosting terminal games like NetHack.
+DungeonGate is a over-engineered microservices-based middleware inspired by [dgamelaunch](https://github.com/paxed/dgamelaunch) for hosting terminal games like NetHack. This software fronts terminal games with a network ssh front end that users can login to play or spectate games in progress.
+
+Supported games
+- NetHack
 
 ## 🚀 Quick Start
 
 ### 1. Run with Make (Easiest)
 
-- review the config options in `configs/development/local.yaml` and make changes to your liking. You can find more information about the options in `docs/CONFIG.md`. the `local.yaml` defualts to a local sqlite database and requires nethack to be installed locally
+- Review the config options in `configs/development/local.yaml` and make changes to your liking. You can find more information about the options in `docs/CONFIG.md`. The `local.yaml` defaults to a local sqlite database and requires nethack to be installed locally.
 
 ```bash
 make test-run
@@ -28,7 +31,7 @@ This will:
 - Copy the development config to `/tmp/dungeongate-session-service.yaml`
 - Start the SSH server on port 2222
 
-> Note: If you have ran DungeonGate previous or changed the host key, you will need to remove it from your known hosts file 
+> Note: If you have ran DungeonGate previous or changed the host key, you will need to remove it from your known hosts file.
 
 ### 2. Connect via SSH
 
@@ -184,11 +187,13 @@ go install github.com/air-verse/air@latest
 
 DungeonGate uses a microservices architecture with the following services:
 
-- **Session Service** ✅ - Handles SSH connections, PTY management, and user sessions
-- **User Service** ✅ - Manages user registration, authentication, and profiles  
-- **Auth Service** 🔄 - Authentication, authorization, automated password reset, misc admin functions (planned)
-- **Game Service** 📋 - Game management, loading, saving, and configuration (planned)
-- **Log Service** 📋 - Genernal Logging for tracing and debugging
+- **Session Service** - Handles SSH connections, PTY management, and user sessions
+- **User Service** - Manages user registration, authentication, and profiles  
+- **Auth Service** - Authentication, authorization, automated password reset, misc admin functions (planned)
+- **Game Service** - Game management, loading, saving, and configuration (planned)
+- **Log Service** - Genernal Logging for tracing and debugging
+
+These decoupled services are deployed 
 
 ## 📁 Project Structure
 

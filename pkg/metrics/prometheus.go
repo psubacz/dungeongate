@@ -21,15 +21,15 @@ type SSHMetrics struct {
 	SessionBytesWrite prometheus.Counter
 
 	// Authentication metrics
-	AuthAttemptsTotal  *prometheus.CounterVec
-	AuthFailuresTotal  *prometheus.CounterVec
-	AuthDuration       prometheus.Histogram
+	AuthAttemptsTotal *prometheus.CounterVec
+	AuthFailuresTotal *prometheus.CounterVec
+	AuthDuration      prometheus.Histogram
 
 	// Game metrics
-	GamesStartedTotal  *prometheus.CounterVec
-	GamesActive        *prometheus.GaugeVec
-	GameDuration       *prometheus.HistogramVec
-	GameSessionErrors  *prometheus.CounterVec
+	GamesStartedTotal *prometheus.CounterVec
+	GamesActive       *prometheus.GaugeVec
+	GameDuration      *prometheus.HistogramVec
+	GameSessionErrors *prometheus.CounterVec
 
 	// Terminal metrics
 	TerminalSizeChanges prometheus.Counter
@@ -170,9 +170,9 @@ type ServiceMetrics struct {
 	StartTime prometheus.Gauge
 
 	// HTTP metrics
-	HTTPRequestsTotal    *prometheus.CounterVec
-	HTTPRequestDuration  *prometheus.HistogramVec
-	HTTPResponseSize     *prometheus.HistogramVec
+	HTTPRequestsTotal   *prometheus.CounterVec
+	HTTPRequestDuration *prometheus.HistogramVec
+	HTTPResponseSize    *prometheus.HistogramVec
 
 	// Database metrics
 	DBConnectionsActive prometheus.Gauge

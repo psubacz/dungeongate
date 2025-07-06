@@ -49,8 +49,8 @@ type SSHServer struct {
 	connectionsMux sync.RWMutex
 
 	// Metrics
-	metrics      *SSHMetrics
-	promMetrics  *metrics.SSHMetrics
+	metrics     *SSHMetrics
+	promMetrics *metrics.SSHMetrics
 }
 
 // SSHConnection represents an active SSH connection
@@ -255,7 +255,7 @@ func (s *SSHServer) handleConnection(ctx context.Context, netConn net.Conn) {
 		s.metrics.mutex.Lock()
 		s.metrics.ActiveConnections--
 		s.metrics.mutex.Unlock()
-		
+
 		// Update Prometheus metrics
 		s.promMetrics.ConnectionsActive.Dec()
 		s.promMetrics.ConnectionDuration.Observe(time.Since(connectionStart).Seconds())
@@ -268,7 +268,7 @@ func (s *SSHServer) handleConnection(ctx context.Context, netConn net.Conn) {
 		s.metrics.mutex.Lock()
 		s.metrics.FailedConnections++
 		s.metrics.mutex.Unlock()
-		
+
 		// Update Prometheus metrics
 		s.promMetrics.ConnectionsFailed.Inc()
 		return
@@ -369,7 +369,7 @@ func (s *SSHServer) handleChannel(ctx context.Context, newChannel ssh.NewChannel
 		s.metrics.mutex.Lock()
 		s.metrics.ActiveSessions--
 		s.metrics.mutex.Unlock()
-		
+
 		// Update Prometheus metrics
 		s.promMetrics.SessionsActive.Dec()
 		s.promMetrics.SessionDuration.Observe(time.Since(sessionStart).Seconds())
@@ -431,7 +431,7 @@ func (s *SSHServer) handlePTYRequest(sessionCtx *SSHSessionContext, req *ssh.Req
 	}
 
 	sessionCtx.TerminalType = string(req.Payload[4 : 4+termLen])
-	
+
 	// Track terminal type
 	s.promMetrics.TerminalTypes.WithLabelValues(sessionCtx.TerminalType).Inc()
 
@@ -486,7 +486,7 @@ func (s *SSHServer) handleWindowChangeRequest(sessionCtx *SSHSessionContext, req
 		sessionCtx.WindowSize.Height = uint16(req.Payload[2])<<8 | uint16(req.Payload[3])
 		sessionCtx.WindowSize.X = sessionCtx.WindowSize.Width
 		sessionCtx.WindowSize.Y = sessionCtx.WindowSize.Height
-		
+
 		// Track terminal size change
 		s.promMetrics.TerminalSizeChanges.Inc()
 
@@ -1081,7 +1081,7 @@ func (s *SSHServer) handleLogin(ctx context.Context, sessionCtx *SSHSessionConte
 	// Track authentication attempt
 	authStart := time.Now()
 	s.promMetrics.AuthAttemptsTotal.WithLabelValues("password", username).Inc()
-	
+
 	// REPLACE THIS: Direct call to user service instead of auth client
 	if s.sessionService.userService != nil {
 		authenticatedUser, err := s.sessionService.userService.AuthenticateUser(ctx, username, password)
@@ -1112,7 +1112,7 @@ func (s *SSHServer) handleLogin(ctx context.Context, sessionCtx *SSHSessionConte
 			}(),
 		}
 		sessionCtx.Username = authenticatedUser.Username
-		
+
 		// Track successful authentication
 		s.promMetrics.AuthDuration.Observe(time.Since(authStart).Seconds())
 
@@ -1405,9 +1405,19 @@ func (s *SSHServer) handlePlayGame(ctx context.Context, sessionCtx *SSHSessionCo
 	s.writeToSession(sessionCtx, fmt.Sprintf("Starting %s...\r\n", selectedGame.Name))
 
 	// Create game session
+	var userID int
+	var username string
+	if sessionCtx.IsAuthenticated && sessionCtx.AuthenticatedUser != nil {
+		userID = sessionCtx.AuthenticatedUser.ID
+		username = sessionCtx.AuthenticatedUser.Username
+	} else {
+		userID = 0                     // Anonymous user
+		username = sessionCtx.Username // Use the session username
+	}
+
 	gameSession, err := s.sessionService.CreateSession(ctx, &CreateSessionRequest{
-		UserID:       sessionCtx.AuthenticatedUser.ID,
-		Username:     sessionCtx.AuthenticatedUser.Username,
+		UserID:       userID,
+		Username:     username,
 		GameID:       selectedGame.ID,
 		TerminalSize: fmt.Sprintf("%dx%d", sessionCtx.WindowSize.Width, sessionCtx.WindowSize.Height),
 		Encoding:     "utf-8",
@@ -1441,7 +1451,7 @@ func (s *SSHServer) startGameInPTY(ctx context.Context, sessionCtx *SSHSessionCo
 	gameStart := time.Now()
 	s.promMetrics.GamesStartedTotal.WithLabelValues(game.ID, game.Name).Inc()
 	s.promMetrics.GamesActive.WithLabelValues(game.ID, game.Name).Inc()
-	
+
 	// Allocate PTY
 	ptySession, err := s.ptyManager.AllocatePTY(sessionCtx.SessionID, sessionCtx.Username, game.ID, *sessionCtx.WindowSize)
 	if err != nil {
@@ -1461,7 +1471,7 @@ func (s *SSHServer) startGameInPTY(ctx context.Context, sessionCtx *SSHSessionCo
 		s.promMetrics.GamesActive.WithLabelValues(game.ID, game.Name).Dec()
 		return fmt.Errorf("failed to start game: %w", err)
 	}
-	
+
 	// Set up cleanup for when game ends
 	defer func() {
 		s.promMetrics.GamesActive.WithLabelValues(game.ID, game.Name).Dec()
@@ -1840,11 +1850,6 @@ func (s *SSHServer) startSpectating(ctx context.Context, sessionCtx *SSHSessionC
 		return true
 	}
 
-	// Start spectating
-	s.clearScreen(sessionCtx)
-	s.writeToSession(sessionCtx, fmt.Sprintf("Now spectating %s's game of %s...\r\n", selectedSession.Username, selectedSession.GameID))
-	s.writeToSession(sessionCtx, "Press Ctrl+C to stop spectating.\r\n\r\n")
-
 	// Run spectating loop
 	return s.runSpectatorSession(ctx, sessionCtx, selectedSession.ID, userID)
 }
@@ -1853,6 +1858,11 @@ func (s *SSHServer) startSpectating(ctx context.Context, sessionCtx *SSHSessionC
 func (s *SSHServer) runSpectatorSession(ctx context.Context, sessionCtx *SSHSessionContext, gameSessionID string, userID int) bool {
 	// Create a channel to handle user input for exiting
 	exitChan := make(chan struct{})
+
+	// Initialize terminal for spectating
+	// Clear screen and set up terminal properly
+	s.writeToSession(sessionCtx, "\033[2J\033[H") // Clear screen and home cursor
+	s.writeToSession(sessionCtx, "\033[?1049h")   // Switch to alternate screen buffer (like vim/less)
 
 	// Start goroutine to handle user input (Ctrl+C to exit)
 	go func() {
@@ -1864,14 +1874,21 @@ func (s *SSHServer) runSpectatorSession(ctx context.Context, sessionCtx *SSHSess
 			default:
 				n, err := sessionCtx.Channel.Read(buffer)
 				if err != nil {
-					close(exitChan)
+					log.Printf("Spectator input read error for user %d: %v", userID, err)
+					select {
+					case exitChan <- struct{}{}:
+					default:
+					}
 					return
 				}
 
-				if n > 0 {
+				if n > 0 && n <= len(buffer) {
 					char := buffer[0]
 					if char == 3 { // Ctrl+C
-						close(exitChan)
+						select {
+						case exitChan <- struct{}{}:
+						default:
+						}
 						return
 					}
 					// Ignore other input while spectating
@@ -1880,17 +1897,44 @@ func (s *SSHServer) runSpectatorSession(ctx context.Context, sessionCtx *SSHSess
 		}
 	}()
 
+	// Note: The actual game data is being written directly to sessionCtx.Channel
+	// by the SSHSpectatorConnection.Write() method, so we just need to wait
+	// for the user to exit
+
 	// Wait for exit signal or context cancellation
+	var exitReason string
 	select {
 	case <-exitChan:
-		s.writeToSession(sessionCtx, "\r\nExiting spectator mode...\r\n")
+		exitReason = "user_exit"
+		// Restore terminal state
+		s.writeToSession(sessionCtx, "\033[?1049l")   // Switch back from alternate screen buffer
+		s.writeToSession(sessionCtx, "\033[2J\033[H") // Clear screen
+		s.writeToSession(sessionCtx, "Exiting spectator mode...\r\n")
 	case <-ctx.Done():
-		s.writeToSession(sessionCtx, "\r\nConnection terminated.\r\n")
+		exitReason = "context_cancelled"
+		// Restore terminal state
+		s.writeToSession(sessionCtx, "\033[?1049l")   // Switch back from alternate screen buffer
+		s.writeToSession(sessionCtx, "\033[2J\033[H") // Clear screen
+		s.writeToSession(sessionCtx, "Connection terminated.\r\n")
 	}
 
-	// Remove spectator from session
-	if err := s.sessionService.RemoveSpectator(ctx, gameSessionID, userID); err != nil {
-		log.Printf("Failed to remove spectator %d from session %s: %v", userID, gameSessionID, err)
+	// Always attempt to remove spectator with retry logic
+	const maxCleanupRetries = 3
+	var cleanupErr error
+	for i := 0; i < maxCleanupRetries; i++ {
+		cleanupErr = s.sessionService.RemoveSpectator(ctx, gameSessionID, userID)
+		if cleanupErr == nil {
+			log.Printf("Successfully removed spectator %d from session %s (exit reason: %s)", userID, gameSessionID, exitReason)
+			break
+		}
+		log.Printf("Failed to remove spectator %d from session %s (attempt %d/%d): %v", userID, gameSessionID, i+1, maxCleanupRetries, cleanupErr)
+		if i < maxCleanupRetries-1 {
+			time.Sleep(time.Duration(100*(i+1)) * time.Millisecond)
+		}
+	}
+
+	if cleanupErr != nil {
+		log.Printf("CRITICAL: Failed to remove spectator %d from session %s after %d attempts: %v", userID, gameSessionID, maxCleanupRetries, cleanupErr)
 	}
 
 	s.writeToSession(sessionCtx, "Press any key to continue...")
@@ -2074,9 +2118,11 @@ func (s *SSHServer) handleBanner(conn ssh.ConnMetadata) string {
 
 // loadOrGenerateHostKey loads or generates SSH host key
 func (s *SSHServer) loadOrGenerateHostKey() (ssh.Signer, error) {
-	keyPath := "/etc/ssh/ssh_host_rsa_key"
-	if s.config != nil && s.config.SSH != nil && s.config.SSH.HostKeyPath != "" {
-		keyPath = s.config.SSH.HostKeyPath
+	// Use configured path, which already has a default value from config
+	keyPath := s.config.SSH.HostKeyPath
+	if keyPath == "" {
+		// This should never happen as config provides defaults, but just in case
+		keyPath = "./ssh_host_rsa_key"
 	}
 
 	// Try to load existing key
@@ -2320,9 +2366,19 @@ func (s *SSHServer) startNetHackWithSave(ctx context.Context, sessionCtx *SSHSes
 	}
 
 	// Create game session
+	var userID int
+	var username string
+	if sessionCtx.IsAuthenticated && sessionCtx.AuthenticatedUser != nil {
+		userID = sessionCtx.AuthenticatedUser.ID
+		username = sessionCtx.AuthenticatedUser.Username
+	} else {
+		userID = 0                     // Anonymous user
+		username = sessionCtx.Username // Use the session username
+	}
+
 	gameSession, err := s.sessionService.CreateSession(ctx, &CreateSessionRequest{
-		UserID:       sessionCtx.AuthenticatedUser.ID,
-		Username:     sessionCtx.AuthenticatedUser.Username,
+		UserID:       userID,
+		Username:     username,
 		GameID:       gameWithSave.ID,
 		TerminalSize: fmt.Sprintf("%dx%d", sessionCtx.WindowSize.Width, sessionCtx.WindowSize.Height),
 		Encoding:     "utf-8",

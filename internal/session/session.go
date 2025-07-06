@@ -13,8 +13,8 @@ import (
 	"github.com/dungeongate/pkg/config"
 	"github.com/dungeongate/pkg/database"
 	"github.com/dungeongate/pkg/encryption"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/dungeongate/pkg/ttyrec"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 // Service handles session management operations
@@ -63,7 +63,7 @@ func (s *Service) CreateSession(ctx context.Context, req *CreateSessionRequest) 
 		TerminalSize:  req.TerminalSize,
 		Encoding:      req.Encoding,
 		LastActivity:  time.Now(),
-		StreamEnabled: s.config.Encryption.Enabled,
+		StreamEnabled: true, // Always enable streaming for spectators
 		Encrypted:     s.config.Encryption.Enabled,
 		Spectators:    make([]*Spectator, 0), // Legacy field for JSON serialization
 		Registry:      registry,              // Immutable spectator registry
@@ -88,6 +88,7 @@ func (s *Service) CreateSession(ctx context.Context, req *CreateSessionRequest) 
 	s.sessionsMux.Unlock()
 
 	log.Printf("Created session %s for user %s playing %s", sessionID, req.Username, req.GameID)
+	log.Printf("Total active sessions: %d", len(s.sessions))
 
 	// TODO: Store session in database
 	// TODO: Set up session monitoring
@@ -118,6 +119,7 @@ func (s *Service) GetActiveSessions(ctx context.Context) ([]*Session, error) {
 	s.sessionsMux.RLock()
 	defer s.sessionsMux.RUnlock()
 
+	log.Printf("GetActiveSessions: Total sessions in registry: %d", len(s.sessions))
 	var activeSessions []*Session
 
 	// Iterate through all sessions and collect active ones
@@ -274,7 +276,8 @@ func (s *Service) AddSpectatorWithConnection(ctx context.Context, sessionID stri
 	}
 
 	// Atomically update spectator registry (immutable pattern)
-	for {
+	const maxRetries = 10
+	for retry := 0; retry < maxRetries; retry++ {
 		oldRegistry := session.Registry.Load()
 		newRegistry := oldRegistry.AddSpectator(spectator)
 
@@ -286,10 +289,40 @@ func (s *Service) AddSpectatorWithConnection(ctx context.Context, sessionID stri
 			// Update legacy field for JSON serialization
 			session.Spectators = newRegistry.GetSpectators()
 
+			// Send recent frames to the new spectator
+			if session.StreamManager != nil {
+				recentFrames := session.StreamManager.GetRecentFrames()
+				if len(recentFrames) > 0 {
+					log.Printf("Sending %d recent frames to new spectator %s", len(recentFrames), username)
+					go func() {
+						// Small delay to ensure spectator is ready
+						time.Sleep(100 * time.Millisecond)
+
+						// Send each frame with a small delay to avoid overwhelming
+						for i, frame := range recentFrames {
+							if spectator.Connection != nil && spectator.Connection.IsConnected() {
+								if err := spectator.Connection.Write(frame); err != nil {
+									log.Printf("Failed to send historical frame %d to spectator %s: %v", i, username, err)
+									break
+								}
+								// Small delay between frames to ensure proper rendering
+								time.Sleep(10 * time.Millisecond)
+							}
+						}
+						log.Printf("Finished sending historical frames to spectator %s", username)
+					}()
+				}
+			}
+
 			return nil
 		}
-		// If swap failed, another goroutine updated the registry, retry
+		// If swap failed, another goroutine updated the registry, retry with exponential backoff
+		if retry < maxRetries-1 {
+			time.Sleep(time.Duration(1<<uint(retry)) * time.Millisecond)
+		}
 	}
+
+	return fmt.Errorf("failed to add spectator after %d retries due to high contention", maxRetries)
 }
 
 // RemoveSpectator removes a spectator from a session using immutable data sharing
@@ -388,6 +421,13 @@ func (s *Service) WriteToSession(ctx context.Context, sessionID string, data []b
 	// Broadcast to spectators using immutable stream frames
 	if session.StreamManager != nil && session.StreamEnabled {
 		session.StreamManager.SendFrame(dataToStream)
+		// Debug logging for spectator broadcasting
+		if currentRegistry := session.Registry.Load(); currentRegistry != nil {
+			spectatorCount := len(currentRegistry.GetSpectators())
+			if spectatorCount > 0 {
+				log.Printf("Broadcasting %d bytes to %d spectators for session %s", len(dataToStream), spectatorCount, sessionID)
+			}
+		}
 	}
 
 	return nil
