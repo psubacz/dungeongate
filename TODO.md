@@ -15,15 +15,16 @@
 - update watch menu to look better
 - login failure. notify user that user name doest exist
 - login failure. notify user that password is incorrect
+- login failure. Increase login attempts when failure to login to a max of 3, make it a configurable number
 - edit message when exiting that game was saved and display the hash of the save
-- Increase login attempts when failure to login
 - Look into inactivity time and automatic logout
-- Stream gameplay clear buffers once user exits, only need live game play
-- Stream game windows for game messages
+- Spectating. We only want to view live stream gameplay. once a user stops playing, clear buffers and remove from menus
+- Spectating. windows for the game stream and game messages. window for 
 - Logging to file, template in `pkg/log/log.go`
 - Logging implementation
 - Add TCP socket tuning (TCP_NODELAY, SO_RCVBUF, SO_SNDBUF) for SSH connections
 - Replace string concatenation with strings.Builder in query detection (database.go:431-458)
+- added messages when session or game servers it at capacity 
 
 ## Medium Tasks 🟡
 - implment whitelist/blacklist options for incoming connections
@@ -51,10 +52,11 @@
 - add `hidden` admin menu for ssh native administation: account management, update and hot reloading configs (if not in k8s)
 - look into adding a status webpage
 - break out `internal/session/ssh.go` into smaller files
+- allow users to share a save file( or game config? need to see how seeds are generated). make it an option
 
 ## Hard Tasks 🔴
 
-- Auth Service implementation (currently stub with health endpoint only)
+- Auth Service implementation (currently stub with health endpoint only); need to seperate auth and session functions
 - Game Service implementation (currently stub with health endpoint only)
 - Stream encryption implementation (currently stub returning unencrypted data)
 - Namespace isolation implementation (Linux syscalls and container integration)
