@@ -1491,11 +1491,14 @@ func (s *SSHServer) startGameInPTY(ctx context.Context, sessionCtx *SSHSessionCo
 
 	sessionCtx.ptySession = ptySession
 
+	// Apply game-specific environment variables
+	s.applyGameEnvironment(ptySession, game, sessionCtx)
+
 	// Build game command
 	command, args := s.buildGameCommand(game, sessionCtx)
 
 	// Start game process
-	if err := ptySession.StartCommand(command, args); err != nil {
+	if err := ptySession.StartCommandWithDir(command, args, game.WorkingDir); err != nil {
 		_ = s.ptyManager.ReleasePTY(sessionCtx.SessionID)
 		s.promMetrics.GameSessionErrors.WithLabelValues(game.ID, "start_failed").Inc()
 		s.promMetrics.GamesActive.WithLabelValues(game.ID, game.Name).Dec()
@@ -1564,6 +1567,18 @@ func (s *SSHServer) buildGameCommand(game *Game, sessionCtx *SSHSessionContext) 
 	default:
 		// Default to a simple shell
 		return "/bin/bash", []string{"-c", fmt.Sprintf("echo 'Welcome to %s!'; /bin/bash", game.Name)}
+	}
+}
+
+// applyGameEnvironment applies game-specific environment variables to the PTY session
+func (s *SSHServer) applyGameEnvironment(ptySession *PTYSession, game *Game, sessionCtx *SSHSessionContext) {
+	if game.Environment != nil {
+		for key, value := range game.Environment {
+			// Replace template variables
+			value = strings.ReplaceAll(value, "${USERNAME}", sessionCtx.Username)
+			value = strings.ReplaceAll(value, "${USER}", sessionCtx.Username)
+			ptySession.Environment[key] = value
+		}
 	}
 }
 

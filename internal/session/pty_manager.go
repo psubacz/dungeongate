@@ -226,6 +226,57 @@ func (ps *PTYSession) StartCommand(command string, args []string) error {
 	return nil
 }
 
+// StartCommandWithDir starts a command in the PTY session with a specific working directory
+func (ps *PTYSession) StartCommandWithDir(command string, args []string, workingDir string) error {
+	ps.mutex.Lock()
+	defer ps.mutex.Unlock()
+
+	if ps.Command != nil {
+		return fmt.Errorf("command already running in PTY session %s", ps.SessionID)
+	}
+
+	// Create command
+	cmd := exec.Command(command, args...)
+
+	// Set working directory if provided
+	if workingDir != "" {
+		cmd.Dir = workingDir
+	}
+
+	// Set up environment
+	env := os.Environ()
+	for key, value := range ps.Environment {
+		env = append(env, fmt.Sprintf("%s=%s", key, value))
+	}
+	cmd.Env = env
+
+	// Set up process group
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		Setsid:  true,
+		Setctty: true,
+	}
+
+	// Connect to PTY
+	cmd.Stdin = ps.TTY
+	cmd.Stdout = ps.TTY
+	cmd.Stderr = ps.TTY
+
+	// Start command
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("failed to start command: %w", err)
+	}
+
+	ps.Command = cmd
+	ps.ProcessPID = cmd.Process.Pid
+
+	log.Printf("Command started in PTY session %s: %s (PID: %d) in directory: %s", ps.SessionID, command, ps.ProcessPID, workingDir)
+
+	// Monitor process
+	go ps.monitorProcess()
+
+	return nil
+}
+
 // monitorProcess monitors the running process
 func (ps *PTYSession) monitorProcess() {
 	if ps.Command == nil {

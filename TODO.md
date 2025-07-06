@@ -52,17 +52,15 @@
 - add a admin account flag to user profile.
 - add `hidden` admin menu for ssh native administation: account management, update and hot reloading configs (if not in k8s)
 - look into adding a status webpage
-- Session.simplify: break out `internal/session/ssh.go` into smaller files
 - game.save: allow users to share a save file( or game config? need to see how seeds are generated). make it an option
 - Session.spectating: migrate to a simple pub-sub model between game and session.
 - Session.spectating: when a user stops playing, the spectators should return to lobby
 
 ## Hard Tasks 🔴
 
-- Game Service implementation (currently stub with health endpoint only). as part of microservice architecture. I want to breakout functionality out of session and into internal/games. lets make this for games running, playing, saving, loading, etc...
+- Game Service implementation (currently stub with health endpoint only). as part of microservice architecture. I want to breakout functionality out of session and into internal/games. lets make this for games running, playing, saving, loading, etc... │ > we do not need to maintance backwards compabitity with previous code as this is a major revision
 - Stream encryption implementation (currently stub returning unencrypted data)
-- Namespace isolation implementation (Linux syscalls and container integration)
-- Game isolation when multiple players are using the
+- Game isolation when multiple players are using the same service
 - Shared game state for nethack "bones" across multiple server/containers of nethack
 - Automated password reset and account recovery (should require an sshkey or email)
 - look into https://alt.org/nethack/ integration?

@@ -1,4 +1,5 @@
 # Development Configuration for DungeonGate Session Service
+# Note. this config is valid of macOS with nethack installed with brew
 version: "0.4.0"
 
 server:
@@ -225,18 +226,18 @@ games:
   - id: "nethack"
     name: "NetHack"
     short_name: "nh"
-    version: "3.7.0"
+    version: "3.6.7"
     enabled: true
     binary:
       path: "/opt/homebrew/bin/nethack"
       args: ["-u", "${USERNAME}"]
-      working_directory: "/opt/homebrew/share/nethack"
+      working_directory: "/opt/homebrew/Cellar/nethack/3.6.7/libexec"
       # user and group not needed for homebrew installation
       permissions: "0755"
     files:
-      data_directory: "/opt/homebrew/share/nethack"
-      save_directory: "/opt/homebrew/share/nethack/save"
-      config_directory: "/opt/homebrew/share/nethack"
+      data_directory: "/opt/homebrew/Cellar/nethack/3.6.7/libexec"
+      save_directory: "/opt/homebrew/Cellar/nethack/3.6.7/libexec/save"
+      config_directory: "/opt/homebrew/Cellar/nethack/3.6.7/libexec"
       log_directory: "/tmp/nethack-logs"
       temp_directory: "/tmp/nethack-temp"
       shared_files: ["nhdat", "license", "recover"]
@@ -268,14 +269,15 @@ games:
         SEDLEVEL: "5"
         DUMPLOG: "1"
         LIVELOG: "1"
-        XLOGFILE: "/opt/homebrew/share/nethack/xlogfile"
-        LIVELOGFILE: "/opt/homebrew/share/nethack/livelog"
+        XLOGFILE: "/opt/homebrew/Cellar/nethack/3.6.7/libexec/xlogfile"
+        LIVELOGFILE: "/opt/homebrew/Cellar/nethack/3.6.7/libexec/livelog"
     environment:
-      NETHACKOPTIONS: "@/opt/homebrew/share/nethack/${USERNAME}.nethackrc"
-      HACKDIR: "/opt/homebrew/share/nethack"
+      NETHACKOPTIONS: "@/opt/homebrew/Cellar/nethack/3.6.7/libexec/${USERNAME}.nethackrc"
+      HACKDIR: "/opt/homebrew/Cellar/nethack/3.6.7/libexec"
+      NETHACKDIR: "/opt/homebrew/Cellar/nethack/3.6.7/libexec"
       TERM: "xterm-256color"
       USER: "${USERNAME}"
-      HOME: "/opt/homebrew/share/nethack/${USERNAME}"
+      HOME: "/opt/homebrew/Cellar/nethack/3.6.7/libexec/${USERNAME}"
       SHELL: "/bin/sh"
     resources:
       cpu_limit: "500m"

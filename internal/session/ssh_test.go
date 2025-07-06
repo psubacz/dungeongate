@@ -748,3 +748,200 @@ func TestSSHEndToEnd(t *testing.T) {
 
 	t.Log("SSH server started successfully")
 }
+
+// TestNetHackLaunch tests that a user can successfully launch NetHack
+func TestNetHackLaunch(t *testing.T) {
+	// Skip if NetHack is not available
+	if _, err := os.Stat("/opt/homebrew/bin/nethack"); os.IsNotExist(err) {
+		t.Skip("NetHack not found at /opt/homebrew/bin/nethack, skipping test")
+	}
+
+	// Create test configuration with NetHack game
+	cfg := createTestConfigWithNetHack()
+
+	// Create mock session service
+	sessionService := &Service{}
+
+	// Create SSH server
+	sshServer, err := NewSSHServer(sessionService, cfg)
+	if err != nil {
+		t.Fatalf("Failed to create SSH server: %v", err)
+	}
+
+	// Use sshServer to avoid unused variable error
+	if sshServer == nil {
+		t.Error("SSH server should not be nil")
+		return
+	}
+
+	// Test that NetHack game configuration is loaded
+	if len(cfg.Games) == 0 {
+		t.Fatal("No games configured")
+	}
+
+	var nethackGame *config.GameConfig
+	for _, game := range cfg.Games {
+		if game.ID == "nethack" {
+			nethackGame = game
+			break
+		}
+	}
+
+	if nethackGame == nil {
+		t.Fatal("NetHack game not found in configuration")
+	}
+
+	// Verify NetHack configuration
+	if nethackGame.Binary.Path != "/opt/homebrew/bin/nethack" {
+		t.Errorf("Expected NetHack binary path '/opt/homebrew/bin/nethack', got '%s'", nethackGame.Binary.Path)
+	}
+
+	if !nethackGame.Enabled {
+		t.Error("NetHack should be enabled")
+	}
+
+	// Test PTY allocation and environment setup
+	ptyManager, err := NewPTYManager()
+	if err != nil {
+		t.Fatalf("Failed to create PTY manager: %v", err)
+	}
+	defer ptyManager.Shutdown()
+
+	windowSize := WindowSize{Width: 80, Height: 24}
+	ptySession, err := ptyManager.AllocatePTY("test-session", "testuser", "nethack", windowSize)
+	if err != nil {
+		t.Fatalf("Failed to allocate PTY: %v", err)
+	}
+
+	// Create a mock SSH session context
+	sessionCtx := &SSHSessionContext{
+		SessionID:  "test-session",
+		Username:   "testuser",
+		WindowSize: &windowSize,
+		ptySession: ptySession,
+	}
+
+	// Test that game environment variables are applied
+	game := &Game{
+		ID:   nethackGame.ID,
+		Name: nethackGame.Name,
+		Environment: map[string]string{
+			"NETHACKOPTIONS": "@/opt/homebrew/share/nethack/${USERNAME}.nethackrc",
+			"HACKDIR":        "/opt/homebrew/share/nethack",
+			"HOME":           "/opt/homebrew/share/nethack/${USERNAME}",
+			"TERM":           "xterm-256color",
+		},
+		Binary: nethackGame.Binary.Path,
+		Args:   []string{"-u", "testuser"}, // Use processed args rather than template
+	}
+
+	// Apply game environment (this is the fix we implemented)
+	sshServer.applyGameEnvironment(ptySession, game, sessionCtx)
+
+	// Verify environment variables were applied correctly
+	expectedVars := map[string]string{
+		"NETHACKOPTIONS": "@/opt/homebrew/share/nethack/testuser.nethackrc",
+		"HACKDIR":        "/opt/homebrew/share/nethack",
+		"HOME":           "/opt/homebrew/share/nethack/testuser",
+		"TERM":           "xterm-256color",
+	}
+
+	for key, expectedValue := range expectedVars {
+		if actualValue, exists := ptySession.Environment[key]; !exists {
+			t.Errorf("Environment variable %s not set", key)
+		} else if actualValue != expectedValue {
+			t.Errorf("Environment variable %s: expected '%s', got '%s'", key, expectedValue, actualValue)
+		}
+	}
+
+	// Test command building
+	command, args := sshServer.buildGameCommand(game, sessionCtx)
+	
+	if command != "/opt/homebrew/bin/nethack" {
+		t.Errorf("Expected command '/opt/homebrew/bin/nethack', got '%s'", command)
+	}
+
+	// Debug: Print the actual args
+	t.Logf("Command args: %v", args)
+
+	// Check that username is properly added to args
+	foundUserFlag := false
+	foundUsername := false
+	for i, arg := range args {
+		if arg == "-u" {
+			foundUserFlag = true
+			if i+1 < len(args) && args[i+1] == "testuser" {
+				foundUsername = true
+			}
+		}
+	}
+
+	if !foundUserFlag {
+		t.Error("NetHack command should include -u flag")
+	}
+
+	if !foundUsername {
+		t.Errorf("NetHack command should include username after -u flag. Args: %v", args)
+	}
+
+	// Test that the game can be started (but don't actually run it to completion)
+	// We'll start it and immediately stop it to test the launch mechanism
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_ = ctx // Avoid unused variable warning
+
+	// Start the command
+	err = ptySession.StartCommand(command, args)
+	if err != nil {
+		t.Errorf("Failed to start NetHack command: %v", err)
+	} else {
+		// If command started successfully, stop it immediately
+		time.Sleep(100 * time.Millisecond) // Give it a moment to start
+		ptySession.Close()
+		t.Log("NetHack command started and stopped successfully")
+	}
+
+	// Clean up
+	_ = ptyManager.ReleasePTY("test-session")
+}
+
+// createTestConfigWithNetHack creates a test configuration that includes NetHack
+func createTestConfigWithNetHack() *config.SessionServiceConfig {
+	cfg := createTestConfig()
+	
+	// Add NetHack game configuration
+	cfg.Games = []*config.GameConfig{
+		{
+			ID:        "nethack",
+			Name:      "NetHack",
+			ShortName: "nh",
+			Version:   "3.6.7",
+			Enabled:   true,
+			Binary: &config.BinaryConfig{
+				Path: "/opt/homebrew/bin/nethack",
+				Args: []string{"-u", "${USERNAME}"},
+				WorkingDirectory: "/opt/homebrew/share/nethack",
+				Permissions:      "0755",
+			},
+			Files: &config.FilesConfig{
+				DataDirectory:   "/opt/homebrew/share/nethack",
+				SaveDirectory:   "/opt/homebrew/share/nethack/save",
+				ConfigDirectory: "/opt/homebrew/share/nethack",
+				LogDirectory:    "/tmp/nethack-logs",
+				TempDirectory:   "/tmp/nethack-temp",
+				SharedFiles:     []string{"nhdat", "license", "recover"},
+				UserFiles:       []string{"${USERNAME}.nh", "${USERNAME}.0", "${USERNAME}.bak"},
+			},
+			Environment: map[string]string{
+				"NETHACKOPTIONS": "@/opt/homebrew/share/nethack/${USERNAME}.nethackrc",
+				"HACKDIR":        "/opt/homebrew/share/nethack",
+				"TERM":           "xterm-256color",
+				"USER":           "${USERNAME}",
+				"HOME":           "/opt/homebrew/share/nethack/${USERNAME}",
+				"SHELL":          "/bin/sh",
+			},
+		},
+	}
+	
+	return cfg
+}

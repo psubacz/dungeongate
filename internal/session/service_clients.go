@@ -289,6 +289,12 @@ func (c *gameServiceClient) ListGames(ctx context.Context) ([]*Game, error) {
 		games := make([]*Game, 0, len(c.games))
 		for _, cfg := range c.games {
 			if cfg.Enabled {
+				// Check if Binary config exists
+				if cfg.Binary == nil {
+					log.Printf("Warning: Game %s has no binary configuration", cfg.ID)
+					continue
+				}
+				log.Printf("Loading game %s: binary=%s, workingDir=%s", cfg.ID, cfg.Binary.Path, cfg.Binary.WorkingDirectory)
 				game := &Game{
 					ID:          cfg.ID,
 					Name:        cfg.Name,
