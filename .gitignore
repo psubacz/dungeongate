@@ -85,7 +85,6 @@ configs/legacy/
 
 # Logs
 logs/
-*.log
 
 # Environment files
 .env
@@ -126,7 +125,6 @@ node_modules/
 .yarn-integrity
 
 # dotenv environment variables file
-.env
 .env.test
 
 # parcel-bundler cache (https://parceljs.org/)
@@ -152,11 +150,15 @@ public
 tmp/
 temp/
 
-# Service specific
-auth-service
-user-service
-game-service
-session-service
+# Service binaries (compiled executables)
+/auth-service
+/user-service
+/game-service
+/session-service
+build/auth-service
+build/user-service
+build/game-service
+build/session-service
 nethack-kuberentes/*
 
 # Helm charts
@@ -176,8 +178,6 @@ scripts/debug/*
 # Development files
 test-data/
 data/
-.env
-*.log
 
 # SSH keys
 ssh_host_*
