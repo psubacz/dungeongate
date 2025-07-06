@@ -4,18 +4,20 @@
 
 - ✅ All configs now live in the configs directory
 - ✅ Implemented golang-standards/project-layout structure
-- ✅ Created microservice architecture with separate services:
-  - Auth Service (authentication & authorization)
-  - User Service (user management & registration)
-  - Game Service (game management & process control)
-  - Session Service (TTY sessions & recording)
+- ✅ Session Service fully implemented (SSH server, HTTP handlers, TTY management)
 - ✅ Separated build-time and runtime configurations
 - ✅ Kubernetes-ready configuration structure
-- ✅ Namespace isolation design (replaces traditional chroot)
-- ✅ Stream encryption support in session service
 - ✅ External database made optional (SQLite default, PostgreSQL optional)
+- ✅ Namespace isolation configuration structure designed
 
 ## In Progress 🚧
+
+### Microservice Implementation
+- Auth Service implementation (currently stub with health endpoint only)
+- User Service implementation (partial - service layer exists, needs HTTP handlers)
+- Game Service implementation (currently stub with health endpoint only)
+- Stream encryption implementation (currently stub returning unencrypted data)
+- Namespace isolation implementation (Linux syscalls and container integration)
 
 ### Core Functionality Implementation
 - Logging to file, template in `pkg/log/log.go`
@@ -28,7 +30,7 @@
 - Automated password reset and account recovery (should require an sshkey or email.)
 - Semi-public mode which requires accounts
 - Logging implementation
-- Prometheus metrics
+- Prometheus metrics, not all are displaying as expected. 
 - Add dashboard template configuration for common metrics
 - Game isolation when multiple players are using the
 - Shared game state for nethack "bones" accoss multiple server/containers of nethack
