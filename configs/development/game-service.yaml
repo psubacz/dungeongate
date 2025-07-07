@@ -1,0 +1,82 @@
+version: "1.0"
+
+server:
+  port: 8084
+  grpc_port: 50051
+
+database:
+  driver: "sqlite"
+  host: "localhost"
+  port: 5432
+  name: "dungeongate-dev"
+  user: "dungeongate"
+  password: "password"
+  ssl_mode: "disable"
+  max_open_connections: 25
+  max_idle_connections: 5
+  connection_max_lifetime: "1h"
+  sqlite:
+    file_path: "./data/sqlite/dungeongate-dev.db"
+
+game_engine:
+  mode: "process"  # process, container, or hybrid
+  
+  process_pool:
+    max_workers: 100
+    worker_timeout: "30s"
+    
+  isolation:
+    enable_namespaces: false
+    enable_cgroups: false
+    
+  resources:
+    default_cpu_limit: "1000m"
+    default_memory_limit: "512Mi"
+    default_timeout: "3600s"
+
+games:
+  - id: "nethack"
+    name: "NetHack"
+    short_name: "NH"
+    version: "3.6.7"
+    enabled: true
+    binary:
+      path: "/usr/games/nethack"
+      args: []
+      working_directory: "/tmp"
+    settings:
+      max_players: 50
+      max_session_duration: "8h"
+      idle_timeout: "30m"
+      auto_save: true
+      
+  - id: "dcss"
+    name: "Dungeon Crawl Stone Soup"
+    short_name: "DCSS"
+    version: "0.30"
+    enabled: true
+    binary:
+      path: "/usr/games/crawl"
+      args: []
+      working_directory: "/tmp"
+    settings:
+      max_players: 30
+      max_session_duration: "12h"
+      idle_timeout: "45m"
+      auto_save: true
+
+logging:
+  level: "info"
+  format: "json"
+  
+metrics:
+  enabled: true
+  port: 9090
+  
+health:
+  enabled: true
+  port: 8085
+
+security:
+  enable_encryption: false
+  enable_isolation: false

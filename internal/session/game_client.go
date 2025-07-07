@@ -9,13 +9,16 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/dungeongate/pkg/config"
+	games_pb "github.com/dungeongate/pkg/api/games"
 )
 
 // GameServiceGRPCClient represents a gRPC client for the game service
 type GameServiceGRPCClient struct {
 	conn    *grpc.ClientConn
+	client  games_pb.GameServiceClient
 	address string
 	timeout time.Duration
 }
@@ -33,8 +36,12 @@ func NewGameServiceGRPCClient(address string) (*GameServiceGRPCClient, error) {
 		return nil, fmt.Errorf("failed to connect to game service at %s: %w", address, err)
 	}
 
+	// Create the protobuf client
+	client := games_pb.NewGameServiceClient(conn)
+
 	return &GameServiceGRPCClient{
 		conn:    conn,
+		client:  client,
 		address: address,
 		timeout: 30 * time.Second,
 	}, nil
@@ -102,23 +109,32 @@ func (c *GameServiceGRPCClient) StartGame(ctx context.Context, req *StartGameReq
 	// Create context with timeout
 	timeoutCtx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
-	_ = timeoutCtx // TODO: Use this context when implementing gRPC call
 
-	// This would normally call the gRPC service
-	// For now, we'll simulate the response
+	// Convert session service request to game service protobuf request
+	grpcReq := &games_pb.StartGameSessionRequest{
+		UserId:   int32(req.UserID),
+		Username: req.Username,
+		GameId:   req.GameID,
+		TerminalSize: &games_pb.TerminalSize{
+			Width:  80,  // Default terminal width
+			Height: 24,  // Default terminal height
+		},
+		EnableRecording:  false, // TODO: Make configurable
+		EnableStreaming:  false, // TODO: Make configurable
+		EnableEncryption: false, // TODO: Make configurable
+	}
 
-	// TODO: Replace with actual gRPC call when protobuf is generated
-	// client := games.NewGameServiceClient(c.conn)
-	// response, err := client.StartGame(ctx, &games.StartGameRequest{...})
+	// Call the game service
+	grpcResp, err := c.client.StartGameSession(timeoutCtx, grpcReq)
+	if err != nil {
+		return nil, fmt.Errorf("failed to start game session: %w", err)
+	}
 
-	// Generate a session ID since the existing StartGameRequest doesn't have one
-	sessionID := fmt.Sprintf("session_%d_%s", req.UserID, req.GameID)
-
-	// Simulate game service response
+	// Convert protobuf response to session service response
 	response := &StartGameResponse{
-		SessionID:   sessionID,
-		ContainerID: fmt.Sprintf("container_%s", sessionID),
-		PodName:     fmt.Sprintf("nethack-%s", sessionID),
+		SessionID:   grpcResp.Session.Id,
+		ContainerID: grpcResp.Session.ProcessInfo.ContainerId,
+		PodName:     grpcResp.Session.ProcessInfo.PodName,
 		Success:     true,
 	}
 
@@ -130,18 +146,68 @@ func (c *GameServiceGRPCClient) StopGame(ctx context.Context, req *StopGameReque
 	// Create context with timeout
 	timeoutCtx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
-	_ = timeoutCtx // TODO: Use this context when implementing gRPC call
 
-	// TODO: Replace with actual gRPC call when protobuf is generated
-	// client := games.NewGameServiceClient(c.conn)
-	// response, err := client.StopGame(ctx, &games.StopGameRequest{...})
+	// Convert session service request to game service protobuf request
+	grpcReq := &games_pb.StopGameSessionRequest{
+		SessionId: req.SessionID,
+		Reason:    req.Reason,
+		Force:     req.Force,
+	}
 
-	// Simulate game service response
+	// Call the game service
+	grpcResp, err := c.client.StopGameSession(timeoutCtx, grpcReq)
+	if err != nil {
+		return nil, fmt.Errorf("failed to stop game session: %w", err)
+	}
+
+	// Convert protobuf response to session service response
 	response := &StopGameResponse{
-		Success: true,
+		Success: grpcResp.Success,
 	}
 
 	return response, nil
+}
+
+// ListGames lists available games
+func (c *GameServiceGRPCClient) ListGames(ctx context.Context) ([]*Game, error) {
+	// Create context with timeout
+	timeoutCtx, cancel := context.WithTimeout(ctx, c.timeout)
+	defer cancel()
+
+	// Create the protobuf request
+	grpcReq := &games_pb.ListGamesRequest{
+		EnabledOnly: true, // Only list enabled games
+		Limit:       100,  // Default limit
+		Offset:      0,
+	}
+
+	// Call the game service
+	grpcResp, err := c.client.ListGames(timeoutCtx, grpcReq)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list games: %w", err)
+	}
+
+	// Convert protobuf response to session service response
+	games := make([]*Game, len(grpcResp.Games))
+	for i, game := range grpcResp.Games {
+		games[i] = &Game{
+			ID:          game.Id,
+			Name:        game.Name,
+			ShortName:   game.ShortName,
+			Description: game.Description,
+			Enabled:     game.Status == games_pb.GameStatus_GAME_STATUS_ENABLED,
+			Binary:      game.Binary.Path,
+			Args:        game.Binary.Args,
+			WorkingDir:  game.Binary.WorkingDirectory,
+			Environment: game.Environment,
+			MaxPlayers:  int(game.Statistics.ActiveSessions), // Using active sessions as placeholder
+			Spectatable: true,                                 // Default to true
+			CreatedAt:   game.CreatedAt.AsTime(),
+			UpdatedAt:   game.UpdatedAt.AsTime(),
+		}
+	}
+
+	return games, nil
 }
 
 // GetGameSession gets information about a game session
@@ -149,25 +215,46 @@ func (c *GameServiceGRPCClient) GetGameSession(ctx context.Context, sessionID st
 	// Create context with timeout
 	timeoutCtx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
-	_ = timeoutCtx // TODO: Use this context when implementing gRPC call
 
-	// TODO: Replace with actual gRPC call when protobuf is generated
-	// client := games.NewGameServiceClient(c.conn)
-	// response, err := client.GetGameSession(ctx, &games.GetGameSessionRequest{...})
+	// Create the protobuf request
+	grpcReq := &games_pb.GetGameSessionRequest{
+		SessionId: sessionID,
+	}
 
-	// Simulate game service response
+	// Call the game service
+	grpcResp, err := c.client.GetGameSession(timeoutCtx, grpcReq)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get game session: %w", err)
+	}
+
+	session := grpcResp.Session
+
+	// Convert protobuf response to session service response
 	info := &GameSessionInfo{
-		SessionID:    sessionID,
-		Status:       "running",
-		StartTime:    time.Now().Add(-time.Hour),
-		LastActivity: time.Now(),
-		ContainerID:  fmt.Sprintf("container_%s", sessionID),
-		PodName:      fmt.Sprintf("nethack-%s", sessionID),
-		Spectators:   []string{},
-		Metadata:     make(map[string]string),
+		SessionID:     session.Id,
+		UserID:        fmt.Sprintf("%d", session.UserId),
+		Username:      session.Username,
+		GameID:        session.GameId,
+		Status:        session.Status.String(),
+		StartTime:     session.StartTime.AsTime(),
+		LastActivity:  session.LastActivity.AsTime(),
+		ContainerID:   session.ProcessInfo.ContainerId,
+		PodName:       session.ProcessInfo.PodName,
+		RecordingPath: session.Recording.FilePath,
+		Spectators:    extractSpectatorUsernames(session.Spectators),
+		Metadata:      make(map[string]string),
 	}
 
 	return info, nil
+}
+
+// extractSpectatorUsernames extracts usernames from spectator info
+func extractSpectatorUsernames(spectators []*games_pb.SpectatorInfo) []string {
+	usernames := make([]string, len(spectators))
+	for i, spectator := range spectators {
+		usernames[i] = spectator.Username
+	}
+	return usernames
 }
 
 // ListActiveGames lists all active game sessions
@@ -175,27 +262,46 @@ func (c *GameServiceGRPCClient) ListActiveGames(ctx context.Context, userID stri
 	// Create context with timeout
 	timeoutCtx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
-	_ = timeoutCtx // TODO: Use this context when implementing gRPC call
 
-	// TODO: Replace with actual gRPC call when protobuf is generated
-	// client := games.NewGameServiceClient(c.conn)
-	// response, err := client.ListActiveSessions(ctx, &games.ListActiveSessionsRequest{...})
+	// Convert userID string to int32 (assuming it's a valid integer string)
+	var userIDInt int32
+	if userID != "" {
+		if _, err := fmt.Sscanf(userID, "%d", &userIDInt); err != nil {
+			userIDInt = 0 // Use 0 to list all sessions if parsing fails
+		}
+	}
 
-	// Simulate game service response
-	sessions := []*GameSessionInfo{
-		{
-			SessionID:    "session_123",
-			UserID:       userID,
-			Username:     "testuser",
-			GameID:       "nethack",
-			Status:       "running",
-			StartTime:    time.Now().Add(-time.Hour),
-			LastActivity: time.Now(),
-			ContainerID:  "container_session_123",
-			PodName:      "nethack-session_123",
-			Spectators:   []string{},
-			Metadata:     make(map[string]string),
-		},
+	// Create the protobuf request
+	grpcReq := &games_pb.ListGameSessionsRequest{
+		UserId: userIDInt,
+		Status: games_pb.SessionStatus_SESSION_STATUS_ACTIVE,
+		Limit:  100, // Default limit
+		Offset: 0,
+	}
+
+	// Call the game service
+	grpcResp, err := c.client.ListGameSessions(timeoutCtx, grpcReq)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list game sessions: %w", err)
+	}
+
+	// Convert protobuf response to session service response
+	sessions := make([]*GameSessionInfo, len(grpcResp.Sessions))
+	for i, session := range grpcResp.Sessions {
+		sessions[i] = &GameSessionInfo{
+			SessionID:     session.Id,
+			UserID:        fmt.Sprintf("%d", session.UserId),
+			Username:      session.Username,
+			GameID:        session.GameId,
+			Status:        session.Status.String(),
+			StartTime:     session.StartTime.AsTime(),
+			LastActivity:  session.LastActivity.AsTime(),
+			ContainerID:   session.ProcessInfo.ContainerId,
+			PodName:       session.ProcessInfo.PodName,
+			RecordingPath: session.Recording.FilePath,
+			Spectators:    extractSpectatorUsernames(session.Spectators),
+			Metadata:      make(map[string]string),
+		}
 	}
 
 	return sessions, nil
@@ -206,15 +312,14 @@ func (c *GameServiceGRPCClient) HealthCheck(ctx context.Context) (bool, error) {
 	// Create context with timeout
 	timeoutCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	_ = timeoutCtx // TODO: Use this context when implementing gRPC call
 
-	// TODO: Replace with actual gRPC call when protobuf is generated
-	// client := games.NewGameServiceClient(c.conn)
-	// response, err := client.Health(ctx, &empty.Empty{})
+	// Call the health check endpoint
+	response, err := c.client.Health(timeoutCtx, &emptypb.Empty{})
+	if err != nil {
+		return false, fmt.Errorf("health check failed: %w", err)
+	}
 
-	// For now, just check if connection is alive
-	state := c.conn.GetState()
-	return state.String() == "READY", nil
+	return response.Status == "healthy", nil
 }
 
 // IsAvailable checks if the game service is available
@@ -245,6 +350,7 @@ func (c *GameServiceGRPCClient) Reconnect() error {
 	}
 
 	c.conn = conn
+	c.client = games_pb.NewGameServiceClient(conn)
 	return nil
 }
 

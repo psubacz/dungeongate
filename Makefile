@@ -449,3 +449,32 @@ demo-spectating: build setup-test-env ## Demo spectating functionality
 	@echo "Press Enter to continue..."
 	@read
 	@$(MAKE) test-run
+
+# Protocol Buffers
+PROTOC=protoc
+PROTO_DIR=api/proto
+GO_OUT_DIR=pkg/api
+
+.PHONY: proto-gen
+proto-gen: ## Generate Go code from Protocol Buffers
+	@echo "$(GREEN)Generating Go code from protobuf definitions...$(NC)"
+	@mkdir -p $(GO_OUT_DIR)
+	$(PROTOC) --go_out=$(GO_OUT_DIR) --go_opt=paths=source_relative \
+		--go-grpc_out=$(GO_OUT_DIR) --go-grpc_opt=paths=source_relative \
+		-I $(PROTO_DIR) $(PROTO_DIR)/games/game_service.proto
+
+.PHONY: proto-clean
+proto-clean: ## Clean generated protobuf files
+	@echo "$(GREEN)Cleaning generated protobuf files...$(NC)"
+	@rm -rf $(GO_OUT_DIR)/games
+
+.PHONY: build-game-service
+build-game-service: ## Build game service binary
+	@echo "$(GREEN)Building game service...$(NC)"
+	@mkdir -p $(BUILD_DIR)
+	$(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/dungeongate-game-service ./cmd/game-service
+
+.PHONY: test-game-service
+test-game-service: ## Test game service
+	@echo "$(GREEN)Testing game service...$(NC)"
+	$(GOTEST) -v -timeout=30s ./internal/games/...
