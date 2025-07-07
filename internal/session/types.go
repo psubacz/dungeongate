@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/dungeongate/internal/games"
 	"github.com/dungeongate/pkg/config"
 	"github.com/dungeongate/pkg/ttyrec"
 )
@@ -27,267 +28,26 @@ type User struct {
 	LastLogin       time.Time `json:"last_login"`
 }
 
-// Game represents a game configuration
-type Game struct {
-	ID          string            `json:"id"`
-	Name        string            `json:"name"`
-	ShortName   string            `json:"short_name"`
-	Description string            `json:"description"`
-	Enabled     bool              `json:"enabled"`
-	Binary      string            `json:"binary"`
-	Args        []string          `json:"args"`
-	WorkingDir  string            `json:"working_dir"`
-	Environment map[string]string `json:"environment"`
-	MaxPlayers  int               `json:"max_players"`
-	Spectatable bool              `json:"spectatable"`
-	CreatedAt   time.Time         `json:"created_at"`
-	UpdatedAt   time.Time         `json:"updated_at"`
-}
-
 // Session represents a game session
 type Session struct {
-	ID            string                             `json:"id"`
-	UserID        int                                `json:"user_id"`
-	Username      string                             `json:"username"`
-	GameID        string                             `json:"game_id"`
-	StartTime     time.Time                          `json:"start_time"`
-	EndTime       *time.Time                         `json:"end_time,omitempty"`
-	IsActive      bool                               `json:"is_active"`
-	TTYRecording  *ttyrec.Session                    `json:"-"`
-	TerminalSize  string                             `json:"terminal_size"`
-	Encoding      string                             `json:"encoding"`
-	LastActivity  time.Time                          `json:"last_activity"`
-	StreamEnabled bool                               `json:"stream_enabled"`
-	Encrypted     bool                               `json:"encrypted"`
-	Spectators    []*Spectator                       `json:"spectators,omitempty"` // For JSON serialization (legacy)
-	Registry      *atomic.Pointer[SpectatorRegistry] `json:"-"`                    // Immutable spectator registry
-	StreamManager *StreamManager                     `json:"-"`                    // Handles immutable data streaming
-	ProcessPID    int                                `json:"process_pid,omitempty"`
-	ExitCode      int                                `json:"exit_code,omitempty"`
-}
-
-// StreamManager handles immutable data streaming to spectators
-type StreamManager struct {
-	frameID      atomic.Uint64
-	frameChannel chan *StreamFrame
-	stopChan     chan struct{}
-	wg           sync.WaitGroup
-
-	// Circular buffer for recent frames
-	recentFrames     []*StreamFrame
-	recentFramesLock sync.RWMutex
-	bufferSize       int
-	bufferIndex      int
-}
-
-// NewStreamManager creates a new stream manager for a session
-func NewStreamManager() *StreamManager {
-	const defaultBufferSize = 20 // Keep last 20 frames
-	return &StreamManager{
-		frameChannel: make(chan *StreamFrame, 1000), // Buffered channel for frames
-		stopChan:     make(chan struct{}),
-		bufferSize:   defaultBufferSize,
-		recentFrames: make([]*StreamFrame, defaultBufferSize),
-		bufferIndex:  0,
-	}
-}
-
-// Start begins the streaming process
-func (sm *StreamManager) Start(registry *atomic.Pointer[SpectatorRegistry]) {
-	sm.wg.Add(1)
-	go sm.streamLoop(registry)
-}
-
-// Stop gracefully stops the streaming process
-func (sm *StreamManager) Stop() {
-	close(sm.stopChan)
-	sm.wg.Wait()
-}
-
-// SendFrame sends an immutable frame to all spectators
-func (sm *StreamManager) SendFrame(data []byte) {
-	if len(data) == 0 {
-		return
-	}
-
-	frameID := sm.frameID.Add(1)
-	frame := NewStreamFrame(data, frameID)
-
-	select {
-	case sm.frameChannel <- frame:
-		// Frame queued successfully
-	default:
-		// Channel full, drop frame (prevents blocking)
-		log.Printf("Warning: Dropped frame %d due to full buffer", frameID)
-	}
-}
-
-// streamLoop processes frames and distributes them to spectators
-func (sm *StreamManager) streamLoop(registry *atomic.Pointer[SpectatorRegistry]) {
-	defer sm.wg.Done()
-
-	for {
-		select {
-		case frame := <-sm.frameChannel:
-			sm.distributeFrame(frame, registry)
-		case <-sm.stopChan:
-			return
-		}
-	}
-}
-
-// distributeFrame sends a frame to all active spectators
-func (sm *StreamManager) distributeFrame(frame *StreamFrame, registry *atomic.Pointer[SpectatorRegistry]) {
-	// Store frame in circular buffer
-	sm.recentFramesLock.Lock()
-	sm.recentFrames[sm.bufferIndex] = frame
-	sm.bufferIndex = (sm.bufferIndex + 1) % sm.bufferSize
-	sm.recentFramesLock.Unlock()
-
-	// Load current immutable registry
-	currentRegistry := registry.Load()
-	if currentRegistry == nil {
-		return
-	}
-
-	// Get current spectators (safe concurrent read)
-	spectators := currentRegistry.GetSpectators()
-
-	// Send frame to each spectator concurrently
-	for _, spectator := range spectators {
-		if spectator.IsActive && spectator.Connection != nil && spectator.Connection.IsConnected() {
-			go func(spec *Spectator, f *StreamFrame) {
-				if err := spec.Connection.Write(f); err != nil {
-					log.Printf("Failed to send frame %d to spectator %s: %v", f.FrameID, spec.Username, err)
-					// TODO: Mark spectator as inactive or remove
-				}
-			}(spectator, frame)
-		}
-	}
-}
-
-// GetRecentFrames returns the recent frames from the circular buffer
-func (sm *StreamManager) GetRecentFrames() []*StreamFrame {
-	sm.recentFramesLock.RLock()
-	defer sm.recentFramesLock.RUnlock()
-
-	// Collect non-nil frames in order
-	frames := make([]*StreamFrame, 0, sm.bufferSize)
-
-	// Start from the oldest frame position
-	startIdx := sm.bufferIndex
-	for i := 0; i < sm.bufferSize; i++ {
-		idx := (startIdx + i) % sm.bufferSize
-		if sm.recentFrames[idx] != nil {
-			frames = append(frames, sm.recentFrames[idx])
-		}
-	}
-
-	return frames
-}
-
-// StreamFrame represents an immutable frame of terminal data
-type StreamFrame struct {
-	Timestamp time.Time `json:"timestamp"`
-	Data      []byte    `json:"data"`     // Immutable copy of terminal data
-	FrameID   uint64    `json:"frame_id"` // Sequential frame identifier
-}
-
-// NewStreamFrame creates a new immutable stream frame
-func NewStreamFrame(data []byte, frameID uint64) *StreamFrame {
-	// Create deep copy to ensure immutability
-	dataCopy := make([]byte, len(data))
-	copy(dataCopy, data)
-
-	return &StreamFrame{
-		Timestamp: time.Now(),
-		Data:      dataCopy,
-		FrameID:   frameID,
-	}
-}
-
-// SpectatorRegistry represents an immutable list of spectators
-type SpectatorRegistry struct {
-	Spectators map[string]*Spectator `json:"spectators"` // key: spectator ID
-	Version    uint64                `json:"version"`    // Registry version for atomic updates
-}
-
-// NewSpectatorRegistry creates a new immutable spectator registry
-func NewSpectatorRegistry() *SpectatorRegistry {
-	return &SpectatorRegistry{
-		Spectators: make(map[string]*Spectator),
-		Version:    0,
-	}
-}
-
-// AddSpectator returns a new registry with the spectator added (immutable)
-func (r *SpectatorRegistry) AddSpectator(spectator *Spectator) *SpectatorRegistry {
-	newSpectators := make(map[string]*Spectator, len(r.Spectators)+1)
-
-	// Copy existing spectators
-	for id, spec := range r.Spectators {
-		newSpectators[id] = spec
-	}
-
-	// Add new spectator
-	spectatorID := fmt.Sprintf("%d_%s", spectator.UserID, spectator.Username)
-	newSpectators[spectatorID] = spectator
-
-	return &SpectatorRegistry{
-		Spectators: newSpectators,
-		Version:    r.Version + 1,
-	}
-}
-
-// RemoveSpectator returns a new registry with the spectator removed (immutable)
-func (r *SpectatorRegistry) RemoveSpectator(userID int, username string) *SpectatorRegistry {
-	spectatorID := fmt.Sprintf("%d_%s", userID, username)
-
-	// If spectator doesn't exist, return same registry
-	if _, exists := r.Spectators[spectatorID]; !exists {
-		return r
-	}
-
-	newSpectators := make(map[string]*Spectator, len(r.Spectators)-1)
-
-	// Copy all except the removed spectator
-	for id, spec := range r.Spectators {
-		if id != spectatorID {
-			newSpectators[id] = spec
-		}
-	}
-
-	return &SpectatorRegistry{
-		Spectators: newSpectators,
-		Version:    r.Version + 1,
-	}
-}
-
-// GetSpectators returns a slice of all spectators (safe to read concurrently)
-func (r *SpectatorRegistry) GetSpectators() []*Spectator {
-	spectators := make([]*Spectator, 0, len(r.Spectators))
-	for _, spectator := range r.Spectators {
-		spectators = append(spectators, spectator)
-	}
-	return spectators
-}
-
-// Spectator represents a session spectator
-type Spectator struct {
-	UserID     int                 `json:"user_id"`
-	Username   string              `json:"username"`
-	JoinTime   time.Time           `json:"join_time"`
-	Connection SpectatorConnection `json:"-"`
-	BytesSent  int64               `json:"bytes_sent"`
-	IsActive   bool                `json:"is_active"`
-}
-
-// SpectatorConnection interface for different connection types
-type SpectatorConnection interface {
-	Write(frame *StreamFrame) error
-	Close() error
-	GetType() string
-	IsConnected() bool
+	ID            string                                   `json:"id"`
+	UserID        int                                      `json:"user_id"`
+	Username      string                                   `json:"username"`
+	GameID        string                                   `json:"game_id"`
+	StartTime     time.Time                                `json:"start_time"`
+	EndTime       *time.Time                               `json:"end_time,omitempty"`
+	IsActive      bool                                     `json:"is_active"`
+	TTYRecording  *ttyrec.Session                          `json:"-"`
+	TerminalSize  string                                   `json:"terminal_size"`
+	Encoding      string                                   `json:"encoding"`
+	LastActivity  time.Time                                `json:"last_activity"`
+	StreamEnabled bool                                     `json:"stream_enabled"`
+	Encrypted     bool                                     `json:"encrypted"`
+	Spectators    []*games.Spectator                       `json:"spectators,omitempty"` // For JSON serialization (legacy)
+	Registry      *atomic.Pointer[games.SpectatorRegistry] `json:"-"`                    // Immutable spectator registry
+	StreamManager *games.StreamManager                     `json:"-"`                    // Handles immutable data streaming
+	ProcessPID    int                                      `json:"process_pid,omitempty"`
+	ExitCode      int                                      `json:"exit_code,omitempty"`
 }
 
 // SSHSpectatorConnection represents an SSH-based spectator connection
@@ -304,7 +64,7 @@ func NewSSHSpectatorConnection(sessionCtx *SSHSessionContext) *SSHSpectatorConne
 	}
 }
 
-func (c *SSHSpectatorConnection) Write(frame *StreamFrame) error {
+func (c *SSHSpectatorConnection) Write(frame *games.StreamFrame) error {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
 
@@ -360,7 +120,7 @@ func NewWebSocketSpectatorConnection(connID string) *WebSocketSpectatorConnectio
 	}
 }
 
-func (c *WebSocketSpectatorConnection) Write(frame *StreamFrame) error {
+func (c *WebSocketSpectatorConnection) Write(frame *games.StreamFrame) error {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
 
@@ -458,22 +218,6 @@ type LoginResponse struct {
 	Message      string `json:"message,omitempty"`
 }
 
-// StartGameRequest represents a game start request
-type StartGameRequest struct {
-	UserID   int    `json:"user_id"`
-	Username string `json:"username"`
-	GameID   string `json:"game_id"`
-}
-
-// GameSession represents a game session response
-type GameSession struct {
-	ID       string `json:"id"`
-	UserID   int    `json:"user_id"`
-	Username string `json:"username"`
-	GameID   string `json:"game_id"`
-	Status   string `json:"status"`
-}
-
 // ServiceMetrics represents service metrics
 type ServiceMetrics struct {
 	ActiveSessions   int   `json:"active_sessions"`
@@ -485,6 +229,80 @@ type ServiceMetrics struct {
 }
 
 // Service interfaces
+
+// GameServiceClient interface for game service (adapter interface for session service needs)
+type GameServiceClient interface {
+	StartGame(ctx context.Context, req *StartGameRequest) (*StartGameResponse, error)
+	StopGame(ctx context.Context, req *StopGameRequest) (*StopGameResponse, error)
+	GetGameSession(ctx context.Context, sessionID string) (*GameSessionInfo, error)
+	ListActiveGames(ctx context.Context, userID string) ([]*GameSessionInfo, error)
+	ListGames(ctx context.Context) ([]*Game, error) // Needed by ssh.go
+	HealthCheck(ctx context.Context) (bool, error)
+	Close() error
+}
+
+// Game represents a game for the session service (simplified from games package)
+type Game struct {
+	ID          string            `json:"id"`
+	Name        string            `json:"name"`
+	ShortName   string            `json:"short_name"`
+	Description string            `json:"description"`
+	Enabled     bool              `json:"enabled"`
+	Binary      string            `json:"binary"`
+	Args        []string          `json:"args"`
+	WorkingDir  string            `json:"working_dir"`
+	Environment map[string]string `json:"environment"`
+	MaxPlayers  int               `json:"max_players"`
+	Spectatable bool              `json:"spectatable"`
+	CreatedAt   time.Time         `json:"created_at"`
+	UpdatedAt   time.Time         `json:"updated_at"`
+}
+
+// StartGameRequest represents a game start request
+type StartGameRequest struct {
+	UserID   int    `json:"user_id"`
+	Username string `json:"username"`
+	GameID   string `json:"game_id"`
+}
+
+// StartGameResponse represents the response from starting a game
+type StartGameResponse struct {
+	SessionID   string `json:"session_id"`
+	ContainerID string `json:"container_id"`
+	PodName     string `json:"pod_name"`
+	Success     bool   `json:"success"`
+	Error       string `json:"error,omitempty"`
+}
+
+// StopGameRequest represents a request to stop a game
+type StopGameRequest struct {
+	SessionID string `json:"session_id"`
+	UserID    string `json:"user_id"`
+	Force     bool   `json:"force"`
+	Reason    string `json:"reason"`
+}
+
+// StopGameResponse represents the response from stopping a game
+type StopGameResponse struct {
+	Success bool   `json:"success"`
+	Error   string `json:"error,omitempty"`
+}
+
+// GameSessionInfo represents information about a game session
+type GameSessionInfo struct {
+	SessionID     string            `json:"session_id"`
+	UserID        string            `json:"user_id"`
+	Username      string            `json:"username"`
+	GameID        string            `json:"game_id"`
+	Status        string            `json:"status"`
+	StartTime     time.Time         `json:"start_time"`
+	LastActivity  time.Time         `json:"last_activity"`
+	ContainerID   string            `json:"container_id"`
+	PodName       string            `json:"pod_name"`
+	RecordingPath string            `json:"recording_path"`
+	Spectators    []string          `json:"spectators"`
+	Metadata      map[string]string `json:"metadata"`
+}
 
 // UserServiceClient interface for user service
 type UserServiceClient interface {
@@ -505,16 +323,6 @@ type AuthServiceClient interface {
 	Logout(ctx context.Context, token string) error
 	ValidateToken(ctx context.Context, token string) (*User, error)
 	RefreshToken(ctx context.Context, refreshToken string) (*LoginResponse, error)
-}
-
-// GameServiceClient interface for game service
-type GameServiceClient interface {
-	ListGames(ctx context.Context) ([]*Game, error)
-	GetGame(ctx context.Context, gameID string) (*Game, error)
-	StartGame(ctx context.Context, req *StartGameRequest) (*GameSession, error)
-	StopGame(ctx context.Context, sessionID string) error
-	GetGameStatus(ctx context.Context, sessionID string) (*GameSession, error)
-	UpdateGameConfig(ctx context.Context, gameID string, config *Game) error
 }
 
 // Server access control modes
@@ -631,44 +439,6 @@ type ServerAccessStats struct {
 	UsedPreloadedKeys   int              `json:"used_preloaded_keys"`
 }
 
-// SessionStatus represents session status
-type SessionStatus string
-
-const (
-	SessionStatusStarting SessionStatus = "starting"
-	SessionStatusActive   SessionStatus = "active"
-	SessionStatusPaused   SessionStatus = "paused"
-	SessionStatusEnding   SessionStatus = "ending"
-	SessionStatusEnded    SessionStatus = "ended"
-)
-
-// GameType represents game type
-type GameType string
-
-const (
-	GameTypeRoguelike GameType = "roguelike"
-	GameTypeShell     GameType = "shell"
-	GameTypeEditor    GameType = "editor"
-	GameTypeOther     GameType = "other"
-)
-
-// Extended Game structure with additional fields
-type ExtendedGame struct {
-	*Game
-	Type            GameType          `json:"type"`
-	Category        string            `json:"category"`
-	Version         string            `json:"version"`
-	MinTerminalSize string            `json:"min_terminal_size"`
-	MaxTerminalSize string            `json:"max_terminal_size"`
-	Tags            []string          `json:"tags"`
-	LastPlayed      *time.Time        `json:"last_played,omitempty"`
-	PlayCount       int               `json:"play_count"`
-	AveragePlayTime time.Duration     `json:"average_play_time"`
-	Rating          float32           `json:"rating"`
-	Difficulty      int               `json:"difficulty"` // 1-10 scale
-	Requirements    map[string]string `json:"requirements"`
-}
-
 // SessionStatistics represents session statistics
 type SessionStatistics struct {
 	TotalSessions       int           `json:"total_sessions"`
@@ -694,21 +464,6 @@ type UserStatistics struct {
 	LoginCount         int           `json:"login_count"`
 	Achievements       []string      `json:"achievements"`
 	Rank               int           `json:"rank"`
-}
-
-// GameStatistics represents game statistics
-type GameStatistics struct {
-	TotalSessions      int           `json:"total_sessions"`
-	ActiveSessions     int           `json:"active_sessions"`
-	TotalPlayTime      time.Duration `json:"total_play_time"`
-	AverageSessionTime time.Duration `json:"average_session_time"`
-	UniqueUsers        int           `json:"unique_users"`
-	PopularityRank     int           `json:"popularity_rank"`
-	Rating             float32       `json:"rating"`
-	CompletionRate     float32       `json:"completion_rate"`
-	AverageScore       float32       `json:"average_score"`
-	HighScore          int           `json:"high_score"`
-	HighScoreHolder    string        `json:"high_score_holder"`
 }
 
 // Event system for notifications

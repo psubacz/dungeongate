@@ -89,7 +89,7 @@ func NewGameSave(
 ) *GameSave {
 	now := time.Now()
 	checksum := calculateChecksum(data)
-	
+
 	return &GameSave{
 		id:        id,
 		userID:    userID,

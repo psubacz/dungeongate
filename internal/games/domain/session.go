@@ -8,12 +8,12 @@ import (
 // GameSession aggregate root represents an active game session
 type GameSession struct {
 	// Identity
-	id       SessionID
-	userID   UserID
-	gameID   GameID
+	id     SessionID
+	userID UserID
+	gameID GameID
 
 	// Configuration
-	username string
+	username   string
 	gameConfig GameConfig
 
 	// Process information
@@ -103,12 +103,12 @@ func (ts TerminalSize) String() string {
 
 // RecordingInfo contains session recording information
 type RecordingInfo struct {
-	Enabled     bool
-	FilePath    string
-	Format      string
-	StartTime   time.Time
-	FileSize    int64
-	Compressed  bool
+	Enabled    bool
+	FilePath   string
+	Format     string
+	StartTime  time.Time
+	FileSize   int64
+	Compressed bool
 }
 
 // StreamingInfo contains session streaming information

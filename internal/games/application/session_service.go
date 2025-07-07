@@ -135,7 +135,7 @@ func (s *SessionService) StartGameSession(ctx context.Context, req *StartSession
 		},
 		Timestamp: time.Now(),
 	}
-	
+
 	if err := s.uow.Events().SaveEvent(ctx, event); err != nil {
 		// Log but don't fail the session start
 		// log error
@@ -152,7 +152,7 @@ func (s *SessionService) StartGameSession(ctx context.Context, req *StartSession
 // StopGameSession stops a game session
 func (s *SessionService) StopGameSession(ctx context.Context, sessionID string, reason string) error {
 	id := domain.NewSessionID(sessionID)
-	
+
 	// Find the session
 	session, err := s.sessionRepo.FindByID(ctx, id)
 	if err != nil {
@@ -199,7 +199,7 @@ func (s *SessionService) StopGameSession(ctx context.Context, sessionID string, 
 		},
 		Timestamp: time.Now(),
 	}
-	
+
 	if err := s.uow.Events().SaveEvent(ctx, event); err != nil {
 		// Log but don't fail
 	}
@@ -228,7 +228,7 @@ func (s *SessionService) ListUserSessions(ctx context.Context, userID int) ([]*d
 // AddSpectator adds a spectator to a session
 func (s *SessionService) AddSpectator(ctx context.Context, sessionID string, spectatorUserID int, spectatorUsername string) error {
 	id := domain.NewSessionID(sessionID)
-	
+
 	session, err := s.sessionRepo.FindByID(ctx, id)
 	if err != nil {
 		return fmt.Errorf("session not found: %w", err)
@@ -256,7 +256,7 @@ func (s *SessionService) AddSpectator(ctx context.Context, sessionID string, spe
 		},
 		Timestamp: time.Now(),
 	}
-	
+
 	s.eventRepo.SaveEvent(ctx, event)
 
 	return nil
@@ -265,7 +265,7 @@ func (s *SessionService) AddSpectator(ctx context.Context, sessionID string, spe
 // RemoveSpectator removes a spectator from a session
 func (s *SessionService) RemoveSpectator(ctx context.Context, sessionID string, spectatorUserID int) error {
 	id := domain.NewSessionID(sessionID)
-	
+
 	session, err := s.sessionRepo.FindByID(ctx, id)
 	if err != nil {
 		return fmt.Errorf("session not found: %w", err)
@@ -280,10 +280,10 @@ func (s *SessionService) RemoveSpectator(ctx context.Context, sessionID string, 
 // startGameProcess starts the actual game process
 func (s *SessionService) startGameProcess(ctx context.Context, session *domain.GameSession, game *domain.Game) (domain.ProcessInfo, error) {
 	config := game.Config()
-	
+
 	// Create the command
 	cmd := exec.CommandContext(ctx, config.Binary.Path, config.Binary.Args...)
-	
+
 	if config.Binary.WorkingDirectory != "" {
 		cmd.Dir = config.Binary.WorkingDirectory
 	}

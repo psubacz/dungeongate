@@ -9,6 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/dungeongate/internal/games"
 	"github.com/dungeongate/internal/user"
 	"github.com/dungeongate/pkg/config"
 	"github.com/dungeongate/pkg/database"
@@ -61,11 +62,11 @@ func (s *Service) CreateSession(ctx context.Context, req *CreateSessionRequest) 
 	sessionID := generateSessionID()
 
 	// Initialize immutable spectator registry
-	registry := &atomic.Pointer[SpectatorRegistry]{}
-	registry.Store(NewSpectatorRegistry())
+	registry := &atomic.Pointer[games.SpectatorRegistry]{}
+	registry.Store(games.NewSpectatorRegistry())
 
 	// Initialize stream manager
-	streamManager := NewStreamManager()
+	streamManager := games.NewStreamManager()
 
 	session := &Session{
 		ID:            sessionID,
@@ -79,9 +80,9 @@ func (s *Service) CreateSession(ctx context.Context, req *CreateSessionRequest) 
 		LastActivity:  time.Now(),
 		StreamEnabled: true, // Always enable streaming for spectators
 		Encrypted:     s.config.Encryption.Enabled,
-		Spectators:    make([]*Spectator, 0), // Legacy field for JSON serialization
-		Registry:      registry,              // Immutable spectator registry
-		StreamManager: streamManager,         // Stream manager for broadcasting
+		Spectators:    make([]*games.Spectator, 0), // Legacy field for JSON serialization
+		Registry:      registry,                    // Immutable spectator registry
+		StreamManager: streamManager,               // Stream manager for broadcasting
 	}
 
 	// Start TTY recording if enabled
@@ -177,7 +178,7 @@ func (s *Service) createTestSessions() []*Session {
 			TerminalSize: "80x24",
 			Encoding:     "utf-8",
 			LastActivity: time.Now().Add(-5 * time.Minute),
-			Spectators:   []*Spectator{},
+			Spectators:   []*games.Spectator{},
 		},
 		{
 			ID:           "test_session_2",
@@ -189,7 +190,7 @@ func (s *Service) createTestSessions() []*Session {
 			TerminalSize: "120x40",
 			Encoding:     "utf-8",
 			LastActivity: time.Now().Add(-2 * time.Minute),
-			Spectators: []*Spectator{
+			Spectators: []*games.Spectator{
 				{
 					UserID:   3,
 					Username: "spectator1",
@@ -203,12 +204,12 @@ func (s *Service) createTestSessions() []*Session {
 	s.sessionsMux.Lock()
 	for _, session := range testSessions {
 		// Initialize immutable spectator registry for test sessions
-		registry := &atomic.Pointer[SpectatorRegistry]{}
-		registry.Store(NewSpectatorRegistry())
+		registry := &atomic.Pointer[games.SpectatorRegistry]{}
+		registry.Store(games.NewSpectatorRegistry())
 		session.Registry = registry
 
 		// Initialize stream manager
-		session.StreamManager = NewStreamManager()
+		session.StreamManager = games.NewStreamManager()
 		session.StreamManager.Start(registry)
 
 		s.sessions[session.ID] = session
@@ -253,7 +254,7 @@ func (s *Service) AddSpectator(ctx context.Context, sessionID string, userID int
 }
 
 // AddSpectatorWithConnection adds a spectator to a session with a specific connection
-func (s *Service) AddSpectatorWithConnection(ctx context.Context, sessionID string, userID int, username string, connection SpectatorConnection) error {
+func (s *Service) AddSpectatorWithConnection(ctx context.Context, sessionID string, userID int, username string, connection games.SpectatorConnection) error {
 	// Check if spectating is enabled
 	if !s.config.SessionManagement.Spectating.Enabled {
 		return fmt.Errorf("spectating is not enabled")
@@ -280,7 +281,7 @@ func (s *Service) AddSpectatorWithConnection(ctx context.Context, sessionID stri
 	}
 
 	// Create new spectator
-	spectator := &Spectator{
+	spectator := &games.Spectator{
 		UserID:     userID,
 		Username:   username,
 		JoinTime:   time.Now(),
@@ -516,9 +517,9 @@ func (s *Service) GetUserStatistics(ctx context.Context, userID int) (*UserStati
 }
 
 // GetGameStatistics returns statistics for a game
-func (s *Service) GetGameStatistics(ctx context.Context, gameID string) (*GameStatistics, error) {
+func (s *Service) GetGameStatistics(ctx context.Context, gameID string) (*games.GameStatistics, error) {
 	// Mock implementation
-	return &GameStatistics{}, nil
+	return &games.GameStatistics{}, nil
 }
 
 // GetSystemStatistics returns system-wide statistics

@@ -79,7 +79,7 @@ build-auth: deps ## Build the auth service binary
 	@echo "$(GREEN)Build completed: $(BUILD_DIR)/$(AUTH_BINARY_NAME)$(NC)"
 
 .PHONY: build-all
-build-all: build build-auth ## Build all service binaries
+build-all: build build-auth build-game-service ## Build all service binaries
 
 .PHONY: build-debug
 build-debug: deps ## Build with debug symbols
@@ -268,13 +268,16 @@ test-run-auth: build-auth ## Run test auth service on port 8082
 	./$(BUILD_DIR)/$(AUTH_BINARY_NAME) -config=$(TEST_CONFIG)
 
 .PHONY: test-run-all
-test-run-all: build-all setup-test-env ## Run both session and auth services for testing
-	@echo "$(GREEN)Starting both test services...$(NC)"
+test-run-all: build-all setup-test-env ## Run all services (auth, game, session) for testing
+	@echo "$(GREEN)Starting all test services...$(NC)"
 	@echo "$(YELLOW)Auth service will run on port 8082$(NC)"
+	@echo "$(YELLOW)Game service will run on port 50051$(NC)"
 	@echo "$(YELLOW)Session service will run on port 2222$(NC)"
-	@echo "$(YELLOW)Use Ctrl+C to stop both services$(NC)"
+	@echo "$(YELLOW)Use Ctrl+C to stop all services$(NC)"
 	@cp $(TEST_CONFIG) /tmp/dungeongate-session-service.yaml
 	@(./$(BUILD_DIR)/$(AUTH_BINARY_NAME) -config=$(TEST_CONFIG) &) && \
+	 sleep 2 && \
+	 (./$(BUILD_DIR)/dungeongate-game-service -config=$(TEST_CONFIG) &) && \
 	 sleep 2 && \
 	 ./$(BUILD_DIR)/$(BINARY_NAME) -config=/tmp/dungeongate-session-service.yaml
 

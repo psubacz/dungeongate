@@ -130,12 +130,12 @@ func (a *AuthServiceClientImpl) Login(ctx context.Context, req *SessionLoginRequ
 			CreatedAt:       time.Unix(protoResp.User.CreatedAt.Seconds, int64(protoResp.User.CreatedAt.Nanos)),
 			UpdatedAt:       time.Unix(protoResp.User.UpdatedAt.Seconds, int64(protoResp.User.UpdatedAt.Nanos)),
 		}
-		
+
 		// Handle LastLogin safely - it can be nil for newly registered users
 		if protoResp.User.LastLogin != nil {
 			sessionUser.LastLogin = time.Unix(protoResp.User.LastLogin.Seconds, int64(protoResp.User.LastLogin.Nanos))
 		}
-		
+
 		resp.User = sessionUser
 	}
 

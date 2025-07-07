@@ -1,15 +1,13 @@
 package games
 
 import (
-	"context"
+	"fmt"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/dungeongate/pkg/ttyrec"
 )
-
-// Note: Game struct is defined in games.go
 
 // Session represents a game session
 type Session struct {
@@ -67,6 +65,58 @@ func NewSpectatorRegistry() *SpectatorRegistry {
 	}
 }
 
+// AddSpectator returns a new registry with the spectator added (immutable)
+func (r *SpectatorRegistry) AddSpectator(spectator *Spectator) *SpectatorRegistry {
+	newSpectators := make(map[string]*Spectator, len(r.Spectators)+1)
+
+	// Copy existing spectators
+	for id, spec := range r.Spectators {
+		newSpectators[id] = spec
+	}
+
+	// Add new spectator
+	spectatorID := fmt.Sprintf("%d_%s", spectator.UserID, spectator.Username)
+	newSpectators[spectatorID] = spectator
+
+	return &SpectatorRegistry{
+		Spectators: newSpectators,
+		Version:    r.Version + 1,
+	}
+}
+
+// RemoveSpectator returns a new registry with the spectator removed (immutable)
+func (r *SpectatorRegistry) RemoveSpectator(userID int, username string) *SpectatorRegistry {
+	spectatorID := fmt.Sprintf("%d_%s", userID, username)
+
+	// If spectator doesn't exist, return same registry
+	if _, exists := r.Spectators[spectatorID]; !exists {
+		return r
+	}
+
+	newSpectators := make(map[string]*Spectator, len(r.Spectators)-1)
+
+	// Copy all except the removed spectator
+	for id, spec := range r.Spectators {
+		if id != spectatorID {
+			newSpectators[id] = spec
+		}
+	}
+
+	return &SpectatorRegistry{
+		Spectators: newSpectators,
+		Version:    r.Version + 1,
+	}
+}
+
+// GetSpectators returns a slice of all spectators (safe to read concurrently)
+func (r *SpectatorRegistry) GetSpectators() []*Spectator {
+	spectators := make([]*Spectator, 0, len(r.Spectators))
+	for _, spectator := range r.Spectators {
+		spectators = append(spectators, spectator)
+	}
+	return spectators
+}
+
 // Spectator represents a session spectator
 type Spectator struct {
 	UserID     int                 `json:"user_id"`
@@ -108,6 +158,102 @@ func NewStreamManager() *StreamManager {
 		bufferSize:   defaultBufferSize,
 		recentFrames: make([]*StreamFrame, defaultBufferSize),
 		bufferIndex:  0,
+	}
+}
+
+// Start begins the streaming process
+func (sm *StreamManager) Start(registry *atomic.Pointer[SpectatorRegistry]) {
+	sm.wg.Add(1)
+	go sm.streamLoop(registry)
+}
+
+// Stop gracefully stops the streaming process
+func (sm *StreamManager) Stop() {
+	close(sm.stopChan)
+	sm.wg.Wait()
+}
+
+// SendFrame sends an immutable frame to all spectators
+func (sm *StreamManager) SendFrame(data []byte) {
+	if len(data) == 0 {
+		return
+	}
+
+	frameID := sm.frameID.Add(1)
+	frame := NewStreamFrame(data, frameID)
+
+	select {
+	case sm.frameChannel <- frame:
+		// Frame queued successfully
+	default:
+		// Channel full, drop frame (prevents blocking)
+		// Note: would need to import log package for this
+		// log.Printf("Warning: Dropped frame %d due to full buffer", frameID)
+	}
+}
+
+// GetRecentFrames returns the recent frames from the circular buffer
+func (sm *StreamManager) GetRecentFrames() []*StreamFrame {
+	sm.recentFramesLock.RLock()
+	defer sm.recentFramesLock.RUnlock()
+
+	// Collect non-nil frames in order
+	frames := make([]*StreamFrame, 0, sm.bufferSize)
+
+	// Start from the oldest frame position
+	startIdx := sm.bufferIndex
+	for i := 0; i < sm.bufferSize; i++ {
+		idx := (startIdx + i) % sm.bufferSize
+		if sm.recentFrames[idx] != nil {
+			frames = append(frames, sm.recentFrames[idx])
+		}
+	}
+
+	return frames
+}
+
+// streamLoop processes frames and distributes them to spectators
+func (sm *StreamManager) streamLoop(registry *atomic.Pointer[SpectatorRegistry]) {
+	defer sm.wg.Done()
+
+	for {
+		select {
+		case frame := <-sm.frameChannel:
+			sm.distributeFrame(frame, registry)
+		case <-sm.stopChan:
+			return
+		}
+	}
+}
+
+// distributeFrame sends a frame to all active spectators
+func (sm *StreamManager) distributeFrame(frame *StreamFrame, registry *atomic.Pointer[SpectatorRegistry]) {
+	// Store frame in circular buffer
+	sm.recentFramesLock.Lock()
+	sm.recentFrames[sm.bufferIndex] = frame
+	sm.bufferIndex = (sm.bufferIndex + 1) % sm.bufferSize
+	sm.recentFramesLock.Unlock()
+
+	// Load current immutable registry
+	currentRegistry := registry.Load()
+	if currentRegistry == nil {
+		return
+	}
+
+	// Get current spectators (safe concurrent read)
+	spectators := currentRegistry.GetSpectators()
+
+	// Send frame to each spectator concurrently
+	for _, spectator := range spectators {
+		if spectator.IsActive && spectator.Connection != nil && spectator.Connection.IsConnected() {
+			go func(spec *Spectator, f *StreamFrame) {
+				if err := spec.Connection.Write(f); err != nil {
+					// Note: would need to import log package for this
+					// log.Printf("Failed to send frame %d to spectator %s: %v", f.FrameID, spec.Username, err)
+					// TODO: Mark spectator as inactive or remove
+				}
+			}(spectator, frame)
+		}
 	}
 }
 
@@ -167,18 +313,6 @@ type GameStatistics struct {
 }
 
 // Service interfaces
-
-// GameServiceClient interface for game service
-type GameServiceClient interface {
-	ListGames(ctx context.Context) ([]*Game, error)
-	GetGame(ctx context.Context, gameID string) (*Game, error)
-	StartGame(ctx context.Context, req *StartGameRequest) (*GameSession, error)
-	StopGame(ctx context.Context, sessionID string) error
-	GetGameStatus(ctx context.Context, sessionID string) (*GameSession, error)
-	UpdateGameConfig(ctx context.Context, gameID string, config *Game) error
-}
-
-// Note: StartGameRequest struct is defined in games.go
 
 // Event system for game notifications
 

@@ -115,7 +115,7 @@ func (s *GameService) CreateGame(ctx context.Context, req *CreateGameRequest) (*
 // UpdateGame updates an existing game
 func (s *GameService) UpdateGame(ctx context.Context, gameID string, req *UpdateGameRequest) (*domain.Game, error) {
 	id := domain.NewGameID(gameID)
-	
+
 	// Find existing game
 	game, err := s.gameRepo.FindByID(ctx, id)
 	if err != nil {
@@ -191,13 +191,13 @@ func (s *GameService) UpdateGame(ctx context.Context, gameID string, req *Update
 // DeleteGame deletes a game
 func (s *GameService) DeleteGame(ctx context.Context, gameID string) error {
 	id := domain.NewGameID(gameID)
-	
+
 	// Check if game has active sessions
 	activeSessions, err := s.sessionRepo.FindActiveByGame(ctx, id)
 	if err != nil {
 		return fmt.Errorf("failed to check active sessions: %w", err)
 	}
-	
+
 	if len(activeSessions) > 0 {
 		return fmt.Errorf("cannot delete game with active sessions")
 	}
@@ -209,7 +209,7 @@ func (s *GameService) DeleteGame(ctx context.Context, gameID string) error {
 // EnableGame enables a game
 func (s *GameService) EnableGame(ctx context.Context, gameID string) error {
 	id := domain.NewGameID(gameID)
-	
+
 	game, err := s.gameRepo.FindByID(ctx, id)
 	if err != nil {
 		return fmt.Errorf("game not found: %w", err)
@@ -222,7 +222,7 @@ func (s *GameService) EnableGame(ctx context.Context, gameID string) error {
 // DisableGame disables a game
 func (s *GameService) DisableGame(ctx context.Context, gameID string) error {
 	id := domain.NewGameID(gameID)
-	
+
 	game, err := s.gameRepo.FindByID(ctx, id)
 	if err != nil {
 		return fmt.Errorf("game not found: %w", err)
@@ -235,7 +235,7 @@ func (s *GameService) DisableGame(ctx context.Context, gameID string) error {
 // GetGameStatistics retrieves game statistics
 func (s *GameService) GetGameStatistics(ctx context.Context, gameID string) (*domain.GameStatistics, error) {
 	id := domain.NewGameID(gameID)
-	
+
 	game, err := s.gameRepo.FindByID(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("game not found: %w", err)

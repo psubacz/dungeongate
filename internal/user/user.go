@@ -362,7 +362,6 @@ func (s *Service) usernameExists(ctx context.Context, username string) (bool, er
 	return count > 0, nil
 }
 
-
 // hashPassword hashes a password using Argon2
 func (s *Service) hashPassword(password string) (string, string, error) {
 	// Generate salt

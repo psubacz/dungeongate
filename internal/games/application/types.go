@@ -92,9 +92,9 @@ type UpdateGameConfig struct {
 
 // StartSessionRequest represents a request to start a new game session
 type StartSessionRequest struct {
-	UserID    int    `json:"user_id"`
-	Username  string `json:"username"`
-	GameID    string `json:"game_id"`
+	UserID   int    `json:"user_id"`
+	Username string `json:"username"`
+	GameID   string `json:"game_id"`
 
 	// Terminal configuration
 	TerminalWidth  int `json:"terminal_width"`
@@ -166,11 +166,11 @@ type RestoreBackupRequest struct {
 
 // ListSessionsRequest represents a request to list sessions
 type ListSessionsRequest struct {
-	UserID   *int    `json:"user_id,omitempty"`
-	GameID   *string `json:"game_id,omitempty"`
-	Status   *string `json:"status,omitempty"`
-	Limit    int     `json:"limit"`
-	Offset   int     `json:"offset"`
+	UserID *int    `json:"user_id,omitempty"`
+	GameID *string `json:"game_id,omitempty"`
+	Status *string `json:"status,omitempty"`
+	Limit  int     `json:"limit"`
+	Offset int     `json:"offset"`
 }
 
 // ListGamesRequest represents a request to list games

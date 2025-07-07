@@ -432,7 +432,6 @@ func (s *Service) startKubernetesPod(ctx context.Context, session *GameSession, 
 	return fmt.Errorf("Kubernetes pod runtime not yet implemented")
 }
 
-
 // Event streaming methods
 
 // PublishGameEvent publishes an event to all listening streams

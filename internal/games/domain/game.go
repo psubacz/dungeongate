@@ -75,29 +75,29 @@ type ResourceConfig struct {
 
 // SecurityConfig defines security settings for the game
 type SecurityConfig struct {
-	RunAsUser              uint32
-	RunAsGroup             uint32
-	ReadOnlyRootFilesystem bool
+	RunAsUser                uint32
+	RunAsGroup               uint32
+	ReadOnlyRootFilesystem   bool
 	AllowPrivilegeEscalation bool
-	Capabilities           []string
+	Capabilities             []string
 }
 
 // NetworkConfig defines networking settings for the game
 type NetworkConfig struct {
-	Isolated        bool
-	AllowedPorts    []int
-	AllowedDomains  []string
-	BlockInternet   bool
+	Isolated       bool
+	AllowedPorts   []int
+	AllowedDomains []string
+	BlockInternet  bool
 }
 
 // GameStatus represents the current status of a game
 type GameStatus string
 
 const (
-	GameStatusEnabled  GameStatus = "enabled"
-	GameStatusDisabled GameStatus = "disabled"
+	GameStatusEnabled     GameStatus = "enabled"
+	GameStatusDisabled    GameStatus = "disabled"
 	GameStatusMaintenance GameStatus = "maintenance"
-	GameStatusDeprecated GameStatus = "deprecated"
+	GameStatusDeprecated  GameStatus = "deprecated"
 )
 
 // GameStatistics tracks usage statistics for a game

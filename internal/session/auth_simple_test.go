@@ -11,18 +11,18 @@ import (
 func TestUserTypeConversion(t *testing.T) {
 	lastLogin := time.Now()
 	userServiceUser := &user.User{
-		ID:           123,
-		Username:     "testuser",
-		Email:        "test@example.com",
-		IsActive:     true,
-		Flags:        user.UserFlagAdmin | user.UserFlagModerator,
-		CreatedAt:    time.Now(),
-		UpdatedAt:    time.Now(),
-		LastLogin:    &lastLogin,
-		LoginCount:   5,
+		ID:            123,
+		Username:      "testuser",
+		Email:         "test@example.com",
+		IsActive:      true,
+		Flags:         user.UserFlagAdmin | user.UserFlagModerator,
+		CreatedAt:     time.Now(),
+		UpdatedAt:     time.Now(),
+		LastLogin:     &lastLogin,
+		LoginCount:    5,
 		EmailVerified: true,
 	}
-	
+
 	// Convert user.User to session.User (simulating the conversion in ssh.go)
 	sessionUser := &User{
 		ID:              userServiceUser.ID,
@@ -35,24 +35,24 @@ func TestUserTypeConversion(t *testing.T) {
 		UpdatedAt:       userServiceUser.UpdatedAt,
 		LastLogin:       *userServiceUser.LastLogin,
 	}
-	
+
 	// Verify conversion
 	if sessionUser.ID != userServiceUser.ID {
 		t.Errorf("Expected ID %d, got %d", userServiceUser.ID, sessionUser.ID)
 	}
-	
+
 	if sessionUser.Username != userServiceUser.Username {
 		t.Errorf("Expected username '%s', got '%s'", userServiceUser.Username, sessionUser.Username)
 	}
-	
+
 	if !sessionUser.IsAdmin {
 		t.Error("Expected user to be admin based on flags")
 	}
-	
+
 	if !sessionUser.IsAuthenticated {
 		t.Error("Expected session user to be authenticated")
 	}
-	
+
 	if sessionUser.Email != userServiceUser.Email {
 		t.Errorf("Expected email '%s', got '%s'", userServiceUser.Email, sessionUser.Email)
 	}
@@ -86,7 +86,7 @@ func TestUserTypeFlagConversion(t *testing.T) {
 			expectAdmin: false,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			lastLogin := time.Now()
@@ -98,7 +98,7 @@ func TestUserTypeFlagConversion(t *testing.T) {
 				Flags:     tt.flags,
 				LastLogin: &lastLogin,
 			}
-			
+
 			// Convert to session user
 			sessionUser := &User{
 				ID:              userServiceUser.ID,
@@ -109,7 +109,7 @@ func TestUserTypeFlagConversion(t *testing.T) {
 				IsAdmin:         (userServiceUser.Flags & user.UserFlagAdmin) != 0,
 				LastLogin:       *userServiceUser.LastLogin,
 			}
-			
+
 			if sessionUser.IsAdmin != tt.expectAdmin {
 				t.Errorf("Expected IsAdmin=%v, got IsAdmin=%v", tt.expectAdmin, sessionUser.IsAdmin)
 			}
@@ -120,10 +120,10 @@ func TestUserTypeFlagConversion(t *testing.T) {
 // TestAuthenticationPathSelection tests which authentication path would be selected
 func TestAuthenticationPathSelection(t *testing.T) {
 	tests := []struct {
-		name               string
-		hasAuthMiddleware  bool
-		hasUserService     bool
-		expectedPath       string
+		name              string
+		hasAuthMiddleware bool
+		hasUserService    bool
+		expectedPath      string
 	}{
 		{
 			name:              "Auth middleware available",
@@ -144,7 +144,7 @@ func TestAuthenticationPathSelection(t *testing.T) {
 			expectedPath:      "none",
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Test which path would be taken (simulating the logic from ssh.go)
@@ -156,7 +156,7 @@ func TestAuthenticationPathSelection(t *testing.T) {
 			} else {
 				actualPath = "none"
 			}
-			
+
 			if actualPath != tt.expectedPath {
 				t.Errorf("Expected path '%s', got '%s'", tt.expectedPath, actualPath)
 			}
@@ -197,21 +197,21 @@ func TestAuthenticationRetryLogic(t *testing.T) {
 			expectedResult: "success",
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			attempts := 0
 			var result string
-			
+
 			for _, shouldFail := range tt.failurePattern {
 				attempts++
-				
+
 				if !shouldFail {
 					// Authentication succeeded
 					result = "success"
 					break
 				}
-				
+
 				// Authentication failed
 				if attempts >= tt.maxAttempts {
 					result = "max_attempts_exceeded"
@@ -219,7 +219,7 @@ func TestAuthenticationRetryLogic(t *testing.T) {
 				}
 				// Otherwise, continue to next attempt
 			}
-			
+
 			if result != tt.expectedResult {
 				t.Errorf("Expected result '%s', got '%s'", tt.expectedResult, result)
 			}
@@ -260,13 +260,13 @@ func TestErrorMessageMapping(t *testing.T) {
 			expectedLabel: "authentication_failed",
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Simulate the error handling logic from ssh.go
 			var errorMessage string
 			var metricLabel string
-			
+
 			switch {
 			case contains(tt.errorString, "username_not_found"):
 				errorMessage = "Username not found. Please check your username and try again.\r\n"
@@ -281,11 +281,11 @@ func TestErrorMessageMapping(t *testing.T) {
 				errorMessage = "Authentication failed. Please try again.\r\n"
 				metricLabel = "authentication_failed"
 			}
-			
+
 			if errorMessage != tt.expectedMsg {
 				t.Errorf("Expected message '%s', got '%s'", tt.expectedMsg, errorMessage)
 			}
-			
+
 			if metricLabel != tt.expectedLabel {
 				t.Errorf("Expected label '%s', got '%s'", tt.expectedLabel, metricLabel)
 			}

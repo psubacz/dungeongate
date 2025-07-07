@@ -473,7 +473,7 @@ func (s *Service) convertUserToProto(userObj *user.User) *proto.User {
 	if userObj.LastLogin != nil {
 		lastLogin = timestampProto(*userObj.LastLogin)
 	}
-	
+
 	return &proto.User{
 		Id:              strconv.Itoa(userObj.ID),
 		Username:        userObj.Username,
@@ -501,4 +501,3 @@ func (s *Service) resetFailedLoginAttempts(ctx context.Context, username, client
 func timestampProto(t time.Time) *timestamppb.Timestamp {
 	return timestamppb.New(t)
 }
-

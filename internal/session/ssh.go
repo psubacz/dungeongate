@@ -19,11 +19,15 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/dungeongate/internal/games/saves"
 	"github.com/dungeongate/internal/user"
 	"github.com/dungeongate/pkg/config"
 	"github.com/dungeongate/pkg/metrics"
 	"golang.org/x/crypto/ssh"
 )
+
+// NewSaveManager creates a new save manager (alias to the extracted function)
+var NewSaveManager = saves.NewSaveManager
 
 // WindowSize represents terminal window dimensions
 type WindowSize struct {
@@ -687,6 +691,15 @@ func (s *SSHServer) replaceBannerPlaceholders(bannerText, username string) strin
 }
 
 // addBannerFooter adds a hardcoded footer to the banner content
+//   Left side (Danger):
+//   - ᛞ (Dagaz) - day/danger/transformation
+//   - ᚦ (Thurisaz) - thorn/giant/destructive force
+//   - ᛁ (Isa) - ice/standstill/danger
+
+// Right side (Luck):
+// - ᚠ (Fehu) - wealth/prosperity/good fortune
+// - ᛟ (Othala) - inheritance/legacy/ancestral luck
+// - ᚹ (Wunjo) - joy/harmony/wish fulfillment
 func (s *SSHServer) addBannerFooter(bannerText string) string {
 	version := "0.0.2" // default fallback
 	if s.config != nil && s.config.Version != "" {
@@ -696,8 +709,8 @@ func (s *SSHServer) addBannerFooter(bannerText string) string {
 	footer := fmt.Sprintf(`
 
 	
-  ## Powered by ᚠ ᚢ ᚦ ᚨ ᚱ ᚷ ᚹ ᛞ ᛉ ᛏ   DungeonGate   ᛃ ᛇ ᛒ ᛗ ᛚ ᛝ %s
-  ## See https://github.com/psubacz/dungeongate`, version)
+Powered by ᛞ ᚦ ᛁ   DungeonGate   ᚠ ᛟ ᚹ %s
+https://github.com/psubacz/dungeongate`, version)
 
 	return bannerText + footer
 }

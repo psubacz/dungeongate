@@ -18,9 +18,9 @@ import (
 
 	"github.com/dungeongate/internal/games/application"
 	grpc_service "github.com/dungeongate/internal/games/infrastructure/grpc"
+	games_pb "github.com/dungeongate/pkg/api/games"
 	"github.com/dungeongate/pkg/config"
 	"github.com/dungeongate/pkg/database"
-	games_pb "github.com/dungeongate/pkg/api/games"
 )
 
 var (
@@ -231,7 +231,7 @@ func startGRPCServer(ctx context.Context, cfg *config.GameServiceConfig, server 
 	}
 
 	log.Printf("gRPC server starting on %s", addr)
-	
+
 	go func() {
 		<-ctx.Done()
 		log.Println("Shutting down gRPC server...")
@@ -248,14 +248,14 @@ func startGRPCServer(ctx context.Context, cfg *config.GameServiceConfig, server 
 // startHTTPServer starts the HTTP server
 func startHTTPServer(ctx context.Context, cfg *config.GameServiceConfig, server *http.Server) error {
 	log.Printf("HTTP server starting on %s", server.Addr)
-	
+
 	go func() {
 		<-ctx.Done()
 		log.Println("Shutting down HTTP server...")
-		
+
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-		
+
 		if err := server.Shutdown(shutdownCtx); err != nil {
 			log.Printf("HTTP server shutdown error: %v", err)
 		}
@@ -301,7 +301,7 @@ func handleGamesAPI(gameService *application.GameService) http.HandlerFunc {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
-			
+
 			w.Header().Set("Content-Type", "application/json")
 			// TODO: Serialize games to JSON
 			fmt.Fprintf(w, `{"games": [], "count": %d}`, len(games))
@@ -333,7 +333,7 @@ func handleSessionsAPI(sessionService *application.SessionService) http.HandlerF
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
-			
+
 			w.Header().Set("Content-Type", "application/json")
 			fmt.Fprintf(w, `{"sessions": [], "count": %d}`, len(sessions))
 
