@@ -23,6 +23,25 @@
                         └─────────────────┘
 ```
 
+## 🐛 Known Issues
+
+### **SSH Client Window Size Compatibility**
+**Issue**: Some SSH clients send `width=0` in PTY requests, causing NetHack and other terminal games to fail with exit status 1.
+
+**Root Cause**: SSH clients may send invalid window dimensions (0x0) in the initial PTY request payload, resulting in `COLUMNS=0` and `LINES=0` environment variables being passed to games.
+
+**Solution**: Implemented fallback using `max()` function in PTY manager:
+```go
+session.Environment["COLUMNS"] = fmt.Sprintf("%d", max(windowSize.Width, 80))
+session.Environment["LINES"] = fmt.Sprintf("%d", max(windowSize.Height, 24))
+```
+
+**Files**: 
+- `internal/session/pty_manager.go` - PTY environment variable setup
+- `internal/session/ssh.go` - SSH PTY request parsing
+
+**Impact**: Ensures minimum viable terminal dimensions (80x24) for all games, preventing startup failures due to invalid window sizes.
+
 ## 🚨 Critical Issues to Address
 
 ### **Current Session Service Problems**
