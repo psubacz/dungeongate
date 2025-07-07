@@ -2,24 +2,37 @@
 
 ## 🎯 Game Service Architecture Vision
 
-### **Core Philosophy: Event-Driven Microservice with Clean Separation**
+### **Core Philosophy: Scalable Stateful Game Backend**
 
-**Architecture Pattern**: Domain-Driven Design (DDD) with CQRS and Event Sourcing
-- **Domain**: Game lifecycle, process management, save states
-- **Command Side**: Game operations (start, stop, save, load)
-- **Query Side**: Game metadata, status, statistics
-- **Events**: Game state changes, session events
+**Architecture Pattern**: Stateful microservice that runs inside containers and scales independently
+- **Domain**: Game process management, world state synchronization, user data
+- **Deployment**: Multiple game service pods, each running multiple concurrent games
+- **Scaling**: Horizontal scaling of game service pods based on load
+- **State Sync**: Cross-pod synchronization for shared world state (bones files, levels)
+- **Session Routing**: Session service connects to any available game service pod
 
 ### **Service Boundaries**
 ```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│  Session Service │────│  Game Service   │────│  Storage Service│
-│  (SSH/Terminal) │    │  (Lifecycle)    │    │  (Saves/Config) │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-         │                       │                       │
-         │              ┌─────────────────┐              │
-         └──────────────│  Auth Service   │──────────────┘
+┌─────────────────┐    ┌─────────────────────────────────────┐
+│  Session Service │────│         Game Service Cluster       │
+│  (SSH/Terminal) │    │  ┌───────────┐ ┌───────────┐       │
+└─────────────────┘    │  │Game Pod 1 │ │Game Pod 2 │ ...   │
+         │              │  │- NetHack  │ │- DCSS     │       │
+         │              │  │- DCSS     │ │- NetHack  │       │
+         │              │  │- Saves    │ │- Saves    │       │
+         │              │  └───────────┘ └───────────┘       │
+         │              └─────────────────────────────────────┘
+         │                       │
+         │              ┌─────────────────┐
+         └──────────────│  Auth Service   │
                         │ (Identity/Perms)│
+                        └─────────────────┘
+                                 │
+                        ┌─────────────────┐
+                        │ Shared Storage  │
+                        │- User Saves     │
+                        │- Bones Files    │ 
+                        │- World State    │
                         └─────────────────┘
 ```
 
@@ -320,12 +333,25 @@ func (p *SSHConnectionPool) HandleConnection(conn net.Conn) {
 14. **✅ Update game client integration** - Replaced all mock gRPC calls with real protobuf service calls
 15. **✅ Service interoperability** - Both services build and can communicate via gRPC
 
-### **📋 Phase 5: Advanced Features (PLANNED)**
-16. **Add RabbitMQ spectating integration**
-17. **Add stream encryption** for security
-18. **Implement game isolation** (critical for multi-user)
-19. **Shared game state (bones) implementation**
-20. **Object pooling optimization**
+### **📋 Phase 5: Stateful Game Backend (PLANNED)**
+16. **Game cleanup after exit, save storage and loading**
+17. **Pod-based deployment architecture**
+    - Game service runs inside containers/pods
+    - Horizontal scaling based on game load
+    - Session service load balancing across pods
+18. **Cross-pod world state synchronization**
+    - NetHack bones files shared across all pods
+    - Shared dungeon levels and world state
+    - Event-driven synchronization for real-time updates
+19. **User data management per pod**
+    - Save files accessible from any pod
+    - Session migration between pods
+    - Distributed save state consistency
+20. **Add RabbitMQ spectating integration**
+21. **Add stream encryption** for security
+22. **Object pooling optimization**
+
+
 
 ### **🎯 Current Status: Ready for Phase 5 - Advanced Features**
 The microservices architecture is now complete! Both session and game services are fully integrated:
@@ -456,24 +482,25 @@ const (
 )
 ```
 
-### **Process Management Strategy**
+### **Deployment Strategy**
 
-#### **Option 1: Process-based (Recommended for Start)**
-- Direct process management with PTY
-- Fast startup, low overhead
-- Easier debugging and development
-- Resource isolation via cgroups
+#### **Game Service Pod Architecture**
+- **Game Service runs inside containers/pods** (not managing containers)
+- **Multiple games per pod**: Each pod can run multiple concurrent game processes
+- **Horizontal scaling**: Scale pods based on game load and resource usage
+- **Load balancing**: Session service distributes game requests across available pods
 
-#### **Option 2: Container-based (Future)**
-- Docker/Podman containers
-- Better isolation and security
-- Kubernetes orchestration
-- Resource limits and monitoring
+#### **World State Synchronization**
+- **Shared storage backend**: NetHack bones files, save data, shared world state
+- **Cross-pod consistency**: Real-time synchronization of world changes
+- **Event-driven updates**: Game events broadcast to all pods for state consistency
+- **Conflict resolution**: Handle concurrent updates to shared world state
 
-#### **Option 3: Hybrid Approach (Long-term)**
-- Process-based for development
-- Container-based for production
-- Automatic scaling based on load
+#### **Session Routing**
+- **Pod discovery**: Session service maintains registry of available game pods
+- **Health checks**: Monitor pod health and game capacity
+- **Game placement**: Route new games to least-loaded available pods
+- **Session migration**: Support moving active sessions between pods (future)
 
 ### **Data Architecture**
 

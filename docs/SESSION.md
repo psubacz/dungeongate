@@ -173,9 +173,43 @@ The SSH service supports various terminal games:
 - **Bash Shell**: Interactive shell for testing
 - **Custom Games**: Easy to add new terminal games
 
-### Game Configuration
+### Game Service Integration
 
-Games are configured through the Game Service:
+The Session Service integrates with the Game Service cluster through a microservices architecture. The Game Service operates as a **stateful, scalable backend** that runs inside containers/pods and handles:
+
+- **Multi-Game Pod Management**: Each pod runs multiple concurrent games
+- **World State Synchronization**: NetHack bones files and shared world state across pods  
+- **User Data Management**: Save files accessible from any pod in the cluster
+- **Load Balancing**: Session service routes games to available pods
+- **Cross-Pod Events**: Real-time synchronization of game state changes
+
+#### Service Communication Flow
+
+```
+SSH Client → Session Service → Game Service Cluster
+     ↑              ↓              ↓
+  Terminal     Load Balancer   ┌─────────────┐
+   Output     PTY Bridge      │ Game Pod 1  │
+                              │- NetHack    │
+                              │- DCSS       │
+                              └─────────────┘
+                                     ↓
+                              ┌─────────────┐
+                              │ Game Pod 2  │  
+                              │- Multiple   │
+                              │  Games      │
+                              └─────────────┘
+                                     ↓
+                              ┌─────────────┐
+                              │Shared State │
+                              │- Bones      │
+                              │- Saves      │
+                              └─────────────┘
+```
+
+#### Game Configuration
+
+Games are configured through the Game Service cluster with pod-aware options:
 
 ```go
 // Example game configuration
