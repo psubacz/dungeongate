@@ -374,7 +374,69 @@ func (p *SSHConnectionPool) HandleConnection(conn net.Conn) {
 23. **Add stream encryption** for security
 24. **Object pooling optimization**
 
+### **📋 Phase 6: PTY Tunneling Implementation (PLANNED)**
+**Focus**: Enable PTY communication between session and game services over gRPC
 
+25. **Implement PTY tunnel creation and management**
+    - Create PTY tunnel request handling
+    - Establish bidirectional gRPC streams for PTY data
+    - Handle terminal resize events over tunnel
+26. **Add PTY data batching and optimization**
+    - Batch PTY operations to reduce gRPC calls
+    - Implement efficient binary protocol for PTY data
+    - Add connection pooling for persistent gRPC connections
+27. **Implement session death handling**
+    - Detect session disconnections and trigger auto-save
+    - Handle graceful game shutdown on session loss
+    - Ensure save file consistency during abrupt disconnections
+
+### **📋 Phase 7: Service Discovery Integration (PLANNED)**
+**Focus**: Integrate with Kubernetes service discovery for dynamic game availability
+
+28. **Implement game availability reporting**
+    - Add ListAvailableGames gRPC endpoint
+    - Report current capacity per game per pod
+    - Real-time availability updates via streaming
+29. **Add Kubernetes service discovery integration**
+    - Watch K8s service endpoints for pod health
+    - Combine K8s health with game-level availability
+    - Implement intelligent routing to optimal pods
+30. **Implement capacity tracking and monitoring**
+    - Track game slots usage per pod
+    - Monitor CPU/memory usage for capacity decisions
+    - Implement circuit breakers for unhealthy pods
+
+### **📋 Phase 8: Game Availability Reporting (PLANNED)**
+**Focus**: Real-time game menu updates and intelligent routing
+
+31. **Implement real-time menu updates**
+    - Stream capacity changes to session services
+    - Update game menus dynamically as pods change
+    - Handle race conditions in game selection
+32. **Add intelligent game routing**
+    - Route game requests to optimal pods based on load
+    - Implement fallback handling for unavailable pods
+    - Add connection migration support for pod failures
+33. **Implement distributed game state synchronization**
+    - Share NetHack bones files across pods
+    - Synchronize game world state for consistency
+    - Handle cross-pod game interactions
+
+### **📋 Phase 9: Kubernetes Integration (PLANNED)**
+**Focus**: Native Kubernetes deployment and scaling
+
+34. **Implement Kubernetes-native deployment**
+    - Create Helm charts for all services
+    - Add Kubernetes operators for game management
+    - Implement auto-scaling based on game demand
+35. **Add service mesh integration**
+    - Integrate with Istio/Linkerd for secure communication
+    - Implement distributed tracing across services
+    - Add circuit breakers and retry policies
+36. **Implement multi-cluster support**
+    - Deploy across multiple Kubernetes clusters
+    - Add geographic distribution for game services
+    - Implement cross-cluster service discovery
 
 ## 🎮 Game Configuration Management
 
@@ -1555,6 +1617,15 @@ type GameService interface {
     GetGameStatus(ctx context.Context, gameID string) (*GameStatus, error)
     ListActiveGames(ctx context.Context) ([]*GameInstance, error)
     
+    // Service Discovery
+    ListAvailableGames(ctx context.Context) (*GameAvailability, error)
+    GetPodCapacity(ctx context.Context) (*PodCapacity, error)
+    SubscribeToCapacityUpdates(ctx context.Context) (CapacityUpdateStream, error)
+    
+    // PTY Communication
+    CreatePTYTunnel(ctx context.Context, req *PTYTunnelRequest) (PTYTunnelStream, error)
+    HandlePTYData(ctx context.Context, stream PTYDataStream) error
+    
     // Resource Management
     GetGameMetrics(ctx context.Context, gameID string) (*GameMetrics, error)
     ScaleGame(ctx context.Context, gameID string, resources *ResourceSpec) error
@@ -1574,14 +1645,57 @@ type GameEvent struct {
 
 // Event Types
 const (
-    GameStarted    EventType = "game.started"
-    GameStopped    EventType = "game.stopped"
-    GameSaved      EventType = "game.saved"
-    GameLoaded     EventType = "game.loaded"
-    PlayerJoined   EventType = "player.joined"
-    PlayerLeft     EventType = "player.left"
-    ResourceAlert  EventType = "resource.alert"
+    GameStarted         EventType = "game.started"
+    GameStopped         EventType = "game.stopped"
+    GameSaved           EventType = "game.saved"
+    GameLoaded          EventType = "game.loaded"
+    PlayerJoined        EventType = "player.joined"
+    PlayerLeft          EventType = "player.left"
+    ResourceAlert       EventType = "resource.alert"
+    PodCapacityUpdated  EventType = "pod.capacity.updated"
+    GameAvailabilityChanged EventType = "game.availability.changed"
+    PTYTunnelCreated    EventType = "pty.tunnel.created"
+    PTYTunnelClosed     EventType = "pty.tunnel.closed"
 )
+
+// Service Discovery Data Structures
+type GameAvailability struct {
+    PodID    string                 `json:"pod_id"`
+    Games    map[string]*GameSlots  `json:"games"`
+    Updated  time.Time              `json:"updated"`
+}
+
+type GameSlots struct {
+    GameName        string `json:"game_name"`
+    CurrentPlayers  int    `json:"current_players"`
+    MaxPlayers      int    `json:"max_players"`
+    AcceptingConns  bool   `json:"accepting_connections"`
+}
+
+type PodCapacity struct {
+    PodID           string `json:"pod_id"`
+    TotalSlots      int    `json:"total_slots"`
+    UsedSlots       int    `json:"used_slots"`
+    AvailableSlots  int    `json:"available_slots"`
+    CPUUsage        float64 `json:"cpu_usage"`
+    MemoryUsage     float64 `json:"memory_usage"`
+}
+
+// PTY Tunneling Data Structures
+type PTYTunnelRequest struct {
+    SessionID   string `json:"session_id"`
+    GameName    string `json:"game_name"`
+    UserID      int    `json:"user_id"`
+    TerminalCols int   `json:"terminal_cols"`
+    TerminalRows int   `json:"terminal_rows"`
+}
+
+type PTYData struct {
+    SessionID   string    `json:"session_id"`
+    Data        []byte    `json:"data"`
+    Direction   string    `json:"direction"` // "input" or "output"
+    Timestamp   time.Time `json:"timestamp"`
+}
 ```
 
 ### **Deployment Strategy**
