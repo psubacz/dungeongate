@@ -520,12 +520,18 @@ proto-gen: ## Generate Go code from Protocol Buffers
 	@mkdir -p $(GO_OUT_DIR)
 	$(PROTOC) --go_out=$(GO_OUT_DIR) --go_opt=paths=source_relative \
 		--go-grpc_out=$(GO_OUT_DIR) --go-grpc_opt=paths=source_relative \
-		-I $(PROTO_DIR) $(PROTO_DIR)/games/game_service.proto
+		-I $(PROTO_DIR) $(PROTO_DIR)/auth/auth_service.proto
+	$(PROTOC) --go_out=$(GO_OUT_DIR) --go_opt=paths=source_relative \
+		--go-grpc_out=$(GO_OUT_DIR) --go-grpc_opt=paths=source_relative \
+		-I $(PROTO_DIR) $(PROTO_DIR)/games/game_service_v1.proto
+	$(PROTOC) --go_out=$(GO_OUT_DIR) --go_opt=paths=source_relative \
+		--go-grpc_out=$(GO_OUT_DIR) --go-grpc_opt=paths=source_relative \
+		-I $(PROTO_DIR) $(PROTO_DIR)/games/game_service_v2.proto
 
 .PHONY: proto-clean
 proto-clean: ## Clean generated protobuf files
 	@echo "$(GREEN)Cleaning generated protobuf files...$(NC)"
-	@rm -rf $(GO_OUT_DIR)/games
+	@rm -rf $(GO_OUT_DIR)/auth $(GO_OUT_DIR)/games
 
 
 .PHONY: test-game-service
