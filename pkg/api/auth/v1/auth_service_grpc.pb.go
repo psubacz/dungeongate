@@ -2,9 +2,9 @@
 // versions:
 // - protoc-gen-go-grpc v1.5.1
 // - protoc             v5.29.3
-// source: internal/auth/proto/auth_service.proto
+// source: auth/auth_service.proto
 
-package proto
+package v1
 
 import (
 	context "context"
@@ -20,16 +20,16 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	AuthService_Login_FullMethodName               = "/auth.AuthService/Login"
-	AuthService_Logout_FullMethodName              = "/auth.AuthService/Logout"
-	AuthService_RefreshToken_FullMethodName        = "/auth.AuthService/RefreshToken"
-	AuthService_ValidateToken_FullMethodName       = "/auth.AuthService/ValidateToken"
-	AuthService_GetUserInfo_FullMethodName         = "/auth.AuthService/GetUserInfo"
-	AuthService_ChangePassword_FullMethodName      = "/auth.AuthService/ChangePassword"
-	AuthService_ResetPassword_FullMethodName       = "/auth.AuthService/ResetPassword"
-	AuthService_VerifyPasswordReset_FullMethodName = "/auth.AuthService/VerifyPasswordReset"
-	AuthService_GetLoginAttempts_FullMethodName    = "/auth.AuthService/GetLoginAttempts"
-	AuthService_Health_FullMethodName              = "/auth.AuthService/Health"
+	AuthService_Login_FullMethodName               = "/dungeongate.auth.v1.AuthService/Login"
+	AuthService_Logout_FullMethodName              = "/dungeongate.auth.v1.AuthService/Logout"
+	AuthService_RefreshToken_FullMethodName        = "/dungeongate.auth.v1.AuthService/RefreshToken"
+	AuthService_ValidateToken_FullMethodName       = "/dungeongate.auth.v1.AuthService/ValidateToken"
+	AuthService_GetUserInfo_FullMethodName         = "/dungeongate.auth.v1.AuthService/GetUserInfo"
+	AuthService_ChangePassword_FullMethodName      = "/dungeongate.auth.v1.AuthService/ChangePassword"
+	AuthService_ResetPassword_FullMethodName       = "/dungeongate.auth.v1.AuthService/ResetPassword"
+	AuthService_VerifyPasswordReset_FullMethodName = "/dungeongate.auth.v1.AuthService/VerifyPasswordReset"
+	AuthService_GetLoginAttempts_FullMethodName    = "/dungeongate.auth.v1.AuthService/GetLoginAttempts"
+	AuthService_Health_FullMethodName              = "/dungeongate.auth.v1.AuthService/Health"
 )
 
 // AuthServiceClient is the client API for AuthService service.
@@ -439,7 +439,7 @@ func _AuthService_Health_Handler(srv interface{}, ctx context.Context, dec func(
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var AuthService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "auth.AuthService",
+	ServiceName: "dungeongate.auth.v1.AuthService",
 	HandlerType: (*AuthServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
@@ -484,5 +484,5 @@ var AuthService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "internal/auth/proto/auth_service.proto",
+	Metadata: "auth/auth_service.proto",
 }

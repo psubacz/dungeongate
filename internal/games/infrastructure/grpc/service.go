@@ -8,7 +8,7 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/dungeongate/internal/games/application"
-	games_pb "github.com/dungeongate/pkg/api/games"
+	games_pb "github.com/dungeongate/pkg/api/games/v2"
 )
 
 // GameServiceServer implements the gRPC GameService interface

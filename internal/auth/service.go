@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/dungeongate/internal/auth/proto"
+	proto "github.com/dungeongate/pkg/api/auth/v1"
 	"github.com/dungeongate/internal/user"
 	"github.com/dungeongate/pkg/database"
 	"github.com/dungeongate/pkg/encryption"

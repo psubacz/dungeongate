@@ -2,9 +2,9 @@
 // versions:
 // - protoc-gen-go-grpc v1.5.1
 // - protoc             v5.29.3
-// source: games/game_service.proto
+// source: games/game_service_v2.proto
 
-package v1
+package v2
 
 import (
 	context "context"
@@ -20,20 +20,20 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	GameService_ListGames_FullMethodName        = "/dungeongate.games.v1.GameService/ListGames"
-	GameService_GetGame_FullMethodName          = "/dungeongate.games.v1.GameService/GetGame"
-	GameService_CreateGame_FullMethodName       = "/dungeongate.games.v1.GameService/CreateGame"
-	GameService_UpdateGame_FullMethodName       = "/dungeongate.games.v1.GameService/UpdateGame"
-	GameService_DeleteGame_FullMethodName       = "/dungeongate.games.v1.GameService/DeleteGame"
-	GameService_StartGameSession_FullMethodName = "/dungeongate.games.v1.GameService/StartGameSession"
-	GameService_StopGameSession_FullMethodName  = "/dungeongate.games.v1.GameService/StopGameSession"
-	GameService_GetGameSession_FullMethodName   = "/dungeongate.games.v1.GameService/GetGameSession"
-	GameService_ListGameSessions_FullMethodName = "/dungeongate.games.v1.GameService/ListGameSessions"
-	GameService_SaveGame_FullMethodName         = "/dungeongate.games.v1.GameService/SaveGame"
-	GameService_LoadGame_FullMethodName         = "/dungeongate.games.v1.GameService/LoadGame"
-	GameService_DeleteSave_FullMethodName       = "/dungeongate.games.v1.GameService/DeleteSave"
-	GameService_ListSaves_FullMethodName        = "/dungeongate.games.v1.GameService/ListSaves"
-	GameService_Health_FullMethodName           = "/dungeongate.games.v1.GameService/Health"
+	GameService_ListGames_FullMethodName        = "/dungeongate.games.v2.GameService/ListGames"
+	GameService_GetGame_FullMethodName          = "/dungeongate.games.v2.GameService/GetGame"
+	GameService_CreateGame_FullMethodName       = "/dungeongate.games.v2.GameService/CreateGame"
+	GameService_UpdateGame_FullMethodName       = "/dungeongate.games.v2.GameService/UpdateGame"
+	GameService_DeleteGame_FullMethodName       = "/dungeongate.games.v2.GameService/DeleteGame"
+	GameService_StartGameSession_FullMethodName = "/dungeongate.games.v2.GameService/StartGameSession"
+	GameService_StopGameSession_FullMethodName  = "/dungeongate.games.v2.GameService/StopGameSession"
+	GameService_GetGameSession_FullMethodName   = "/dungeongate.games.v2.GameService/GetGameSession"
+	GameService_ListGameSessions_FullMethodName = "/dungeongate.games.v2.GameService/ListGameSessions"
+	GameService_SaveGame_FullMethodName         = "/dungeongate.games.v2.GameService/SaveGame"
+	GameService_LoadGame_FullMethodName         = "/dungeongate.games.v2.GameService/LoadGame"
+	GameService_DeleteSave_FullMethodName       = "/dungeongate.games.v2.GameService/DeleteSave"
+	GameService_ListSaves_FullMethodName        = "/dungeongate.games.v2.GameService/ListSaves"
+	GameService_Health_FullMethodName           = "/dungeongate.games.v2.GameService/Health"
 )
 
 // GameServiceClient is the client API for GameService service.
@@ -563,7 +563,7 @@ func _GameService_Health_Handler(srv interface{}, ctx context.Context, dec func(
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var GameService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "dungeongate.games.v1.GameService",
+	ServiceName: "dungeongate.games.v2.GameService",
 	HandlerType: (*GameServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
@@ -624,5 +624,5 @@ var GameService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "games/game_service.proto",
+	Metadata: "games/game_service_v2.proto",
 }

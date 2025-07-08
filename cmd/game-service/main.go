@@ -18,7 +18,7 @@ import (
 
 	"github.com/dungeongate/internal/games/application"
 	grpc_service "github.com/dungeongate/internal/games/infrastructure/grpc"
-	games_pb "github.com/dungeongate/pkg/api/games"
+	games_pb "github.com/dungeongate/pkg/api/games/v2"
 	"github.com/dungeongate/pkg/config"
 	"github.com/dungeongate/pkg/database"
 )

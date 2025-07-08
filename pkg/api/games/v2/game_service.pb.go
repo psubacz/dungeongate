@@ -2,9 +2,9 @@
 // versions:
 // 	protoc-gen-go v1.36.6
 // 	protoc        v5.29.3
-// source: games/game_service.proto
+// source: games/game_service_v2.proto
 
-package v1
+package v2
 
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
@@ -63,11 +63,11 @@ func (x GameStatus) String() string {
 }
 
 func (GameStatus) Descriptor() protoreflect.EnumDescriptor {
-	return file_games_game_service_proto_enumTypes[0].Descriptor()
+	return file_games_game_service_v2_proto_enumTypes[0].Descriptor()
 }
 
 func (GameStatus) Type() protoreflect.EnumType {
-	return &file_games_game_service_proto_enumTypes[0]
+	return &file_games_game_service_v2_proto_enumTypes[0]
 }
 
 func (x GameStatus) Number() protoreflect.EnumNumber {
@@ -76,7 +76,7 @@ func (x GameStatus) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use GameStatus.Descriptor instead.
 func (GameStatus) EnumDescriptor() ([]byte, []int) {
-	return file_games_game_service_proto_rawDescGZIP(), []int{0}
+	return file_games_game_service_v2_proto_rawDescGZIP(), []int{0}
 }
 
 // SessionStatus represents the status of a game session
@@ -125,11 +125,11 @@ func (x SessionStatus) String() string {
 }
 
 func (SessionStatus) Descriptor() protoreflect.EnumDescriptor {
-	return file_games_game_service_proto_enumTypes[1].Descriptor()
+	return file_games_game_service_v2_proto_enumTypes[1].Descriptor()
 }
 
 func (SessionStatus) Type() protoreflect.EnumType {
-	return &file_games_game_service_proto_enumTypes[1]
+	return &file_games_game_service_v2_proto_enumTypes[1]
 }
 
 func (x SessionStatus) Number() protoreflect.EnumNumber {
@@ -138,7 +138,7 @@ func (x SessionStatus) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use SessionStatus.Descriptor instead.
 func (SessionStatus) EnumDescriptor() ([]byte, []int) {
-	return file_games_game_service_proto_rawDescGZIP(), []int{1}
+	return file_games_game_service_v2_proto_rawDescGZIP(), []int{1}
 }
 
 // SaveStatus represents the status of a save file
@@ -181,11 +181,11 @@ func (x SaveStatus) String() string {
 }
 
 func (SaveStatus) Descriptor() protoreflect.EnumDescriptor {
-	return file_games_game_service_proto_enumTypes[2].Descriptor()
+	return file_games_game_service_v2_proto_enumTypes[2].Descriptor()
 }
 
 func (SaveStatus) Type() protoreflect.EnumType {
-	return &file_games_game_service_proto_enumTypes[2]
+	return &file_games_game_service_v2_proto_enumTypes[2]
 }
 
 func (x SaveStatus) Number() protoreflect.EnumNumber {
@@ -194,7 +194,7 @@ func (x SaveStatus) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use SaveStatus.Descriptor instead.
 func (SaveStatus) EnumDescriptor() ([]byte, []int) {
-	return file_games_game_service_proto_rawDescGZIP(), []int{2}
+	return file_games_game_service_v2_proto_rawDescGZIP(), []int{2}
 }
 
 // Game represents a game configuration
@@ -208,7 +208,7 @@ type Game struct {
 	Tags          []string               `protobuf:"bytes,6,rep,name=tags,proto3" json:"tags,omitempty"`
 	Version       string                 `protobuf:"bytes,7,opt,name=version,proto3" json:"version,omitempty"`
 	Difficulty    int32                  `protobuf:"varint,8,opt,name=difficulty,proto3" json:"difficulty,omitempty"`
-	Status        GameStatus             `protobuf:"varint,9,opt,name=status,proto3,enum=dungeongate.games.v1.GameStatus" json:"status,omitempty"`
+	Status        GameStatus             `protobuf:"varint,9,opt,name=status,proto3,enum=dungeongate.games.v2.GameStatus" json:"status,omitempty"`
 	Binary        *BinaryConfig          `protobuf:"bytes,10,opt,name=binary,proto3" json:"binary,omitempty"`
 	Environment   map[string]string      `protobuf:"bytes,11,rep,name=environment,proto3" json:"environment,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	Resources     *ResourceConfig        `protobuf:"bytes,12,opt,name=resources,proto3" json:"resources,omitempty"`
@@ -223,7 +223,7 @@ type Game struct {
 
 func (x *Game) Reset() {
 	*x = Game{}
-	mi := &file_games_game_service_proto_msgTypes[0]
+	mi := &file_games_game_service_v2_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -235,7 +235,7 @@ func (x *Game) String() string {
 func (*Game) ProtoMessage() {}
 
 func (x *Game) ProtoReflect() protoreflect.Message {
-	mi := &file_games_game_service_proto_msgTypes[0]
+	mi := &file_games_game_service_v2_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -248,7 +248,7 @@ func (x *Game) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Game.ProtoReflect.Descriptor instead.
 func (*Game) Descriptor() ([]byte, []int) {
-	return file_games_game_service_proto_rawDescGZIP(), []int{0}
+	return file_games_game_service_v2_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *Game) GetId() string {
@@ -382,7 +382,7 @@ type BinaryConfig struct {
 
 func (x *BinaryConfig) Reset() {
 	*x = BinaryConfig{}
-	mi := &file_games_game_service_proto_msgTypes[1]
+	mi := &file_games_game_service_v2_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -394,7 +394,7 @@ func (x *BinaryConfig) String() string {
 func (*BinaryConfig) ProtoMessage() {}
 
 func (x *BinaryConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_games_game_service_proto_msgTypes[1]
+	mi := &file_games_game_service_v2_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -407,7 +407,7 @@ func (x *BinaryConfig) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BinaryConfig.ProtoReflect.Descriptor instead.
 func (*BinaryConfig) Descriptor() ([]byte, []int) {
-	return file_games_game_service_proto_rawDescGZIP(), []int{1}
+	return file_games_game_service_v2_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *BinaryConfig) GetPath() string {
@@ -444,7 +444,7 @@ type ResourceConfig struct {
 
 func (x *ResourceConfig) Reset() {
 	*x = ResourceConfig{}
-	mi := &file_games_game_service_proto_msgTypes[2]
+	mi := &file_games_game_service_v2_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -456,7 +456,7 @@ func (x *ResourceConfig) String() string {
 func (*ResourceConfig) ProtoMessage() {}
 
 func (x *ResourceConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_games_game_service_proto_msgTypes[2]
+	mi := &file_games_game_service_v2_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -469,7 +469,7 @@ func (x *ResourceConfig) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResourceConfig.ProtoReflect.Descriptor instead.
 func (*ResourceConfig) Descriptor() ([]byte, []int) {
-	return file_games_game_service_proto_rawDescGZIP(), []int{2}
+	return file_games_game_service_v2_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *ResourceConfig) GetCpuLimit() string {
@@ -514,7 +514,7 @@ type SecurityConfig struct {
 
 func (x *SecurityConfig) Reset() {
 	*x = SecurityConfig{}
-	mi := &file_games_game_service_proto_msgTypes[3]
+	mi := &file_games_game_service_v2_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -526,7 +526,7 @@ func (x *SecurityConfig) String() string {
 func (*SecurityConfig) ProtoMessage() {}
 
 func (x *SecurityConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_games_game_service_proto_msgTypes[3]
+	mi := &file_games_game_service_v2_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -539,7 +539,7 @@ func (x *SecurityConfig) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SecurityConfig.ProtoReflect.Descriptor instead.
 func (*SecurityConfig) Descriptor() ([]byte, []int) {
-	return file_games_game_service_proto_rawDescGZIP(), []int{3}
+	return file_games_game_service_v2_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *SecurityConfig) GetRunAsUser() uint32 {
@@ -590,7 +590,7 @@ type NetworkConfig struct {
 
 func (x *NetworkConfig) Reset() {
 	*x = NetworkConfig{}
-	mi := &file_games_game_service_proto_msgTypes[4]
+	mi := &file_games_game_service_v2_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -602,7 +602,7 @@ func (x *NetworkConfig) String() string {
 func (*NetworkConfig) ProtoMessage() {}
 
 func (x *NetworkConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_games_game_service_proto_msgTypes[4]
+	mi := &file_games_game_service_v2_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -615,7 +615,7 @@ func (x *NetworkConfig) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NetworkConfig.ProtoReflect.Descriptor instead.
 func (*NetworkConfig) Descriptor() ([]byte, []int) {
-	return file_games_game_service_proto_rawDescGZIP(), []int{4}
+	return file_games_game_service_v2_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *NetworkConfig) GetIsolated() bool {
@@ -663,7 +663,7 @@ type GameStatistics struct {
 
 func (x *GameStatistics) Reset() {
 	*x = GameStatistics{}
-	mi := &file_games_game_service_proto_msgTypes[5]
+	mi := &file_games_game_service_v2_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -675,7 +675,7 @@ func (x *GameStatistics) String() string {
 func (*GameStatistics) ProtoMessage() {}
 
 func (x *GameStatistics) ProtoReflect() protoreflect.Message {
-	mi := &file_games_game_service_proto_msgTypes[5]
+	mi := &file_games_game_service_v2_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -688,7 +688,7 @@ func (x *GameStatistics) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GameStatistics.ProtoReflect.Descriptor instead.
 func (*GameStatistics) Descriptor() ([]byte, []int) {
-	return file_games_game_service_proto_rawDescGZIP(), []int{5}
+	return file_games_game_service_v2_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *GameStatistics) GetTotalSessions() int32 {
@@ -754,7 +754,7 @@ type GameSession struct {
 	UserId        int32                  `protobuf:"varint,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
 	Username      string                 `protobuf:"bytes,3,opt,name=username,proto3" json:"username,omitempty"`
 	GameId        string                 `protobuf:"bytes,4,opt,name=game_id,json=gameId,proto3" json:"game_id,omitempty"`
-	Status        SessionStatus          `protobuf:"varint,5,opt,name=status,proto3,enum=dungeongate.games.v1.SessionStatus" json:"status,omitempty"`
+	Status        SessionStatus          `protobuf:"varint,5,opt,name=status,proto3,enum=dungeongate.games.v2.SessionStatus" json:"status,omitempty"`
 	StartTime     *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=start_time,json=startTime,proto3" json:"start_time,omitempty"`
 	EndTime       *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=end_time,json=endTime,proto3" json:"end_time,omitempty"`
 	LastActivity  *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=last_activity,json=lastActivity,proto3" json:"last_activity,omitempty"`
@@ -770,7 +770,7 @@ type GameSession struct {
 
 func (x *GameSession) Reset() {
 	*x = GameSession{}
-	mi := &file_games_game_service_proto_msgTypes[6]
+	mi := &file_games_game_service_v2_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -782,7 +782,7 @@ func (x *GameSession) String() string {
 func (*GameSession) ProtoMessage() {}
 
 func (x *GameSession) ProtoReflect() protoreflect.Message {
-	mi := &file_games_game_service_proto_msgTypes[6]
+	mi := &file_games_game_service_v2_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -795,7 +795,7 @@ func (x *GameSession) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GameSession.ProtoReflect.Descriptor instead.
 func (*GameSession) Descriptor() ([]byte, []int) {
-	return file_games_game_service_proto_rawDescGZIP(), []int{6}
+	return file_games_game_service_v2_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *GameSession) GetId() string {
@@ -907,7 +907,7 @@ type TerminalSize struct {
 
 func (x *TerminalSize) Reset() {
 	*x = TerminalSize{}
-	mi := &file_games_game_service_proto_msgTypes[7]
+	mi := &file_games_game_service_v2_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -919,7 +919,7 @@ func (x *TerminalSize) String() string {
 func (*TerminalSize) ProtoMessage() {}
 
 func (x *TerminalSize) ProtoReflect() protoreflect.Message {
-	mi := &file_games_game_service_proto_msgTypes[7]
+	mi := &file_games_game_service_v2_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -932,7 +932,7 @@ func (x *TerminalSize) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TerminalSize.ProtoReflect.Descriptor instead.
 func (*TerminalSize) Descriptor() ([]byte, []int) {
-	return file_games_game_service_proto_rawDescGZIP(), []int{7}
+	return file_games_game_service_v2_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *TerminalSize) GetWidth() int32 {
@@ -963,7 +963,7 @@ type ProcessInfo struct {
 
 func (x *ProcessInfo) Reset() {
 	*x = ProcessInfo{}
-	mi := &file_games_game_service_proto_msgTypes[8]
+	mi := &file_games_game_service_v2_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -975,7 +975,7 @@ func (x *ProcessInfo) String() string {
 func (*ProcessInfo) ProtoMessage() {}
 
 func (x *ProcessInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_games_game_service_proto_msgTypes[8]
+	mi := &file_games_game_service_v2_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -988,7 +988,7 @@ func (x *ProcessInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProcessInfo.ProtoReflect.Descriptor instead.
 func (*ProcessInfo) Descriptor() ([]byte, []int) {
-	return file_games_game_service_proto_rawDescGZIP(), []int{8}
+	return file_games_game_service_v2_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *ProcessInfo) GetPid() int32 {
@@ -1041,7 +1041,7 @@ type RecordingInfo struct {
 
 func (x *RecordingInfo) Reset() {
 	*x = RecordingInfo{}
-	mi := &file_games_game_service_proto_msgTypes[9]
+	mi := &file_games_game_service_v2_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1053,7 +1053,7 @@ func (x *RecordingInfo) String() string {
 func (*RecordingInfo) ProtoMessage() {}
 
 func (x *RecordingInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_games_game_service_proto_msgTypes[9]
+	mi := &file_games_game_service_v2_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1066,7 +1066,7 @@ func (x *RecordingInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RecordingInfo.ProtoReflect.Descriptor instead.
 func (*RecordingInfo) Descriptor() ([]byte, []int) {
-	return file_games_game_service_proto_rawDescGZIP(), []int{9}
+	return file_games_game_service_v2_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *RecordingInfo) GetEnabled() bool {
@@ -1125,7 +1125,7 @@ type StreamingInfo struct {
 
 func (x *StreamingInfo) Reset() {
 	*x = StreamingInfo{}
-	mi := &file_games_game_service_proto_msgTypes[10]
+	mi := &file_games_game_service_v2_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1137,7 +1137,7 @@ func (x *StreamingInfo) String() string {
 func (*StreamingInfo) ProtoMessage() {}
 
 func (x *StreamingInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_games_game_service_proto_msgTypes[10]
+	mi := &file_games_game_service_v2_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1150,7 +1150,7 @@ func (x *StreamingInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StreamingInfo.ProtoReflect.Descriptor instead.
 func (*StreamingInfo) Descriptor() ([]byte, []int) {
-	return file_games_game_service_proto_rawDescGZIP(), []int{10}
+	return file_games_game_service_v2_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *StreamingInfo) GetEnabled() bool {
@@ -1202,7 +1202,7 @@ type SpectatorInfo struct {
 
 func (x *SpectatorInfo) Reset() {
 	*x = SpectatorInfo{}
-	mi := &file_games_game_service_proto_msgTypes[11]
+	mi := &file_games_game_service_v2_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1214,7 +1214,7 @@ func (x *SpectatorInfo) String() string {
 func (*SpectatorInfo) ProtoMessage() {}
 
 func (x *SpectatorInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_games_game_service_proto_msgTypes[11]
+	mi := &file_games_game_service_v2_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1227,7 +1227,7 @@ func (x *SpectatorInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SpectatorInfo.ProtoReflect.Descriptor instead.
 func (*SpectatorInfo) Descriptor() ([]byte, []int) {
-	return file_games_game_service_proto_rawDescGZIP(), []int{11}
+	return file_games_game_service_v2_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *SpectatorInfo) GetUserId() int32 {
@@ -1271,7 +1271,7 @@ type GameSave struct {
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	UserId        int32                  `protobuf:"varint,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
 	GameId        string                 `protobuf:"bytes,3,opt,name=game_id,json=gameId,proto3" json:"game_id,omitempty"`
-	Status        SaveStatus             `protobuf:"varint,4,opt,name=status,proto3,enum=dungeongate.games.v1.SaveStatus" json:"status,omitempty"`
+	Status        SaveStatus             `protobuf:"varint,4,opt,name=status,proto3,enum=dungeongate.games.v2.SaveStatus" json:"status,omitempty"`
 	Data          []byte                 `protobuf:"bytes,5,opt,name=data,proto3" json:"data,omitempty"`
 	Metadata      *SaveMetadata          `protobuf:"bytes,6,opt,name=metadata,proto3" json:"metadata,omitempty"`
 	Checksum      string                 `protobuf:"bytes,7,opt,name=checksum,proto3" json:"checksum,omitempty"`
@@ -1286,7 +1286,7 @@ type GameSave struct {
 
 func (x *GameSave) Reset() {
 	*x = GameSave{}
-	mi := &file_games_game_service_proto_msgTypes[12]
+	mi := &file_games_game_service_v2_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1298,7 +1298,7 @@ func (x *GameSave) String() string {
 func (*GameSave) ProtoMessage() {}
 
 func (x *GameSave) ProtoReflect() protoreflect.Message {
-	mi := &file_games_game_service_proto_msgTypes[12]
+	mi := &file_games_game_service_v2_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1311,7 +1311,7 @@ func (x *GameSave) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GameSave.ProtoReflect.Descriptor instead.
 func (*GameSave) Descriptor() ([]byte, []int) {
-	return file_games_game_service_proto_rawDescGZIP(), []int{12}
+	return file_games_game_service_v2_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *GameSave) GetId() string {
@@ -1414,7 +1414,7 @@ type SaveMetadata struct {
 
 func (x *SaveMetadata) Reset() {
 	*x = SaveMetadata{}
-	mi := &file_games_game_service_proto_msgTypes[13]
+	mi := &file_games_game_service_v2_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1426,7 +1426,7 @@ func (x *SaveMetadata) String() string {
 func (*SaveMetadata) ProtoMessage() {}
 
 func (x *SaveMetadata) ProtoReflect() protoreflect.Message {
-	mi := &file_games_game_service_proto_msgTypes[13]
+	mi := &file_games_game_service_v2_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1439,7 +1439,7 @@ func (x *SaveMetadata) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SaveMetadata.ProtoReflect.Descriptor instead.
 func (*SaveMetadata) Descriptor() ([]byte, []int) {
-	return file_games_game_service_proto_rawDescGZIP(), []int{13}
+	return file_games_game_service_v2_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *SaveMetadata) GetGameVersion() string {
@@ -1505,7 +1505,7 @@ type SaveBackup struct {
 
 func (x *SaveBackup) Reset() {
 	*x = SaveBackup{}
-	mi := &file_games_game_service_proto_msgTypes[14]
+	mi := &file_games_game_service_v2_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1517,7 +1517,7 @@ func (x *SaveBackup) String() string {
 func (*SaveBackup) ProtoMessage() {}
 
 func (x *SaveBackup) ProtoReflect() protoreflect.Message {
-	mi := &file_games_game_service_proto_msgTypes[14]
+	mi := &file_games_game_service_v2_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1530,7 +1530,7 @@ func (x *SaveBackup) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SaveBackup.ProtoReflect.Descriptor instead.
 func (*SaveBackup) Descriptor() ([]byte, []int) {
-	return file_games_game_service_proto_rawDescGZIP(), []int{14}
+	return file_games_game_service_v2_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *SaveBackup) GetId() string {
@@ -1573,7 +1573,7 @@ type ListGamesRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Category      string                 `protobuf:"bytes,1,opt,name=category,proto3" json:"category,omitempty"`
 	Tag           string                 `protobuf:"bytes,2,opt,name=tag,proto3" json:"tag,omitempty"`
-	Status        GameStatus             `protobuf:"varint,3,opt,name=status,proto3,enum=dungeongate.games.v1.GameStatus" json:"status,omitempty"`
+	Status        GameStatus             `protobuf:"varint,3,opt,name=status,proto3,enum=dungeongate.games.v2.GameStatus" json:"status,omitempty"`
 	EnabledOnly   bool                   `protobuf:"varint,4,opt,name=enabled_only,json=enabledOnly,proto3" json:"enabled_only,omitempty"`
 	Limit         int32                  `protobuf:"varint,5,opt,name=limit,proto3" json:"limit,omitempty"`
 	Offset        int32                  `protobuf:"varint,6,opt,name=offset,proto3" json:"offset,omitempty"`
@@ -1583,7 +1583,7 @@ type ListGamesRequest struct {
 
 func (x *ListGamesRequest) Reset() {
 	*x = ListGamesRequest{}
-	mi := &file_games_game_service_proto_msgTypes[15]
+	mi := &file_games_game_service_v2_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1595,7 +1595,7 @@ func (x *ListGamesRequest) String() string {
 func (*ListGamesRequest) ProtoMessage() {}
 
 func (x *ListGamesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_games_game_service_proto_msgTypes[15]
+	mi := &file_games_game_service_v2_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1608,7 +1608,7 @@ func (x *ListGamesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListGamesRequest.ProtoReflect.Descriptor instead.
 func (*ListGamesRequest) Descriptor() ([]byte, []int) {
-	return file_games_game_service_proto_rawDescGZIP(), []int{15}
+	return file_games_game_service_v2_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *ListGamesRequest) GetCategory() string {
@@ -1663,7 +1663,7 @@ type ListGamesResponse struct {
 
 func (x *ListGamesResponse) Reset() {
 	*x = ListGamesResponse{}
-	mi := &file_games_game_service_proto_msgTypes[16]
+	mi := &file_games_game_service_v2_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1675,7 +1675,7 @@ func (x *ListGamesResponse) String() string {
 func (*ListGamesResponse) ProtoMessage() {}
 
 func (x *ListGamesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_games_game_service_proto_msgTypes[16]
+	mi := &file_games_game_service_v2_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1688,7 +1688,7 @@ func (x *ListGamesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListGamesResponse.ProtoReflect.Descriptor instead.
 func (*ListGamesResponse) Descriptor() ([]byte, []int) {
-	return file_games_game_service_proto_rawDescGZIP(), []int{16}
+	return file_games_game_service_v2_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *ListGamesResponse) GetGames() []*Game {
@@ -1714,7 +1714,7 @@ type GetGameRequest struct {
 
 func (x *GetGameRequest) Reset() {
 	*x = GetGameRequest{}
-	mi := &file_games_game_service_proto_msgTypes[17]
+	mi := &file_games_game_service_v2_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1726,7 +1726,7 @@ func (x *GetGameRequest) String() string {
 func (*GetGameRequest) ProtoMessage() {}
 
 func (x *GetGameRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_games_game_service_proto_msgTypes[17]
+	mi := &file_games_game_service_v2_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1739,7 +1739,7 @@ func (x *GetGameRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetGameRequest.ProtoReflect.Descriptor instead.
 func (*GetGameRequest) Descriptor() ([]byte, []int) {
-	return file_games_game_service_proto_rawDescGZIP(), []int{17}
+	return file_games_game_service_v2_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *GetGameRequest) GetGameId() string {
@@ -1758,7 +1758,7 @@ type GetGameResponse struct {
 
 func (x *GetGameResponse) Reset() {
 	*x = GetGameResponse{}
-	mi := &file_games_game_service_proto_msgTypes[18]
+	mi := &file_games_game_service_v2_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1770,7 +1770,7 @@ func (x *GetGameResponse) String() string {
 func (*GetGameResponse) ProtoMessage() {}
 
 func (x *GetGameResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_games_game_service_proto_msgTypes[18]
+	mi := &file_games_game_service_v2_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1783,7 +1783,7 @@ func (x *GetGameResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetGameResponse.ProtoReflect.Descriptor instead.
 func (*GetGameResponse) Descriptor() ([]byte, []int) {
-	return file_games_game_service_proto_rawDescGZIP(), []int{18}
+	return file_games_game_service_v2_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *GetGameResponse) GetGame() *Game {
@@ -1802,7 +1802,7 @@ type CreateGameRequest struct {
 
 func (x *CreateGameRequest) Reset() {
 	*x = CreateGameRequest{}
-	mi := &file_games_game_service_proto_msgTypes[19]
+	mi := &file_games_game_service_v2_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1814,7 +1814,7 @@ func (x *CreateGameRequest) String() string {
 func (*CreateGameRequest) ProtoMessage() {}
 
 func (x *CreateGameRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_games_game_service_proto_msgTypes[19]
+	mi := &file_games_game_service_v2_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1827,7 +1827,7 @@ func (x *CreateGameRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateGameRequest.ProtoReflect.Descriptor instead.
 func (*CreateGameRequest) Descriptor() ([]byte, []int) {
-	return file_games_game_service_proto_rawDescGZIP(), []int{19}
+	return file_games_game_service_v2_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *CreateGameRequest) GetGame() *Game {
@@ -1846,7 +1846,7 @@ type CreateGameResponse struct {
 
 func (x *CreateGameResponse) Reset() {
 	*x = CreateGameResponse{}
-	mi := &file_games_game_service_proto_msgTypes[20]
+	mi := &file_games_game_service_v2_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1858,7 +1858,7 @@ func (x *CreateGameResponse) String() string {
 func (*CreateGameResponse) ProtoMessage() {}
 
 func (x *CreateGameResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_games_game_service_proto_msgTypes[20]
+	mi := &file_games_game_service_v2_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1871,7 +1871,7 @@ func (x *CreateGameResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateGameResponse.ProtoReflect.Descriptor instead.
 func (*CreateGameResponse) Descriptor() ([]byte, []int) {
-	return file_games_game_service_proto_rawDescGZIP(), []int{20}
+	return file_games_game_service_v2_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *CreateGameResponse) GetGame() *Game {
@@ -1891,7 +1891,7 @@ type UpdateGameRequest struct {
 
 func (x *UpdateGameRequest) Reset() {
 	*x = UpdateGameRequest{}
-	mi := &file_games_game_service_proto_msgTypes[21]
+	mi := &file_games_game_service_v2_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1903,7 +1903,7 @@ func (x *UpdateGameRequest) String() string {
 func (*UpdateGameRequest) ProtoMessage() {}
 
 func (x *UpdateGameRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_games_game_service_proto_msgTypes[21]
+	mi := &file_games_game_service_v2_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1916,7 +1916,7 @@ func (x *UpdateGameRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateGameRequest.ProtoReflect.Descriptor instead.
 func (*UpdateGameRequest) Descriptor() ([]byte, []int) {
-	return file_games_game_service_proto_rawDescGZIP(), []int{21}
+	return file_games_game_service_v2_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *UpdateGameRequest) GetGameId() string {
@@ -1942,7 +1942,7 @@ type UpdateGameResponse struct {
 
 func (x *UpdateGameResponse) Reset() {
 	*x = UpdateGameResponse{}
-	mi := &file_games_game_service_proto_msgTypes[22]
+	mi := &file_games_game_service_v2_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1954,7 +1954,7 @@ func (x *UpdateGameResponse) String() string {
 func (*UpdateGameResponse) ProtoMessage() {}
 
 func (x *UpdateGameResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_games_game_service_proto_msgTypes[22]
+	mi := &file_games_game_service_v2_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1967,7 +1967,7 @@ func (x *UpdateGameResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateGameResponse.ProtoReflect.Descriptor instead.
 func (*UpdateGameResponse) Descriptor() ([]byte, []int) {
-	return file_games_game_service_proto_rawDescGZIP(), []int{22}
+	return file_games_game_service_v2_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *UpdateGameResponse) GetGame() *Game {
@@ -1986,7 +1986,7 @@ type DeleteGameRequest struct {
 
 func (x *DeleteGameRequest) Reset() {
 	*x = DeleteGameRequest{}
-	mi := &file_games_game_service_proto_msgTypes[23]
+	mi := &file_games_game_service_v2_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1998,7 +1998,7 @@ func (x *DeleteGameRequest) String() string {
 func (*DeleteGameRequest) ProtoMessage() {}
 
 func (x *DeleteGameRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_games_game_service_proto_msgTypes[23]
+	mi := &file_games_game_service_v2_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2011,7 +2011,7 @@ func (x *DeleteGameRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteGameRequest.ProtoReflect.Descriptor instead.
 func (*DeleteGameRequest) Descriptor() ([]byte, []int) {
-	return file_games_game_service_proto_rawDescGZIP(), []int{23}
+	return file_games_game_service_v2_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *DeleteGameRequest) GetGameId() string {
@@ -2030,7 +2030,7 @@ type DeleteGameResponse struct {
 
 func (x *DeleteGameResponse) Reset() {
 	*x = DeleteGameResponse{}
-	mi := &file_games_game_service_proto_msgTypes[24]
+	mi := &file_games_game_service_v2_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2042,7 +2042,7 @@ func (x *DeleteGameResponse) String() string {
 func (*DeleteGameResponse) ProtoMessage() {}
 
 func (x *DeleteGameResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_games_game_service_proto_msgTypes[24]
+	mi := &file_games_game_service_v2_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2055,7 +2055,7 @@ func (x *DeleteGameResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteGameResponse.ProtoReflect.Descriptor instead.
 func (*DeleteGameResponse) Descriptor() ([]byte, []int) {
-	return file_games_game_service_proto_rawDescGZIP(), []int{24}
+	return file_games_game_service_v2_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *DeleteGameResponse) GetSuccess() bool {
@@ -2081,7 +2081,7 @@ type StartGameSessionRequest struct {
 
 func (x *StartGameSessionRequest) Reset() {
 	*x = StartGameSessionRequest{}
-	mi := &file_games_game_service_proto_msgTypes[25]
+	mi := &file_games_game_service_v2_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2093,7 +2093,7 @@ func (x *StartGameSessionRequest) String() string {
 func (*StartGameSessionRequest) ProtoMessage() {}
 
 func (x *StartGameSessionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_games_game_service_proto_msgTypes[25]
+	mi := &file_games_game_service_v2_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2106,7 +2106,7 @@ func (x *StartGameSessionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartGameSessionRequest.ProtoReflect.Descriptor instead.
 func (*StartGameSessionRequest) Descriptor() ([]byte, []int) {
-	return file_games_game_service_proto_rawDescGZIP(), []int{25}
+	return file_games_game_service_v2_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *StartGameSessionRequest) GetUserId() int32 {
@@ -2167,7 +2167,7 @@ type StartGameSessionResponse struct {
 
 func (x *StartGameSessionResponse) Reset() {
 	*x = StartGameSessionResponse{}
-	mi := &file_games_game_service_proto_msgTypes[26]
+	mi := &file_games_game_service_v2_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2179,7 +2179,7 @@ func (x *StartGameSessionResponse) String() string {
 func (*StartGameSessionResponse) ProtoMessage() {}
 
 func (x *StartGameSessionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_games_game_service_proto_msgTypes[26]
+	mi := &file_games_game_service_v2_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2192,7 +2192,7 @@ func (x *StartGameSessionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartGameSessionResponse.ProtoReflect.Descriptor instead.
 func (*StartGameSessionResponse) Descriptor() ([]byte, []int) {
-	return file_games_game_service_proto_rawDescGZIP(), []int{26}
+	return file_games_game_service_v2_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *StartGameSessionResponse) GetSession() *GameSession {
@@ -2213,7 +2213,7 @@ type StopGameSessionRequest struct {
 
 func (x *StopGameSessionRequest) Reset() {
 	*x = StopGameSessionRequest{}
-	mi := &file_games_game_service_proto_msgTypes[27]
+	mi := &file_games_game_service_v2_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2225,7 +2225,7 @@ func (x *StopGameSessionRequest) String() string {
 func (*StopGameSessionRequest) ProtoMessage() {}
 
 func (x *StopGameSessionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_games_game_service_proto_msgTypes[27]
+	mi := &file_games_game_service_v2_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2238,7 +2238,7 @@ func (x *StopGameSessionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StopGameSessionRequest.ProtoReflect.Descriptor instead.
 func (*StopGameSessionRequest) Descriptor() ([]byte, []int) {
-	return file_games_game_service_proto_rawDescGZIP(), []int{27}
+	return file_games_game_service_v2_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *StopGameSessionRequest) GetSessionId() string {
@@ -2271,7 +2271,7 @@ type StopGameSessionResponse struct {
 
 func (x *StopGameSessionResponse) Reset() {
 	*x = StopGameSessionResponse{}
-	mi := &file_games_game_service_proto_msgTypes[28]
+	mi := &file_games_game_service_v2_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2283,7 +2283,7 @@ func (x *StopGameSessionResponse) String() string {
 func (*StopGameSessionResponse) ProtoMessage() {}
 
 func (x *StopGameSessionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_games_game_service_proto_msgTypes[28]
+	mi := &file_games_game_service_v2_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2296,7 +2296,7 @@ func (x *StopGameSessionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StopGameSessionResponse.ProtoReflect.Descriptor instead.
 func (*StopGameSessionResponse) Descriptor() ([]byte, []int) {
-	return file_games_game_service_proto_rawDescGZIP(), []int{28}
+	return file_games_game_service_v2_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *StopGameSessionResponse) GetSuccess() bool {
@@ -2315,7 +2315,7 @@ type GetGameSessionRequest struct {
 
 func (x *GetGameSessionRequest) Reset() {
 	*x = GetGameSessionRequest{}
-	mi := &file_games_game_service_proto_msgTypes[29]
+	mi := &file_games_game_service_v2_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2327,7 +2327,7 @@ func (x *GetGameSessionRequest) String() string {
 func (*GetGameSessionRequest) ProtoMessage() {}
 
 func (x *GetGameSessionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_games_game_service_proto_msgTypes[29]
+	mi := &file_games_game_service_v2_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2340,7 +2340,7 @@ func (x *GetGameSessionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetGameSessionRequest.ProtoReflect.Descriptor instead.
 func (*GetGameSessionRequest) Descriptor() ([]byte, []int) {
-	return file_games_game_service_proto_rawDescGZIP(), []int{29}
+	return file_games_game_service_v2_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *GetGameSessionRequest) GetSessionId() string {
@@ -2359,7 +2359,7 @@ type GetGameSessionResponse struct {
 
 func (x *GetGameSessionResponse) Reset() {
 	*x = GetGameSessionResponse{}
-	mi := &file_games_game_service_proto_msgTypes[30]
+	mi := &file_games_game_service_v2_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2371,7 +2371,7 @@ func (x *GetGameSessionResponse) String() string {
 func (*GetGameSessionResponse) ProtoMessage() {}
 
 func (x *GetGameSessionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_games_game_service_proto_msgTypes[30]
+	mi := &file_games_game_service_v2_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2384,7 +2384,7 @@ func (x *GetGameSessionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetGameSessionResponse.ProtoReflect.Descriptor instead.
 func (*GetGameSessionResponse) Descriptor() ([]byte, []int) {
-	return file_games_game_service_proto_rawDescGZIP(), []int{30}
+	return file_games_game_service_v2_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *GetGameSessionResponse) GetSession() *GameSession {
@@ -2398,7 +2398,7 @@ type ListGameSessionsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	UserId        int32                  `protobuf:"varint,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
 	GameId        string                 `protobuf:"bytes,2,opt,name=game_id,json=gameId,proto3" json:"game_id,omitempty"`
-	Status        SessionStatus          `protobuf:"varint,3,opt,name=status,proto3,enum=dungeongate.games.v1.SessionStatus" json:"status,omitempty"`
+	Status        SessionStatus          `protobuf:"varint,3,opt,name=status,proto3,enum=dungeongate.games.v2.SessionStatus" json:"status,omitempty"`
 	Limit         int32                  `protobuf:"varint,4,opt,name=limit,proto3" json:"limit,omitempty"`
 	Offset        int32                  `protobuf:"varint,5,opt,name=offset,proto3" json:"offset,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -2407,7 +2407,7 @@ type ListGameSessionsRequest struct {
 
 func (x *ListGameSessionsRequest) Reset() {
 	*x = ListGameSessionsRequest{}
-	mi := &file_games_game_service_proto_msgTypes[31]
+	mi := &file_games_game_service_v2_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2419,7 +2419,7 @@ func (x *ListGameSessionsRequest) String() string {
 func (*ListGameSessionsRequest) ProtoMessage() {}
 
 func (x *ListGameSessionsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_games_game_service_proto_msgTypes[31]
+	mi := &file_games_game_service_v2_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2432,7 +2432,7 @@ func (x *ListGameSessionsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListGameSessionsRequest.ProtoReflect.Descriptor instead.
 func (*ListGameSessionsRequest) Descriptor() ([]byte, []int) {
-	return file_games_game_service_proto_rawDescGZIP(), []int{31}
+	return file_games_game_service_v2_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *ListGameSessionsRequest) GetUserId() int32 {
@@ -2480,7 +2480,7 @@ type ListGameSessionsResponse struct {
 
 func (x *ListGameSessionsResponse) Reset() {
 	*x = ListGameSessionsResponse{}
-	mi := &file_games_game_service_proto_msgTypes[32]
+	mi := &file_games_game_service_v2_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2492,7 +2492,7 @@ func (x *ListGameSessionsResponse) String() string {
 func (*ListGameSessionsResponse) ProtoMessage() {}
 
 func (x *ListGameSessionsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_games_game_service_proto_msgTypes[32]
+	mi := &file_games_game_service_v2_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2505,7 +2505,7 @@ func (x *ListGameSessionsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListGameSessionsResponse.ProtoReflect.Descriptor instead.
 func (*ListGameSessionsResponse) Descriptor() ([]byte, []int) {
-	return file_games_game_service_proto_rawDescGZIP(), []int{32}
+	return file_games_game_service_v2_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *ListGameSessionsResponse) GetSessions() []*GameSession {
@@ -2535,7 +2535,7 @@ type SaveGameRequest struct {
 
 func (x *SaveGameRequest) Reset() {
 	*x = SaveGameRequest{}
-	mi := &file_games_game_service_proto_msgTypes[33]
+	mi := &file_games_game_service_v2_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2547,7 +2547,7 @@ func (x *SaveGameRequest) String() string {
 func (*SaveGameRequest) ProtoMessage() {}
 
 func (x *SaveGameRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_games_game_service_proto_msgTypes[33]
+	mi := &file_games_game_service_v2_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2560,7 +2560,7 @@ func (x *SaveGameRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SaveGameRequest.ProtoReflect.Descriptor instead.
 func (*SaveGameRequest) Descriptor() ([]byte, []int) {
-	return file_games_game_service_proto_rawDescGZIP(), []int{33}
+	return file_games_game_service_v2_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *SaveGameRequest) GetUserId() int32 {
@@ -2600,7 +2600,7 @@ type SaveGameResponse struct {
 
 func (x *SaveGameResponse) Reset() {
 	*x = SaveGameResponse{}
-	mi := &file_games_game_service_proto_msgTypes[34]
+	mi := &file_games_game_service_v2_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2612,7 +2612,7 @@ func (x *SaveGameResponse) String() string {
 func (*SaveGameResponse) ProtoMessage() {}
 
 func (x *SaveGameResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_games_game_service_proto_msgTypes[34]
+	mi := &file_games_game_service_v2_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2625,7 +2625,7 @@ func (x *SaveGameResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SaveGameResponse.ProtoReflect.Descriptor instead.
 func (*SaveGameResponse) Descriptor() ([]byte, []int) {
-	return file_games_game_service_proto_rawDescGZIP(), []int{34}
+	return file_games_game_service_v2_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *SaveGameResponse) GetSave() *GameSave {
@@ -2646,7 +2646,7 @@ type LoadGameRequest struct {
 
 func (x *LoadGameRequest) Reset() {
 	*x = LoadGameRequest{}
-	mi := &file_games_game_service_proto_msgTypes[35]
+	mi := &file_games_game_service_v2_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2658,7 +2658,7 @@ func (x *LoadGameRequest) String() string {
 func (*LoadGameRequest) ProtoMessage() {}
 
 func (x *LoadGameRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_games_game_service_proto_msgTypes[35]
+	mi := &file_games_game_service_v2_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2671,7 +2671,7 @@ func (x *LoadGameRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LoadGameRequest.ProtoReflect.Descriptor instead.
 func (*LoadGameRequest) Descriptor() ([]byte, []int) {
-	return file_games_game_service_proto_rawDescGZIP(), []int{35}
+	return file_games_game_service_v2_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *LoadGameRequest) GetUserId() int32 {
@@ -2704,7 +2704,7 @@ type LoadGameResponse struct {
 
 func (x *LoadGameResponse) Reset() {
 	*x = LoadGameResponse{}
-	mi := &file_games_game_service_proto_msgTypes[36]
+	mi := &file_games_game_service_v2_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2716,7 +2716,7 @@ func (x *LoadGameResponse) String() string {
 func (*LoadGameResponse) ProtoMessage() {}
 
 func (x *LoadGameResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_games_game_service_proto_msgTypes[36]
+	mi := &file_games_game_service_v2_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2729,7 +2729,7 @@ func (x *LoadGameResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LoadGameResponse.ProtoReflect.Descriptor instead.
 func (*LoadGameResponse) Descriptor() ([]byte, []int) {
-	return file_games_game_service_proto_rawDescGZIP(), []int{36}
+	return file_games_game_service_v2_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *LoadGameResponse) GetSave() *GameSave {
@@ -2750,7 +2750,7 @@ type DeleteSaveRequest struct {
 
 func (x *DeleteSaveRequest) Reset() {
 	*x = DeleteSaveRequest{}
-	mi := &file_games_game_service_proto_msgTypes[37]
+	mi := &file_games_game_service_v2_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2762,7 +2762,7 @@ func (x *DeleteSaveRequest) String() string {
 func (*DeleteSaveRequest) ProtoMessage() {}
 
 func (x *DeleteSaveRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_games_game_service_proto_msgTypes[37]
+	mi := &file_games_game_service_v2_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2775,7 +2775,7 @@ func (x *DeleteSaveRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteSaveRequest.ProtoReflect.Descriptor instead.
 func (*DeleteSaveRequest) Descriptor() ([]byte, []int) {
-	return file_games_game_service_proto_rawDescGZIP(), []int{37}
+	return file_games_game_service_v2_proto_rawDescGZIP(), []int{37}
 }
 
 func (x *DeleteSaveRequest) GetUserId() int32 {
@@ -2808,7 +2808,7 @@ type DeleteSaveResponse struct {
 
 func (x *DeleteSaveResponse) Reset() {
 	*x = DeleteSaveResponse{}
-	mi := &file_games_game_service_proto_msgTypes[38]
+	mi := &file_games_game_service_v2_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2820,7 +2820,7 @@ func (x *DeleteSaveResponse) String() string {
 func (*DeleteSaveResponse) ProtoMessage() {}
 
 func (x *DeleteSaveResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_games_game_service_proto_msgTypes[38]
+	mi := &file_games_game_service_v2_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2833,7 +2833,7 @@ func (x *DeleteSaveResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteSaveResponse.ProtoReflect.Descriptor instead.
 func (*DeleteSaveResponse) Descriptor() ([]byte, []int) {
-	return file_games_game_service_proto_rawDescGZIP(), []int{38}
+	return file_games_game_service_v2_proto_rawDescGZIP(), []int{38}
 }
 
 func (x *DeleteSaveResponse) GetSuccess() bool {
@@ -2847,7 +2847,7 @@ type ListSavesRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	UserId        int32                  `protobuf:"varint,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
 	GameId        string                 `protobuf:"bytes,2,opt,name=game_id,json=gameId,proto3" json:"game_id,omitempty"`
-	Status        SaveStatus             `protobuf:"varint,3,opt,name=status,proto3,enum=dungeongate.games.v1.SaveStatus" json:"status,omitempty"`
+	Status        SaveStatus             `protobuf:"varint,3,opt,name=status,proto3,enum=dungeongate.games.v2.SaveStatus" json:"status,omitempty"`
 	Limit         int32                  `protobuf:"varint,4,opt,name=limit,proto3" json:"limit,omitempty"`
 	Offset        int32                  `protobuf:"varint,5,opt,name=offset,proto3" json:"offset,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -2856,7 +2856,7 @@ type ListSavesRequest struct {
 
 func (x *ListSavesRequest) Reset() {
 	*x = ListSavesRequest{}
-	mi := &file_games_game_service_proto_msgTypes[39]
+	mi := &file_games_game_service_v2_proto_msgTypes[39]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2868,7 +2868,7 @@ func (x *ListSavesRequest) String() string {
 func (*ListSavesRequest) ProtoMessage() {}
 
 func (x *ListSavesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_games_game_service_proto_msgTypes[39]
+	mi := &file_games_game_service_v2_proto_msgTypes[39]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2881,7 +2881,7 @@ func (x *ListSavesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListSavesRequest.ProtoReflect.Descriptor instead.
 func (*ListSavesRequest) Descriptor() ([]byte, []int) {
-	return file_games_game_service_proto_rawDescGZIP(), []int{39}
+	return file_games_game_service_v2_proto_rawDescGZIP(), []int{39}
 }
 
 func (x *ListSavesRequest) GetUserId() int32 {
@@ -2929,7 +2929,7 @@ type ListSavesResponse struct {
 
 func (x *ListSavesResponse) Reset() {
 	*x = ListSavesResponse{}
-	mi := &file_games_game_service_proto_msgTypes[40]
+	mi := &file_games_game_service_v2_proto_msgTypes[40]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2941,7 +2941,7 @@ func (x *ListSavesResponse) String() string {
 func (*ListSavesResponse) ProtoMessage() {}
 
 func (x *ListSavesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_games_game_service_proto_msgTypes[40]
+	mi := &file_games_game_service_v2_proto_msgTypes[40]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2954,7 +2954,7 @@ func (x *ListSavesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListSavesResponse.ProtoReflect.Descriptor instead.
 func (*ListSavesResponse) Descriptor() ([]byte, []int) {
-	return file_games_game_service_proto_rawDescGZIP(), []int{40}
+	return file_games_game_service_v2_proto_rawDescGZIP(), []int{40}
 }
 
 func (x *ListSavesResponse) GetSaves() []*GameSave {
@@ -2982,7 +2982,7 @@ type HealthResponse struct {
 
 func (x *HealthResponse) Reset() {
 	*x = HealthResponse{}
-	mi := &file_games_game_service_proto_msgTypes[41]
+	mi := &file_games_game_service_v2_proto_msgTypes[41]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2994,7 +2994,7 @@ func (x *HealthResponse) String() string {
 func (*HealthResponse) ProtoMessage() {}
 
 func (x *HealthResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_games_game_service_proto_msgTypes[41]
+	mi := &file_games_game_service_v2_proto_msgTypes[41]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3007,7 +3007,7 @@ func (x *HealthResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HealthResponse.ProtoReflect.Descriptor instead.
 func (*HealthResponse) Descriptor() ([]byte, []int) {
-	return file_games_game_service_proto_rawDescGZIP(), []int{41}
+	return file_games_game_service_v2_proto_rawDescGZIP(), []int{41}
 }
 
 func (x *HealthResponse) GetStatus() string {
@@ -3024,11 +3024,11 @@ func (x *HealthResponse) GetDetails() map[string]string {
 	return nil
 }
 
-var File_games_game_service_proto protoreflect.FileDescriptor
+var File_games_game_service_v2_proto protoreflect.FileDescriptor
 
-const file_games_game_service_proto_rawDesc = "" +
+const file_games_game_service_v2_proto_rawDesc = "" +
 	"\n" +
-	"\x18games/game_service.proto\x12\x14dungeongate.games.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1bgoogle/protobuf/empty.proto\"\xe1\x06\n" +
+	"\x1bgames/game_service_v2.proto\x12\x14dungeongate.games.v2\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1bgoogle/protobuf/empty.proto\"\xe1\x06\n" +
 	"\x04Game\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1d\n" +
@@ -3041,17 +3041,17 @@ const file_games_game_service_proto_rawDesc = "" +
 	"\n" +
 	"difficulty\x18\b \x01(\x05R\n" +
 	"difficulty\x128\n" +
-	"\x06status\x18\t \x01(\x0e2 .dungeongate.games.v1.GameStatusR\x06status\x12:\n" +
+	"\x06status\x18\t \x01(\x0e2 .dungeongate.games.v2.GameStatusR\x06status\x12:\n" +
 	"\x06binary\x18\n" +
-	" \x01(\v2\".dungeongate.games.v1.BinaryConfigR\x06binary\x12M\n" +
-	"\venvironment\x18\v \x03(\v2+.dungeongate.games.v1.Game.EnvironmentEntryR\venvironment\x12B\n" +
-	"\tresources\x18\f \x01(\v2$.dungeongate.games.v1.ResourceConfigR\tresources\x12@\n" +
-	"\bsecurity\x18\r \x01(\v2$.dungeongate.games.v1.SecurityConfigR\bsecurity\x12C\n" +
+	" \x01(\v2\".dungeongate.games.v2.BinaryConfigR\x06binary\x12M\n" +
+	"\venvironment\x18\v \x03(\v2+.dungeongate.games.v2.Game.EnvironmentEntryR\venvironment\x12B\n" +
+	"\tresources\x18\f \x01(\v2$.dungeongate.games.v2.ResourceConfigR\tresources\x12@\n" +
+	"\bsecurity\x18\r \x01(\v2$.dungeongate.games.v2.SecurityConfigR\bsecurity\x12C\n" +
 	"\n" +
-	"networking\x18\x0e \x01(\v2#.dungeongate.games.v1.NetworkConfigR\n" +
+	"networking\x18\x0e \x01(\v2#.dungeongate.games.v2.NetworkConfigR\n" +
 	"networking\x12D\n" +
 	"\n" +
-	"statistics\x18\x0f \x01(\v2$.dungeongate.games.v1.GameStatisticsR\n" +
+	"statistics\x18\x0f \x01(\v2$.dungeongate.games.v2.GameStatisticsR\n" +
 	"statistics\x129\n" +
 	"\n" +
 	"created_at\x18\x10 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
@@ -3097,19 +3097,19 @@ const file_games_game_service_proto_rawDesc = "" +
 	"\auser_id\x18\x02 \x01(\x05R\x06userId\x12\x1a\n" +
 	"\busername\x18\x03 \x01(\tR\busername\x12\x17\n" +
 	"\agame_id\x18\x04 \x01(\tR\x06gameId\x12;\n" +
-	"\x06status\x18\x05 \x01(\x0e2#.dungeongate.games.v1.SessionStatusR\x06status\x129\n" +
+	"\x06status\x18\x05 \x01(\x0e2#.dungeongate.games.v2.SessionStatusR\x06status\x129\n" +
 	"\n" +
 	"start_time\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tstartTime\x125\n" +
 	"\bend_time\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\aendTime\x12?\n" +
 	"\rlast_activity\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\flastActivity\x12G\n" +
-	"\rterminal_size\x18\t \x01(\v2\".dungeongate.games.v1.TerminalSizeR\fterminalSize\x12\x1a\n" +
+	"\rterminal_size\x18\t \x01(\v2\".dungeongate.games.v2.TerminalSizeR\fterminalSize\x12\x1a\n" +
 	"\bencoding\x18\n" +
 	" \x01(\tR\bencoding\x12D\n" +
-	"\fprocess_info\x18\v \x01(\v2!.dungeongate.games.v1.ProcessInfoR\vprocessInfo\x12A\n" +
-	"\trecording\x18\f \x01(\v2#.dungeongate.games.v1.RecordingInfoR\trecording\x12A\n" +
-	"\tstreaming\x18\r \x01(\v2#.dungeongate.games.v1.StreamingInfoR\tstreaming\x12C\n" +
+	"\fprocess_info\x18\v \x01(\v2!.dungeongate.games.v2.ProcessInfoR\vprocessInfo\x12A\n" +
+	"\trecording\x18\f \x01(\v2#.dungeongate.games.v2.RecordingInfoR\trecording\x12A\n" +
+	"\tstreaming\x18\r \x01(\v2#.dungeongate.games.v2.StreamingInfoR\tstreaming\x12C\n" +
 	"\n" +
-	"spectators\x18\x0e \x03(\v2#.dungeongate.games.v1.SpectatorInfoR\n" +
+	"spectators\x18\x0e \x03(\v2#.dungeongate.games.v2.SpectatorInfoR\n" +
 	"spectators\"<\n" +
 	"\fTerminalSize\x12\x14\n" +
 	"\x05width\x18\x01 \x01(\x05R\x05width\x12\x16\n" +
@@ -3148,14 +3148,14 @@ const file_games_game_service_proto_rawDesc = "" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\x05R\x06userId\x12\x17\n" +
 	"\agame_id\x18\x03 \x01(\tR\x06gameId\x128\n" +
-	"\x06status\x18\x04 \x01(\x0e2 .dungeongate.games.v1.SaveStatusR\x06status\x12\x12\n" +
+	"\x06status\x18\x04 \x01(\x0e2 .dungeongate.games.v2.SaveStatusR\x06status\x12\x12\n" +
 	"\x04data\x18\x05 \x01(\fR\x04data\x12>\n" +
-	"\bmetadata\x18\x06 \x01(\v2\".dungeongate.games.v1.SaveMetadataR\bmetadata\x12\x1a\n" +
+	"\bmetadata\x18\x06 \x01(\v2\".dungeongate.games.v2.SaveMetadataR\bmetadata\x12\x1a\n" +
 	"\bchecksum\x18\a \x01(\tR\bchecksum\x12\x1b\n" +
 	"\tfile_path\x18\b \x01(\tR\bfilePath\x12\x1b\n" +
 	"\tfile_size\x18\t \x01(\x03R\bfileSize\x12:\n" +
 	"\abackups\x18\n" +
-	" \x03(\v2 .dungeongate.games.v1.SaveBackupR\abackups\x129\n" +
+	" \x03(\v2 .dungeongate.games.v2.SaveBackupR\abackups\x129\n" +
 	"\n" +
 	"created_at\x18\v \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
@@ -3167,7 +3167,7 @@ const file_games_game_service_proto_rawDesc = "" +
 	"\x05score\x18\x04 \x01(\x05R\x05score\x12*\n" +
 	"\x11play_time_seconds\x18\x05 \x01(\x03R\x0fplayTimeSeconds\x12\x1a\n" +
 	"\blocation\x18\x06 \x01(\tR\blocation\x12Y\n" +
-	"\rcustom_fields\x18\a \x03(\v24.dungeongate.games.v1.SaveMetadata.CustomFieldsEntryR\fcustomFields\x1a?\n" +
+	"\rcustom_fields\x18\a \x03(\v24.dungeongate.games.v2.SaveMetadata.CustomFieldsEntryR\fcustomFields\x1a?\n" +
 	"\x11CustomFieldsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xad\x01\n" +
@@ -3182,27 +3182,27 @@ const file_games_game_service_proto_rawDesc = "" +
 	"\x10ListGamesRequest\x12\x1a\n" +
 	"\bcategory\x18\x01 \x01(\tR\bcategory\x12\x10\n" +
 	"\x03tag\x18\x02 \x01(\tR\x03tag\x128\n" +
-	"\x06status\x18\x03 \x01(\x0e2 .dungeongate.games.v1.GameStatusR\x06status\x12!\n" +
+	"\x06status\x18\x03 \x01(\x0e2 .dungeongate.games.v2.GameStatusR\x06status\x12!\n" +
 	"\fenabled_only\x18\x04 \x01(\bR\venabledOnly\x12\x14\n" +
 	"\x05limit\x18\x05 \x01(\x05R\x05limit\x12\x16\n" +
 	"\x06offset\x18\x06 \x01(\x05R\x06offset\"f\n" +
 	"\x11ListGamesResponse\x120\n" +
-	"\x05games\x18\x01 \x03(\v2\x1a.dungeongate.games.v1.GameR\x05games\x12\x1f\n" +
+	"\x05games\x18\x01 \x03(\v2\x1a.dungeongate.games.v2.GameR\x05games\x12\x1f\n" +
 	"\vtotal_count\x18\x02 \x01(\x05R\n" +
 	"totalCount\")\n" +
 	"\x0eGetGameRequest\x12\x17\n" +
 	"\agame_id\x18\x01 \x01(\tR\x06gameId\"A\n" +
 	"\x0fGetGameResponse\x12.\n" +
-	"\x04game\x18\x01 \x01(\v2\x1a.dungeongate.games.v1.GameR\x04game\"C\n" +
+	"\x04game\x18\x01 \x01(\v2\x1a.dungeongate.games.v2.GameR\x04game\"C\n" +
 	"\x11CreateGameRequest\x12.\n" +
-	"\x04game\x18\x01 \x01(\v2\x1a.dungeongate.games.v1.GameR\x04game\"D\n" +
+	"\x04game\x18\x01 \x01(\v2\x1a.dungeongate.games.v2.GameR\x04game\"D\n" +
 	"\x12CreateGameResponse\x12.\n" +
-	"\x04game\x18\x01 \x01(\v2\x1a.dungeongate.games.v1.GameR\x04game\"\\\n" +
+	"\x04game\x18\x01 \x01(\v2\x1a.dungeongate.games.v2.GameR\x04game\"\\\n" +
 	"\x11UpdateGameRequest\x12\x17\n" +
 	"\agame_id\x18\x01 \x01(\tR\x06gameId\x12.\n" +
-	"\x04game\x18\x02 \x01(\v2\x1a.dungeongate.games.v1.GameR\x04game\"D\n" +
+	"\x04game\x18\x02 \x01(\v2\x1a.dungeongate.games.v2.GameR\x04game\"D\n" +
 	"\x12UpdateGameResponse\x12.\n" +
-	"\x04game\x18\x01 \x01(\v2\x1a.dungeongate.games.v1.GameR\x04game\",\n" +
+	"\x04game\x18\x01 \x01(\v2\x1a.dungeongate.games.v2.GameR\x04game\",\n" +
 	"\x11DeleteGameRequest\x12\x17\n" +
 	"\agame_id\x18\x01 \x01(\tR\x06gameId\".\n" +
 	"\x12DeleteGameResponse\x12\x18\n" +
@@ -3211,12 +3211,12 @@ const file_games_game_service_proto_rawDesc = "" +
 	"\auser_id\x18\x01 \x01(\x05R\x06userId\x12\x1a\n" +
 	"\busername\x18\x02 \x01(\tR\busername\x12\x17\n" +
 	"\agame_id\x18\x03 \x01(\tR\x06gameId\x12G\n" +
-	"\rterminal_size\x18\x04 \x01(\v2\".dungeongate.games.v1.TerminalSizeR\fterminalSize\x12)\n" +
+	"\rterminal_size\x18\x04 \x01(\v2\".dungeongate.games.v2.TerminalSizeR\fterminalSize\x12)\n" +
 	"\x10enable_recording\x18\x05 \x01(\bR\x0fenableRecording\x12)\n" +
 	"\x10enable_streaming\x18\x06 \x01(\bR\x0fenableStreaming\x12+\n" +
 	"\x11enable_encryption\x18\a \x01(\bR\x10enableEncryption\"W\n" +
 	"\x18StartGameSessionResponse\x12;\n" +
-	"\asession\x18\x01 \x01(\v2!.dungeongate.games.v1.GameSessionR\asession\"e\n" +
+	"\asession\x18\x01 \x01(\v2!.dungeongate.games.v2.GameSessionR\asession\"e\n" +
 	"\x16StopGameSessionRequest\x12\x1d\n" +
 	"\n" +
 	"session_id\x18\x01 \x01(\tR\tsessionId\x12\x16\n" +
@@ -3228,30 +3228,30 @@ const file_games_game_service_proto_rawDesc = "" +
 	"\n" +
 	"session_id\x18\x01 \x01(\tR\tsessionId\"U\n" +
 	"\x16GetGameSessionResponse\x12;\n" +
-	"\asession\x18\x01 \x01(\v2!.dungeongate.games.v1.GameSessionR\asession\"\xb6\x01\n" +
+	"\asession\x18\x01 \x01(\v2!.dungeongate.games.v2.GameSessionR\asession\"\xb6\x01\n" +
 	"\x17ListGameSessionsRequest\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\x05R\x06userId\x12\x17\n" +
 	"\agame_id\x18\x02 \x01(\tR\x06gameId\x12;\n" +
-	"\x06status\x18\x03 \x01(\x0e2#.dungeongate.games.v1.SessionStatusR\x06status\x12\x14\n" +
+	"\x06status\x18\x03 \x01(\x0e2#.dungeongate.games.v2.SessionStatusR\x06status\x12\x14\n" +
 	"\x05limit\x18\x04 \x01(\x05R\x05limit\x12\x16\n" +
 	"\x06offset\x18\x05 \x01(\x05R\x06offset\"z\n" +
 	"\x18ListGameSessionsResponse\x12=\n" +
-	"\bsessions\x18\x01 \x03(\v2!.dungeongate.games.v1.GameSessionR\bsessions\x12\x1f\n" +
+	"\bsessions\x18\x01 \x03(\v2!.dungeongate.games.v2.GameSessionR\bsessions\x12\x1f\n" +
 	"\vtotal_count\x18\x02 \x01(\x05R\n" +
 	"totalCount\"\x97\x01\n" +
 	"\x0fSaveGameRequest\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\x05R\x06userId\x12\x17\n" +
 	"\agame_id\x18\x02 \x01(\tR\x06gameId\x12\x12\n" +
 	"\x04data\x18\x03 \x01(\fR\x04data\x12>\n" +
-	"\bmetadata\x18\x04 \x01(\v2\".dungeongate.games.v1.SaveMetadataR\bmetadata\"F\n" +
+	"\bmetadata\x18\x04 \x01(\v2\".dungeongate.games.v2.SaveMetadataR\bmetadata\"F\n" +
 	"\x10SaveGameResponse\x122\n" +
-	"\x04save\x18\x01 \x01(\v2\x1e.dungeongate.games.v1.GameSaveR\x04save\"\\\n" +
+	"\x04save\x18\x01 \x01(\v2\x1e.dungeongate.games.v2.GameSaveR\x04save\"\\\n" +
 	"\x0fLoadGameRequest\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\x05R\x06userId\x12\x17\n" +
 	"\agame_id\x18\x02 \x01(\tR\x06gameId\x12\x17\n" +
 	"\asave_id\x18\x03 \x01(\tR\x06saveId\"F\n" +
 	"\x10LoadGameResponse\x122\n" +
-	"\x04save\x18\x01 \x01(\v2\x1e.dungeongate.games.v1.GameSaveR\x04save\"^\n" +
+	"\x04save\x18\x01 \x01(\v2\x1e.dungeongate.games.v2.GameSaveR\x04save\"^\n" +
 	"\x11DeleteSaveRequest\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\x05R\x06userId\x12\x17\n" +
 	"\agame_id\x18\x02 \x01(\tR\x06gameId\x12\x17\n" +
@@ -3261,16 +3261,16 @@ const file_games_game_service_proto_rawDesc = "" +
 	"\x10ListSavesRequest\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\x05R\x06userId\x12\x17\n" +
 	"\agame_id\x18\x02 \x01(\tR\x06gameId\x128\n" +
-	"\x06status\x18\x03 \x01(\x0e2 .dungeongate.games.v1.SaveStatusR\x06status\x12\x14\n" +
+	"\x06status\x18\x03 \x01(\x0e2 .dungeongate.games.v2.SaveStatusR\x06status\x12\x14\n" +
 	"\x05limit\x18\x04 \x01(\x05R\x05limit\x12\x16\n" +
 	"\x06offset\x18\x05 \x01(\x05R\x06offset\"j\n" +
 	"\x11ListSavesResponse\x124\n" +
-	"\x05saves\x18\x01 \x03(\v2\x1e.dungeongate.games.v1.GameSaveR\x05saves\x12\x1f\n" +
+	"\x05saves\x18\x01 \x03(\v2\x1e.dungeongate.games.v2.GameSaveR\x05saves\x12\x1f\n" +
 	"\vtotal_count\x18\x02 \x01(\x05R\n" +
 	"totalCount\"\xb1\x01\n" +
 	"\x0eHealthResponse\x12\x16\n" +
 	"\x06status\x18\x01 \x01(\tR\x06status\x12K\n" +
-	"\adetails\x18\x02 \x03(\v21.dungeongate.games.v1.HealthResponse.DetailsEntryR\adetails\x1a:\n" +
+	"\adetails\x18\x02 \x03(\v21.dungeongate.games.v2.HealthResponse.DetailsEntryR\adetails\x1a:\n" +
 	"\fDetailsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01*\x95\x01\n" +
@@ -3298,166 +3298,166 @@ const file_games_game_service_proto_rawDesc = "" +
 	"\x13SAVE_STATUS_DELETED\x10\x042\xe6\n" +
 	"\n" +
 	"\vGameService\x12\\\n" +
-	"\tListGames\x12&.dungeongate.games.v1.ListGamesRequest\x1a'.dungeongate.games.v1.ListGamesResponse\x12V\n" +
-	"\aGetGame\x12$.dungeongate.games.v1.GetGameRequest\x1a%.dungeongate.games.v1.GetGameResponse\x12_\n" +
+	"\tListGames\x12&.dungeongate.games.v2.ListGamesRequest\x1a'.dungeongate.games.v2.ListGamesResponse\x12V\n" +
+	"\aGetGame\x12$.dungeongate.games.v2.GetGameRequest\x1a%.dungeongate.games.v2.GetGameResponse\x12_\n" +
 	"\n" +
-	"CreateGame\x12'.dungeongate.games.v1.CreateGameRequest\x1a(.dungeongate.games.v1.CreateGameResponse\x12_\n" +
+	"CreateGame\x12'.dungeongate.games.v2.CreateGameRequest\x1a(.dungeongate.games.v2.CreateGameResponse\x12_\n" +
 	"\n" +
-	"UpdateGame\x12'.dungeongate.games.v1.UpdateGameRequest\x1a(.dungeongate.games.v1.UpdateGameResponse\x12_\n" +
+	"UpdateGame\x12'.dungeongate.games.v2.UpdateGameRequest\x1a(.dungeongate.games.v2.UpdateGameResponse\x12_\n" +
 	"\n" +
-	"DeleteGame\x12'.dungeongate.games.v1.DeleteGameRequest\x1a(.dungeongate.games.v1.DeleteGameResponse\x12q\n" +
-	"\x10StartGameSession\x12-.dungeongate.games.v1.StartGameSessionRequest\x1a..dungeongate.games.v1.StartGameSessionResponse\x12n\n" +
-	"\x0fStopGameSession\x12,.dungeongate.games.v1.StopGameSessionRequest\x1a-.dungeongate.games.v1.StopGameSessionResponse\x12k\n" +
-	"\x0eGetGameSession\x12+.dungeongate.games.v1.GetGameSessionRequest\x1a,.dungeongate.games.v1.GetGameSessionResponse\x12q\n" +
-	"\x10ListGameSessions\x12-.dungeongate.games.v1.ListGameSessionsRequest\x1a..dungeongate.games.v1.ListGameSessionsResponse\x12Y\n" +
-	"\bSaveGame\x12%.dungeongate.games.v1.SaveGameRequest\x1a&.dungeongate.games.v1.SaveGameResponse\x12Y\n" +
-	"\bLoadGame\x12%.dungeongate.games.v1.LoadGameRequest\x1a&.dungeongate.games.v1.LoadGameResponse\x12_\n" +
+	"DeleteGame\x12'.dungeongate.games.v2.DeleteGameRequest\x1a(.dungeongate.games.v2.DeleteGameResponse\x12q\n" +
+	"\x10StartGameSession\x12-.dungeongate.games.v2.StartGameSessionRequest\x1a..dungeongate.games.v2.StartGameSessionResponse\x12n\n" +
+	"\x0fStopGameSession\x12,.dungeongate.games.v2.StopGameSessionRequest\x1a-.dungeongate.games.v2.StopGameSessionResponse\x12k\n" +
+	"\x0eGetGameSession\x12+.dungeongate.games.v2.GetGameSessionRequest\x1a,.dungeongate.games.v2.GetGameSessionResponse\x12q\n" +
+	"\x10ListGameSessions\x12-.dungeongate.games.v2.ListGameSessionsRequest\x1a..dungeongate.games.v2.ListGameSessionsResponse\x12Y\n" +
+	"\bSaveGame\x12%.dungeongate.games.v2.SaveGameRequest\x1a&.dungeongate.games.v2.SaveGameResponse\x12Y\n" +
+	"\bLoadGame\x12%.dungeongate.games.v2.LoadGameRequest\x1a&.dungeongate.games.v2.LoadGameResponse\x12_\n" +
 	"\n" +
-	"DeleteSave\x12'.dungeongate.games.v1.DeleteSaveRequest\x1a(.dungeongate.games.v1.DeleteSaveResponse\x12\\\n" +
-	"\tListSaves\x12&.dungeongate.games.v1.ListSavesRequest\x1a'.dungeongate.games.v1.ListSavesResponse\x12F\n" +
-	"\x06Health\x12\x16.google.protobuf.Empty\x1a$.dungeongate.games.v1.HealthResponseB)Z'github.com/dungeongate/pkg/api/games/v1b\x06proto3"
+	"DeleteSave\x12'.dungeongate.games.v2.DeleteSaveRequest\x1a(.dungeongate.games.v2.DeleteSaveResponse\x12\\\n" +
+	"\tListSaves\x12&.dungeongate.games.v2.ListSavesRequest\x1a'.dungeongate.games.v2.ListSavesResponse\x12F\n" +
+	"\x06Health\x12\x16.google.protobuf.Empty\x1a$.dungeongate.games.v2.HealthResponseB)Z'github.com/dungeongate/pkg/api/games/v2b\x06proto3"
 
 var (
-	file_games_game_service_proto_rawDescOnce sync.Once
-	file_games_game_service_proto_rawDescData []byte
+	file_games_game_service_v2_proto_rawDescOnce sync.Once
+	file_games_game_service_v2_proto_rawDescData []byte
 )
 
-func file_games_game_service_proto_rawDescGZIP() []byte {
-	file_games_game_service_proto_rawDescOnce.Do(func() {
-		file_games_game_service_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_games_game_service_proto_rawDesc), len(file_games_game_service_proto_rawDesc)))
+func file_games_game_service_v2_proto_rawDescGZIP() []byte {
+	file_games_game_service_v2_proto_rawDescOnce.Do(func() {
+		file_games_game_service_v2_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_games_game_service_v2_proto_rawDesc), len(file_games_game_service_v2_proto_rawDesc)))
 	})
-	return file_games_game_service_proto_rawDescData
+	return file_games_game_service_v2_proto_rawDescData
 }
 
-var file_games_game_service_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_games_game_service_proto_msgTypes = make([]protoimpl.MessageInfo, 45)
-var file_games_game_service_proto_goTypes = []any{
-	(GameStatus)(0),                  // 0: dungeongate.games.v1.GameStatus
-	(SessionStatus)(0),               // 1: dungeongate.games.v1.SessionStatus
-	(SaveStatus)(0),                  // 2: dungeongate.games.v1.SaveStatus
-	(*Game)(nil),                     // 3: dungeongate.games.v1.Game
-	(*BinaryConfig)(nil),             // 4: dungeongate.games.v1.BinaryConfig
-	(*ResourceConfig)(nil),           // 5: dungeongate.games.v1.ResourceConfig
-	(*SecurityConfig)(nil),           // 6: dungeongate.games.v1.SecurityConfig
-	(*NetworkConfig)(nil),            // 7: dungeongate.games.v1.NetworkConfig
-	(*GameStatistics)(nil),           // 8: dungeongate.games.v1.GameStatistics
-	(*GameSession)(nil),              // 9: dungeongate.games.v1.GameSession
-	(*TerminalSize)(nil),             // 10: dungeongate.games.v1.TerminalSize
-	(*ProcessInfo)(nil),              // 11: dungeongate.games.v1.ProcessInfo
-	(*RecordingInfo)(nil),            // 12: dungeongate.games.v1.RecordingInfo
-	(*StreamingInfo)(nil),            // 13: dungeongate.games.v1.StreamingInfo
-	(*SpectatorInfo)(nil),            // 14: dungeongate.games.v1.SpectatorInfo
-	(*GameSave)(nil),                 // 15: dungeongate.games.v1.GameSave
-	(*SaveMetadata)(nil),             // 16: dungeongate.games.v1.SaveMetadata
-	(*SaveBackup)(nil),               // 17: dungeongate.games.v1.SaveBackup
-	(*ListGamesRequest)(nil),         // 18: dungeongate.games.v1.ListGamesRequest
-	(*ListGamesResponse)(nil),        // 19: dungeongate.games.v1.ListGamesResponse
-	(*GetGameRequest)(nil),           // 20: dungeongate.games.v1.GetGameRequest
-	(*GetGameResponse)(nil),          // 21: dungeongate.games.v1.GetGameResponse
-	(*CreateGameRequest)(nil),        // 22: dungeongate.games.v1.CreateGameRequest
-	(*CreateGameResponse)(nil),       // 23: dungeongate.games.v1.CreateGameResponse
-	(*UpdateGameRequest)(nil),        // 24: dungeongate.games.v1.UpdateGameRequest
-	(*UpdateGameResponse)(nil),       // 25: dungeongate.games.v1.UpdateGameResponse
-	(*DeleteGameRequest)(nil),        // 26: dungeongate.games.v1.DeleteGameRequest
-	(*DeleteGameResponse)(nil),       // 27: dungeongate.games.v1.DeleteGameResponse
-	(*StartGameSessionRequest)(nil),  // 28: dungeongate.games.v1.StartGameSessionRequest
-	(*StartGameSessionResponse)(nil), // 29: dungeongate.games.v1.StartGameSessionResponse
-	(*StopGameSessionRequest)(nil),   // 30: dungeongate.games.v1.StopGameSessionRequest
-	(*StopGameSessionResponse)(nil),  // 31: dungeongate.games.v1.StopGameSessionResponse
-	(*GetGameSessionRequest)(nil),    // 32: dungeongate.games.v1.GetGameSessionRequest
-	(*GetGameSessionResponse)(nil),   // 33: dungeongate.games.v1.GetGameSessionResponse
-	(*ListGameSessionsRequest)(nil),  // 34: dungeongate.games.v1.ListGameSessionsRequest
-	(*ListGameSessionsResponse)(nil), // 35: dungeongate.games.v1.ListGameSessionsResponse
-	(*SaveGameRequest)(nil),          // 36: dungeongate.games.v1.SaveGameRequest
-	(*SaveGameResponse)(nil),         // 37: dungeongate.games.v1.SaveGameResponse
-	(*LoadGameRequest)(nil),          // 38: dungeongate.games.v1.LoadGameRequest
-	(*LoadGameResponse)(nil),         // 39: dungeongate.games.v1.LoadGameResponse
-	(*DeleteSaveRequest)(nil),        // 40: dungeongate.games.v1.DeleteSaveRequest
-	(*DeleteSaveResponse)(nil),       // 41: dungeongate.games.v1.DeleteSaveResponse
-	(*ListSavesRequest)(nil),         // 42: dungeongate.games.v1.ListSavesRequest
-	(*ListSavesResponse)(nil),        // 43: dungeongate.games.v1.ListSavesResponse
-	(*HealthResponse)(nil),           // 44: dungeongate.games.v1.HealthResponse
-	nil,                              // 45: dungeongate.games.v1.Game.EnvironmentEntry
-	nil,                              // 46: dungeongate.games.v1.SaveMetadata.CustomFieldsEntry
-	nil,                              // 47: dungeongate.games.v1.HealthResponse.DetailsEntry
+var file_games_game_service_v2_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
+var file_games_game_service_v2_proto_msgTypes = make([]protoimpl.MessageInfo, 45)
+var file_games_game_service_v2_proto_goTypes = []any{
+	(GameStatus)(0),                  // 0: dungeongate.games.v2.GameStatus
+	(SessionStatus)(0),               // 1: dungeongate.games.v2.SessionStatus
+	(SaveStatus)(0),                  // 2: dungeongate.games.v2.SaveStatus
+	(*Game)(nil),                     // 3: dungeongate.games.v2.Game
+	(*BinaryConfig)(nil),             // 4: dungeongate.games.v2.BinaryConfig
+	(*ResourceConfig)(nil),           // 5: dungeongate.games.v2.ResourceConfig
+	(*SecurityConfig)(nil),           // 6: dungeongate.games.v2.SecurityConfig
+	(*NetworkConfig)(nil),            // 7: dungeongate.games.v2.NetworkConfig
+	(*GameStatistics)(nil),           // 8: dungeongate.games.v2.GameStatistics
+	(*GameSession)(nil),              // 9: dungeongate.games.v2.GameSession
+	(*TerminalSize)(nil),             // 10: dungeongate.games.v2.TerminalSize
+	(*ProcessInfo)(nil),              // 11: dungeongate.games.v2.ProcessInfo
+	(*RecordingInfo)(nil),            // 12: dungeongate.games.v2.RecordingInfo
+	(*StreamingInfo)(nil),            // 13: dungeongate.games.v2.StreamingInfo
+	(*SpectatorInfo)(nil),            // 14: dungeongate.games.v2.SpectatorInfo
+	(*GameSave)(nil),                 // 15: dungeongate.games.v2.GameSave
+	(*SaveMetadata)(nil),             // 16: dungeongate.games.v2.SaveMetadata
+	(*SaveBackup)(nil),               // 17: dungeongate.games.v2.SaveBackup
+	(*ListGamesRequest)(nil),         // 18: dungeongate.games.v2.ListGamesRequest
+	(*ListGamesResponse)(nil),        // 19: dungeongate.games.v2.ListGamesResponse
+	(*GetGameRequest)(nil),           // 20: dungeongate.games.v2.GetGameRequest
+	(*GetGameResponse)(nil),          // 21: dungeongate.games.v2.GetGameResponse
+	(*CreateGameRequest)(nil),        // 22: dungeongate.games.v2.CreateGameRequest
+	(*CreateGameResponse)(nil),       // 23: dungeongate.games.v2.CreateGameResponse
+	(*UpdateGameRequest)(nil),        // 24: dungeongate.games.v2.UpdateGameRequest
+	(*UpdateGameResponse)(nil),       // 25: dungeongate.games.v2.UpdateGameResponse
+	(*DeleteGameRequest)(nil),        // 26: dungeongate.games.v2.DeleteGameRequest
+	(*DeleteGameResponse)(nil),       // 27: dungeongate.games.v2.DeleteGameResponse
+	(*StartGameSessionRequest)(nil),  // 28: dungeongate.games.v2.StartGameSessionRequest
+	(*StartGameSessionResponse)(nil), // 29: dungeongate.games.v2.StartGameSessionResponse
+	(*StopGameSessionRequest)(nil),   // 30: dungeongate.games.v2.StopGameSessionRequest
+	(*StopGameSessionResponse)(nil),  // 31: dungeongate.games.v2.StopGameSessionResponse
+	(*GetGameSessionRequest)(nil),    // 32: dungeongate.games.v2.GetGameSessionRequest
+	(*GetGameSessionResponse)(nil),   // 33: dungeongate.games.v2.GetGameSessionResponse
+	(*ListGameSessionsRequest)(nil),  // 34: dungeongate.games.v2.ListGameSessionsRequest
+	(*ListGameSessionsResponse)(nil), // 35: dungeongate.games.v2.ListGameSessionsResponse
+	(*SaveGameRequest)(nil),          // 36: dungeongate.games.v2.SaveGameRequest
+	(*SaveGameResponse)(nil),         // 37: dungeongate.games.v2.SaveGameResponse
+	(*LoadGameRequest)(nil),          // 38: dungeongate.games.v2.LoadGameRequest
+	(*LoadGameResponse)(nil),         // 39: dungeongate.games.v2.LoadGameResponse
+	(*DeleteSaveRequest)(nil),        // 40: dungeongate.games.v2.DeleteSaveRequest
+	(*DeleteSaveResponse)(nil),       // 41: dungeongate.games.v2.DeleteSaveResponse
+	(*ListSavesRequest)(nil),         // 42: dungeongate.games.v2.ListSavesRequest
+	(*ListSavesResponse)(nil),        // 43: dungeongate.games.v2.ListSavesResponse
+	(*HealthResponse)(nil),           // 44: dungeongate.games.v2.HealthResponse
+	nil,                              // 45: dungeongate.games.v2.Game.EnvironmentEntry
+	nil,                              // 46: dungeongate.games.v2.SaveMetadata.CustomFieldsEntry
+	nil,                              // 47: dungeongate.games.v2.HealthResponse.DetailsEntry
 	(*timestamppb.Timestamp)(nil),    // 48: google.protobuf.Timestamp
 	(*emptypb.Empty)(nil),            // 49: google.protobuf.Empty
 }
-var file_games_game_service_proto_depIdxs = []int32{
-	0,  // 0: dungeongate.games.v1.Game.status:type_name -> dungeongate.games.v1.GameStatus
-	4,  // 1: dungeongate.games.v1.Game.binary:type_name -> dungeongate.games.v1.BinaryConfig
-	45, // 2: dungeongate.games.v1.Game.environment:type_name -> dungeongate.games.v1.Game.EnvironmentEntry
-	5,  // 3: dungeongate.games.v1.Game.resources:type_name -> dungeongate.games.v1.ResourceConfig
-	6,  // 4: dungeongate.games.v1.Game.security:type_name -> dungeongate.games.v1.SecurityConfig
-	7,  // 5: dungeongate.games.v1.Game.networking:type_name -> dungeongate.games.v1.NetworkConfig
-	8,  // 6: dungeongate.games.v1.Game.statistics:type_name -> dungeongate.games.v1.GameStatistics
-	48, // 7: dungeongate.games.v1.Game.created_at:type_name -> google.protobuf.Timestamp
-	48, // 8: dungeongate.games.v1.Game.updated_at:type_name -> google.protobuf.Timestamp
-	48, // 9: dungeongate.games.v1.GameStatistics.last_played:type_name -> google.protobuf.Timestamp
-	1,  // 10: dungeongate.games.v1.GameSession.status:type_name -> dungeongate.games.v1.SessionStatus
-	48, // 11: dungeongate.games.v1.GameSession.start_time:type_name -> google.protobuf.Timestamp
-	48, // 12: dungeongate.games.v1.GameSession.end_time:type_name -> google.protobuf.Timestamp
-	48, // 13: dungeongate.games.v1.GameSession.last_activity:type_name -> google.protobuf.Timestamp
-	10, // 14: dungeongate.games.v1.GameSession.terminal_size:type_name -> dungeongate.games.v1.TerminalSize
-	11, // 15: dungeongate.games.v1.GameSession.process_info:type_name -> dungeongate.games.v1.ProcessInfo
-	12, // 16: dungeongate.games.v1.GameSession.recording:type_name -> dungeongate.games.v1.RecordingInfo
-	13, // 17: dungeongate.games.v1.GameSession.streaming:type_name -> dungeongate.games.v1.StreamingInfo
-	14, // 18: dungeongate.games.v1.GameSession.spectators:type_name -> dungeongate.games.v1.SpectatorInfo
-	48, // 19: dungeongate.games.v1.RecordingInfo.start_time:type_name -> google.protobuf.Timestamp
-	48, // 20: dungeongate.games.v1.SpectatorInfo.join_time:type_name -> google.protobuf.Timestamp
-	2,  // 21: dungeongate.games.v1.GameSave.status:type_name -> dungeongate.games.v1.SaveStatus
-	16, // 22: dungeongate.games.v1.GameSave.metadata:type_name -> dungeongate.games.v1.SaveMetadata
-	17, // 23: dungeongate.games.v1.GameSave.backups:type_name -> dungeongate.games.v1.SaveBackup
-	48, // 24: dungeongate.games.v1.GameSave.created_at:type_name -> google.protobuf.Timestamp
-	48, // 25: dungeongate.games.v1.GameSave.updated_at:type_name -> google.protobuf.Timestamp
-	46, // 26: dungeongate.games.v1.SaveMetadata.custom_fields:type_name -> dungeongate.games.v1.SaveMetadata.CustomFieldsEntry
-	48, // 27: dungeongate.games.v1.SaveBackup.created_at:type_name -> google.protobuf.Timestamp
-	0,  // 28: dungeongate.games.v1.ListGamesRequest.status:type_name -> dungeongate.games.v1.GameStatus
-	3,  // 29: dungeongate.games.v1.ListGamesResponse.games:type_name -> dungeongate.games.v1.Game
-	3,  // 30: dungeongate.games.v1.GetGameResponse.game:type_name -> dungeongate.games.v1.Game
-	3,  // 31: dungeongate.games.v1.CreateGameRequest.game:type_name -> dungeongate.games.v1.Game
-	3,  // 32: dungeongate.games.v1.CreateGameResponse.game:type_name -> dungeongate.games.v1.Game
-	3,  // 33: dungeongate.games.v1.UpdateGameRequest.game:type_name -> dungeongate.games.v1.Game
-	3,  // 34: dungeongate.games.v1.UpdateGameResponse.game:type_name -> dungeongate.games.v1.Game
-	10, // 35: dungeongate.games.v1.StartGameSessionRequest.terminal_size:type_name -> dungeongate.games.v1.TerminalSize
-	9,  // 36: dungeongate.games.v1.StartGameSessionResponse.session:type_name -> dungeongate.games.v1.GameSession
-	9,  // 37: dungeongate.games.v1.GetGameSessionResponse.session:type_name -> dungeongate.games.v1.GameSession
-	1,  // 38: dungeongate.games.v1.ListGameSessionsRequest.status:type_name -> dungeongate.games.v1.SessionStatus
-	9,  // 39: dungeongate.games.v1.ListGameSessionsResponse.sessions:type_name -> dungeongate.games.v1.GameSession
-	16, // 40: dungeongate.games.v1.SaveGameRequest.metadata:type_name -> dungeongate.games.v1.SaveMetadata
-	15, // 41: dungeongate.games.v1.SaveGameResponse.save:type_name -> dungeongate.games.v1.GameSave
-	15, // 42: dungeongate.games.v1.LoadGameResponse.save:type_name -> dungeongate.games.v1.GameSave
-	2,  // 43: dungeongate.games.v1.ListSavesRequest.status:type_name -> dungeongate.games.v1.SaveStatus
-	15, // 44: dungeongate.games.v1.ListSavesResponse.saves:type_name -> dungeongate.games.v1.GameSave
-	47, // 45: dungeongate.games.v1.HealthResponse.details:type_name -> dungeongate.games.v1.HealthResponse.DetailsEntry
-	18, // 46: dungeongate.games.v1.GameService.ListGames:input_type -> dungeongate.games.v1.ListGamesRequest
-	20, // 47: dungeongate.games.v1.GameService.GetGame:input_type -> dungeongate.games.v1.GetGameRequest
-	22, // 48: dungeongate.games.v1.GameService.CreateGame:input_type -> dungeongate.games.v1.CreateGameRequest
-	24, // 49: dungeongate.games.v1.GameService.UpdateGame:input_type -> dungeongate.games.v1.UpdateGameRequest
-	26, // 50: dungeongate.games.v1.GameService.DeleteGame:input_type -> dungeongate.games.v1.DeleteGameRequest
-	28, // 51: dungeongate.games.v1.GameService.StartGameSession:input_type -> dungeongate.games.v1.StartGameSessionRequest
-	30, // 52: dungeongate.games.v1.GameService.StopGameSession:input_type -> dungeongate.games.v1.StopGameSessionRequest
-	32, // 53: dungeongate.games.v1.GameService.GetGameSession:input_type -> dungeongate.games.v1.GetGameSessionRequest
-	34, // 54: dungeongate.games.v1.GameService.ListGameSessions:input_type -> dungeongate.games.v1.ListGameSessionsRequest
-	36, // 55: dungeongate.games.v1.GameService.SaveGame:input_type -> dungeongate.games.v1.SaveGameRequest
-	38, // 56: dungeongate.games.v1.GameService.LoadGame:input_type -> dungeongate.games.v1.LoadGameRequest
-	40, // 57: dungeongate.games.v1.GameService.DeleteSave:input_type -> dungeongate.games.v1.DeleteSaveRequest
-	42, // 58: dungeongate.games.v1.GameService.ListSaves:input_type -> dungeongate.games.v1.ListSavesRequest
-	49, // 59: dungeongate.games.v1.GameService.Health:input_type -> google.protobuf.Empty
-	19, // 60: dungeongate.games.v1.GameService.ListGames:output_type -> dungeongate.games.v1.ListGamesResponse
-	21, // 61: dungeongate.games.v1.GameService.GetGame:output_type -> dungeongate.games.v1.GetGameResponse
-	23, // 62: dungeongate.games.v1.GameService.CreateGame:output_type -> dungeongate.games.v1.CreateGameResponse
-	25, // 63: dungeongate.games.v1.GameService.UpdateGame:output_type -> dungeongate.games.v1.UpdateGameResponse
-	27, // 64: dungeongate.games.v1.GameService.DeleteGame:output_type -> dungeongate.games.v1.DeleteGameResponse
-	29, // 65: dungeongate.games.v1.GameService.StartGameSession:output_type -> dungeongate.games.v1.StartGameSessionResponse
-	31, // 66: dungeongate.games.v1.GameService.StopGameSession:output_type -> dungeongate.games.v1.StopGameSessionResponse
-	33, // 67: dungeongate.games.v1.GameService.GetGameSession:output_type -> dungeongate.games.v1.GetGameSessionResponse
-	35, // 68: dungeongate.games.v1.GameService.ListGameSessions:output_type -> dungeongate.games.v1.ListGameSessionsResponse
-	37, // 69: dungeongate.games.v1.GameService.SaveGame:output_type -> dungeongate.games.v1.SaveGameResponse
-	39, // 70: dungeongate.games.v1.GameService.LoadGame:output_type -> dungeongate.games.v1.LoadGameResponse
-	41, // 71: dungeongate.games.v1.GameService.DeleteSave:output_type -> dungeongate.games.v1.DeleteSaveResponse
-	43, // 72: dungeongate.games.v1.GameService.ListSaves:output_type -> dungeongate.games.v1.ListSavesResponse
-	44, // 73: dungeongate.games.v1.GameService.Health:output_type -> dungeongate.games.v1.HealthResponse
+var file_games_game_service_v2_proto_depIdxs = []int32{
+	0,  // 0: dungeongate.games.v2.Game.status:type_name -> dungeongate.games.v2.GameStatus
+	4,  // 1: dungeongate.games.v2.Game.binary:type_name -> dungeongate.games.v2.BinaryConfig
+	45, // 2: dungeongate.games.v2.Game.environment:type_name -> dungeongate.games.v2.Game.EnvironmentEntry
+	5,  // 3: dungeongate.games.v2.Game.resources:type_name -> dungeongate.games.v2.ResourceConfig
+	6,  // 4: dungeongate.games.v2.Game.security:type_name -> dungeongate.games.v2.SecurityConfig
+	7,  // 5: dungeongate.games.v2.Game.networking:type_name -> dungeongate.games.v2.NetworkConfig
+	8,  // 6: dungeongate.games.v2.Game.statistics:type_name -> dungeongate.games.v2.GameStatistics
+	48, // 7: dungeongate.games.v2.Game.created_at:type_name -> google.protobuf.Timestamp
+	48, // 8: dungeongate.games.v2.Game.updated_at:type_name -> google.protobuf.Timestamp
+	48, // 9: dungeongate.games.v2.GameStatistics.last_played:type_name -> google.protobuf.Timestamp
+	1,  // 10: dungeongate.games.v2.GameSession.status:type_name -> dungeongate.games.v2.SessionStatus
+	48, // 11: dungeongate.games.v2.GameSession.start_time:type_name -> google.protobuf.Timestamp
+	48, // 12: dungeongate.games.v2.GameSession.end_time:type_name -> google.protobuf.Timestamp
+	48, // 13: dungeongate.games.v2.GameSession.last_activity:type_name -> google.protobuf.Timestamp
+	10, // 14: dungeongate.games.v2.GameSession.terminal_size:type_name -> dungeongate.games.v2.TerminalSize
+	11, // 15: dungeongate.games.v2.GameSession.process_info:type_name -> dungeongate.games.v2.ProcessInfo
+	12, // 16: dungeongate.games.v2.GameSession.recording:type_name -> dungeongate.games.v2.RecordingInfo
+	13, // 17: dungeongate.games.v2.GameSession.streaming:type_name -> dungeongate.games.v2.StreamingInfo
+	14, // 18: dungeongate.games.v2.GameSession.spectators:type_name -> dungeongate.games.v2.SpectatorInfo
+	48, // 19: dungeongate.games.v2.RecordingInfo.start_time:type_name -> google.protobuf.Timestamp
+	48, // 20: dungeongate.games.v2.SpectatorInfo.join_time:type_name -> google.protobuf.Timestamp
+	2,  // 21: dungeongate.games.v2.GameSave.status:type_name -> dungeongate.games.v2.SaveStatus
+	16, // 22: dungeongate.games.v2.GameSave.metadata:type_name -> dungeongate.games.v2.SaveMetadata
+	17, // 23: dungeongate.games.v2.GameSave.backups:type_name -> dungeongate.games.v2.SaveBackup
+	48, // 24: dungeongate.games.v2.GameSave.created_at:type_name -> google.protobuf.Timestamp
+	48, // 25: dungeongate.games.v2.GameSave.updated_at:type_name -> google.protobuf.Timestamp
+	46, // 26: dungeongate.games.v2.SaveMetadata.custom_fields:type_name -> dungeongate.games.v2.SaveMetadata.CustomFieldsEntry
+	48, // 27: dungeongate.games.v2.SaveBackup.created_at:type_name -> google.protobuf.Timestamp
+	0,  // 28: dungeongate.games.v2.ListGamesRequest.status:type_name -> dungeongate.games.v2.GameStatus
+	3,  // 29: dungeongate.games.v2.ListGamesResponse.games:type_name -> dungeongate.games.v2.Game
+	3,  // 30: dungeongate.games.v2.GetGameResponse.game:type_name -> dungeongate.games.v2.Game
+	3,  // 31: dungeongate.games.v2.CreateGameRequest.game:type_name -> dungeongate.games.v2.Game
+	3,  // 32: dungeongate.games.v2.CreateGameResponse.game:type_name -> dungeongate.games.v2.Game
+	3,  // 33: dungeongate.games.v2.UpdateGameRequest.game:type_name -> dungeongate.games.v2.Game
+	3,  // 34: dungeongate.games.v2.UpdateGameResponse.game:type_name -> dungeongate.games.v2.Game
+	10, // 35: dungeongate.games.v2.StartGameSessionRequest.terminal_size:type_name -> dungeongate.games.v2.TerminalSize
+	9,  // 36: dungeongate.games.v2.StartGameSessionResponse.session:type_name -> dungeongate.games.v2.GameSession
+	9,  // 37: dungeongate.games.v2.GetGameSessionResponse.session:type_name -> dungeongate.games.v2.GameSession
+	1,  // 38: dungeongate.games.v2.ListGameSessionsRequest.status:type_name -> dungeongate.games.v2.SessionStatus
+	9,  // 39: dungeongate.games.v2.ListGameSessionsResponse.sessions:type_name -> dungeongate.games.v2.GameSession
+	16, // 40: dungeongate.games.v2.SaveGameRequest.metadata:type_name -> dungeongate.games.v2.SaveMetadata
+	15, // 41: dungeongate.games.v2.SaveGameResponse.save:type_name -> dungeongate.games.v2.GameSave
+	15, // 42: dungeongate.games.v2.LoadGameResponse.save:type_name -> dungeongate.games.v2.GameSave
+	2,  // 43: dungeongate.games.v2.ListSavesRequest.status:type_name -> dungeongate.games.v2.SaveStatus
+	15, // 44: dungeongate.games.v2.ListSavesResponse.saves:type_name -> dungeongate.games.v2.GameSave
+	47, // 45: dungeongate.games.v2.HealthResponse.details:type_name -> dungeongate.games.v2.HealthResponse.DetailsEntry
+	18, // 46: dungeongate.games.v2.GameService.ListGames:input_type -> dungeongate.games.v2.ListGamesRequest
+	20, // 47: dungeongate.games.v2.GameService.GetGame:input_type -> dungeongate.games.v2.GetGameRequest
+	22, // 48: dungeongate.games.v2.GameService.CreateGame:input_type -> dungeongate.games.v2.CreateGameRequest
+	24, // 49: dungeongate.games.v2.GameService.UpdateGame:input_type -> dungeongate.games.v2.UpdateGameRequest
+	26, // 50: dungeongate.games.v2.GameService.DeleteGame:input_type -> dungeongate.games.v2.DeleteGameRequest
+	28, // 51: dungeongate.games.v2.GameService.StartGameSession:input_type -> dungeongate.games.v2.StartGameSessionRequest
+	30, // 52: dungeongate.games.v2.GameService.StopGameSession:input_type -> dungeongate.games.v2.StopGameSessionRequest
+	32, // 53: dungeongate.games.v2.GameService.GetGameSession:input_type -> dungeongate.games.v2.GetGameSessionRequest
+	34, // 54: dungeongate.games.v2.GameService.ListGameSessions:input_type -> dungeongate.games.v2.ListGameSessionsRequest
+	36, // 55: dungeongate.games.v2.GameService.SaveGame:input_type -> dungeongate.games.v2.SaveGameRequest
+	38, // 56: dungeongate.games.v2.GameService.LoadGame:input_type -> dungeongate.games.v2.LoadGameRequest
+	40, // 57: dungeongate.games.v2.GameService.DeleteSave:input_type -> dungeongate.games.v2.DeleteSaveRequest
+	42, // 58: dungeongate.games.v2.GameService.ListSaves:input_type -> dungeongate.games.v2.ListSavesRequest
+	49, // 59: dungeongate.games.v2.GameService.Health:input_type -> google.protobuf.Empty
+	19, // 60: dungeongate.games.v2.GameService.ListGames:output_type -> dungeongate.games.v2.ListGamesResponse
+	21, // 61: dungeongate.games.v2.GameService.GetGame:output_type -> dungeongate.games.v2.GetGameResponse
+	23, // 62: dungeongate.games.v2.GameService.CreateGame:output_type -> dungeongate.games.v2.CreateGameResponse
+	25, // 63: dungeongate.games.v2.GameService.UpdateGame:output_type -> dungeongate.games.v2.UpdateGameResponse
+	27, // 64: dungeongate.games.v2.GameService.DeleteGame:output_type -> dungeongate.games.v2.DeleteGameResponse
+	29, // 65: dungeongate.games.v2.GameService.StartGameSession:output_type -> dungeongate.games.v2.StartGameSessionResponse
+	31, // 66: dungeongate.games.v2.GameService.StopGameSession:output_type -> dungeongate.games.v2.StopGameSessionResponse
+	33, // 67: dungeongate.games.v2.GameService.GetGameSession:output_type -> dungeongate.games.v2.GetGameSessionResponse
+	35, // 68: dungeongate.games.v2.GameService.ListGameSessions:output_type -> dungeongate.games.v2.ListGameSessionsResponse
+	37, // 69: dungeongate.games.v2.GameService.SaveGame:output_type -> dungeongate.games.v2.SaveGameResponse
+	39, // 70: dungeongate.games.v2.GameService.LoadGame:output_type -> dungeongate.games.v2.LoadGameResponse
+	41, // 71: dungeongate.games.v2.GameService.DeleteSave:output_type -> dungeongate.games.v2.DeleteSaveResponse
+	43, // 72: dungeongate.games.v2.GameService.ListSaves:output_type -> dungeongate.games.v2.ListSavesResponse
+	44, // 73: dungeongate.games.v2.GameService.Health:output_type -> dungeongate.games.v2.HealthResponse
 	60, // [60:74] is the sub-list for method output_type
 	46, // [46:60] is the sub-list for method input_type
 	46, // [46:46] is the sub-list for extension type_name
@@ -3465,27 +3465,27 @@ var file_games_game_service_proto_depIdxs = []int32{
 	0,  // [0:46] is the sub-list for field type_name
 }
 
-func init() { file_games_game_service_proto_init() }
-func file_games_game_service_proto_init() {
-	if File_games_game_service_proto != nil {
+func init() { file_games_game_service_v2_proto_init() }
+func file_games_game_service_v2_proto_init() {
+	if File_games_game_service_v2_proto != nil {
 		return
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_games_game_service_proto_rawDesc), len(file_games_game_service_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_games_game_service_v2_proto_rawDesc), len(file_games_game_service_v2_proto_rawDesc)),
 			NumEnums:      3,
 			NumMessages:   45,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_games_game_service_proto_goTypes,
-		DependencyIndexes: file_games_game_service_proto_depIdxs,
-		EnumInfos:         file_games_game_service_proto_enumTypes,
-		MessageInfos:      file_games_game_service_proto_msgTypes,
+		GoTypes:           file_games_game_service_v2_proto_goTypes,
+		DependencyIndexes: file_games_game_service_v2_proto_depIdxs,
+		EnumInfos:         file_games_game_service_v2_proto_enumTypes,
+		MessageInfos:      file_games_game_service_v2_proto_msgTypes,
 	}.Build()
-	File_games_game_service_proto = out.File
-	file_games_game_service_proto_goTypes = nil
-	file_games_game_service_proto_depIdxs = nil
+	File_games_game_service_v2_proto = out.File
+	file_games_game_service_v2_proto_goTypes = nil
+	file_games_game_service_v2_proto_depIdxs = nil
 }

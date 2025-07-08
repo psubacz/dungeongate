@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package dungeongate.games.v1;
 
-option go_package = "github.com/dungeongate/api/proto/games/v1";
+option go_package = "github.com/dungeongate/pkg/api/games/v1";
 
 import "google/protobuf/empty.proto";
 import "google/protobuf/timestamp.proto";

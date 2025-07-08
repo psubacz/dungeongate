@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"github.com/dungeongate/internal/auth"
-	"github.com/dungeongate/internal/auth/proto"
+	proto "github.com/dungeongate/pkg/api/auth/v1"
 	"github.com/dungeongate/internal/user"
 	"github.com/dungeongate/pkg/config"
 	"github.com/dungeongate/pkg/database"

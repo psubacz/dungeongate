@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/dungeongate/internal/auth/proto"
+	proto "github.com/dungeongate/pkg/api/auth/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/types/known/emptypb"
