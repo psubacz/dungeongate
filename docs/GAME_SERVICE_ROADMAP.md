@@ -353,6 +353,11 @@ func (p *SSHConnectionPool) HandleConnection(conn net.Conn) {
     - Death analytics dashboard with player statistics
     - Bones file synchronization between pods
     - Death event streaming for real-time notifications
+    - **Death Event Broadcasting**: Contextual haunting messages sent to all session services
+      - "a haunting scream echoes from beyond the gate... something stirs in the shadows" (with bones)
+      - "a distant cry fades into the void... all is quiet" (without bones)
+      - Messages displayed in session service menu footer with auto-fade
+      - gRPC broadcast system for real-time cross-service notifications
 19. **📋 Pod-based deployment architecture**
     - Game service runs inside containers/pods
     - Horizontal scaling based on game load
@@ -1225,6 +1230,82 @@ func (das *DeathAnalyticsService) GetDeathStatistics(ctx context.Context, timeRa
     }
     
     return stats, nil
+}
+```
+
+### **Death Event Broadcasting System**
+```go
+type DeathEventBroadcaster struct {
+    sessionServices []SessionServiceClient
+    messageBroker   MessageBroker
+    bonesDetector   BonesFileDetector
+    logger          *log.Logger
+}
+
+type DeathBroadcastMessage struct {
+    Type        string    `json:"type"`        // "death.event"
+    Message     string    `json:"message"`     // Contextual message based on bones
+    PlayerName  string    `json:"player_name"`
+    DeathLevel  int       `json:"death_level"`
+    DeathCause  string    `json:"death_cause"`
+    HasBones    bool      `json:"has_bones"`   // Whether bones file was created
+    Timestamp   time.Time `json:"timestamp"`
+}
+
+func (deb *DeathEventBroadcaster) BroadcastDeath(deathInfo *DeathInfo) error {
+    // Check if bones file was created for this death
+    hasBones := deb.bonesDetector.CheckBonesCreated(deathInfo)
+    
+    // Select appropriate message based on bones status
+    message := deb.selectDeathMessage(hasBones)
+    
+    broadcastMsg := &DeathBroadcastMessage{
+        Type:       "death.event",
+        Message:    message,
+        PlayerName: deathInfo.PlayerName,
+        DeathLevel: deathInfo.DeathLevel,
+        DeathCause: deathInfo.DeathCause,
+        HasBones:   hasBones,
+        Timestamp:  time.Now(),
+    }
+    
+    // Broadcast to all session services via gRPC
+    return deb.broadcastToSessionServices(broadcastMsg)
+}
+
+func (deb *DeathEventBroadcaster) selectDeathMessage(hasBones bool) string {
+    if hasBones {
+        return "a haunting scream echoes from beyond the gate... something stirs in the shadows"
+    }
+    return "a distant cry fades into the void... all is quiet"
+}
+```
+
+### **Session Service Integration**
+```go
+// Session service receives death broadcasts and displays in menu footer
+type MenuFooterManager struct {
+    currentMessage string
+    fadeTimer      *time.Timer
+    messageMutex   sync.RWMutex
+}
+
+func (mfm *MenuFooterManager) OnDeathBroadcast(msg *DeathBroadcastMessage) {
+    mfm.messageMutex.Lock()
+    defer mfm.messageMutex.Unlock()
+    
+    // Update footer message
+    mfm.currentMessage = msg.Message
+    
+    // Set fade timer for 5 seconds
+    if mfm.fadeTimer != nil {
+        mfm.fadeTimer.Stop()
+    }
+    mfm.fadeTimer = time.AfterFunc(5*time.Second, func() {
+        mfm.messageMutex.Lock()
+        mfm.currentMessage = ""
+        mfm.messageMutex.Unlock()
+    })
 }
 ```
 
