@@ -44,7 +44,7 @@ ssh:
   host: "localhost"
   
   # Path to SSH host private key (auto-generated if missing)
-  host_key_path: "/Users/caboose/dungeongate/./test-data/ssh_keys/test_host_key"
+  host_key_path: "/Users/caboose/dungeongate/configs/development/ssh_keys/dev_host_key"
   
   # Welcome banner shown on connection (use \r\n for line breaks)
   banner: "Welcome to DungeonGate Development Server!\r\n"
