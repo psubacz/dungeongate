@@ -212,12 +212,8 @@ func (s *SSHServer) initializeClients() {
 	s.authClient = NewAuthServiceClient(authServiceAddr)
 	s.userClient = NewUserServiceClient(userServiceAddr)
 
-	// Use games from config if available
-	if len(s.config.Games) > 0 {
-		s.gameClient = NewGameServiceClientWithConfig(gameServiceAddr, s.config.Games)
-	} else {
-		s.gameClient = NewGameServiceClient(gameServiceAddr)
-	}
+	// Game service client - configuration is now handled by the game service itself
+	s.gameClient = NewGameServiceClient(gameServiceAddr)
 }
 
 // Start starts the SSH server
@@ -2349,7 +2345,7 @@ func (s *SSHServer) handleNetHackGame(ctx context.Context, sessionCtx *SSHSessio
 			size, hashInfo, userSave.UpdatedAt.Format("2006-01-02 15:04:05")))
 	} else {
 		// Start new game
-		s.writeToSession(sessionCtx, "Starting new NetHack game...\r\n")
+		s.writeToSession(sessionCtx, "Starting new NetHack game, standby...\r\n")
 	}
 
 	// Start NetHack

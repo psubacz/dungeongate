@@ -1,0 +1,680 @@
+# ============================================================================
+# DungeonGate Session Service Configuration
+# ============================================================================
+# This configuration file controls the SSH gateway service that provides
+# terminal access to games. It handles SSH connections, PTY management,
+# user sessions, and integrates with other microservices.
+# ============================================================================
+
+# Configuration file format version
+version: "0.4.0"
+
+# ============================================================================
+# HTTP/gRPC Server Configuration
+# ============================================================================
+# Controls the HTTP API server and gRPC endpoints for service communication
+server:
+  # HTTP API server port (REST endpoints, health checks, metrics)
+  port: 8083        
+  
+  # gRPC server port (inter-service communication with auth/game/user services)
+  grpc_port: 9093   
+  
+  # Bind address (localhost for development, 0.0.0.0 for production)
+  host: "localhost"
+  
+  # Request timeout for HTTP operations
+  timeout: "30s"
+  
+  # Maximum concurrent HTTP connections
+  max_connections: 100
+
+# ============================================================================
+# SSH Server Configuration
+# ============================================================================
+# Main SSH server that users connect to for terminal game access
+ssh:
+  # Enable/disable SSH server (set to false to run HTTP-only mode)
+  enabled: true
+  
+  # SSH server port (2222 is non-privileged, production typically uses 22)
+  port: 2222
+  
+  # SSH server bind address
+  host: "localhost"
+  
+  # Path to SSH host private key (auto-generated if missing)
+  host_key_path: "/Users/caboose/dungeongate/./test-data/ssh_keys/test_host_key"
+  
+  # Welcome banner shown on connection (use \r\n for line breaks)
+  banner: "Welcome to DungeonGate Development Server!\r\n"
+  
+  # Maximum concurrent SSH sessions per server
+  max_sessions: 10
+  
+  # Maximum duration for any single session (0 = unlimited)
+  session_timeout: "1h"
+  
+  # Idle timeout before disconnecting inactive sessions
+  idle_timeout: "15m"
+  
+  # SSH Authentication Configuration
+  auth:
+    # Enable password-based authentication
+    password_auth: true
+    
+    # Enable public key authentication (requires key management setup)
+    public_key_auth: false
+    
+    # Allow anonymous connections (no username/password required)
+    # Useful for development and demo environments
+    allow_anonymous: true
+    
+  # Terminal Configuration
+  terminal:
+    # Default terminal size for new sessions (widthxheight)
+    default_size: "80x24"
+    
+    # Maximum allowed terminal size
+    max_size: "120x40"
+    
+    # Supported terminal types for compatibility
+    supported_terminals: ["xterm", "xterm-256color", "screen", "tmux"]
+
+# ============================================================================
+# Session Management Configuration
+# ============================================================================
+# Controls terminal sessions, TTY recording, and session lifecycle
+session_management:
+  # Terminal behavior settings
+  terminal:
+    # Default terminal dimensions for new sessions
+    default_size: "80x24"
+    
+    # Maximum terminal size users can resize to
+    max_size: "120x40"
+    
+    # Character encoding for terminal data
+    encoding: "utf-8"
+    
+  # Session timeout configuration
+  timeouts:
+    # Time before inactive sessions are disconnected
+    idle_timeout: "15m"
+    
+    # Maximum time any session can run (0 = unlimited)
+    max_session_duration: "1h"
+    
+    # How often to check for expired sessions
+    cleanup_interval: "1m"
+    
+  # TTY Recording (Terminal Recording)
+  ttyrec:
+    # Enable recording of all terminal sessions
+    enabled: true
+    
+    # Compression for recorded files (gzip, bzip2, or none)
+    compression: "gzip"
+    
+    # Directory to store recording files
+    directory: "/Users/caboose/Desktop/dungeongate/ttyrec"
+    
+    # Maximum size per recording file before rotation
+    max_file_size: "10MB"
+    
+    # How long to keep recording files (days)
+    retention_days: 7
+    
+  # Spectating System (watch other players)
+  spectating:
+    # Enable the spectating feature
+    enabled: true
+    
+    # Maximum spectators per active game session
+    max_spectators_per_session: 3
+    
+    # Timeout for spectator connections
+    spectator_timeout: "30m"
+
+# ============================================================================
+# Database Configuration
+# ============================================================================
+# Supports both embedded (SQLite) and external (PostgreSQL/MySQL) databases
+database:
+  # Database mode: "embedded" for SQLite, "external" for PostgreSQL/MySQL
+  mode: "embedded"
+  
+  # Database type: sqlite, postgresql, mysql
+  type: "sqlite"
+  
+  # Embedded Database Configuration (SQLite for development/small deployments)
+  embedded:
+    # Database engine type
+    type: "sqlite"
+    
+    # Path to SQLite database file (created automatically)
+    path: "./data/sqlite/dungeongate-dev.db"
+    
+    # Directory containing database migration files
+    migration_path: "./migrations"
+    
+    # Enable automatic database backups
+    backup_enabled: false
+    
+    # SQLite Write-Ahead Logging mode (better concurrency)
+    wal_mode: true
+    
+    # Database caching configuration
+    cache:
+      # Enable query result caching
+      enabled: true
+      
+      # Cache size in MB
+      size: 64
+      
+      # Time-to-live for cached entries
+      ttl: "1h"
+      
+      # Cache type: memory, redis
+      type: "memory"
+  
+  # External Database Configuration (PostgreSQL/MySQL for production)
+  external:
+    # Database type for external mode
+    type: "postgresql"
+    
+    # Writer database endpoint (primary/master database)
+    writer_endpoint: "localhost:5432"
+    
+    # Whether to use writer endpoint for read operations
+    reader_use_writer: true
+    
+    # Reader database endpoint (replica/slave, only used if reader_use_writer is false)
+    reader_endpoint: "localhost:5432"
+    
+    # Database name to connect to
+    database: "postgres"
+    
+    # Database username
+    username: "postgres"
+    
+    # Database password (use environment variables in production)
+    password: "mysecretpassword"
+    
+    # SSL mode: disable, require, verify-ca, verify-full
+    ssl_mode: "disable"
+    
+    # Maximum total database connections
+    max_connections: 25
+    
+    # Maximum idle connections in pool
+    max_idle_conns: 10
+    
+    # Maximum lifetime for database connections
+    conn_max_lifetime: "1h"
+    
+    # Maximum connections for read operations
+    reader_max_connections: 15
+    
+    # Maximum idle connections for readers
+    reader_max_idle_conns: 5
+    
+    # Path to database migration files
+    migration_path: "./migrations"
+    
+    # Database schema name
+    schema: "public"
+    
+    # Database failover configuration
+    failover:
+      # Enable automatic failover on connection issues
+      enabled: true
+      
+      # How often to check database health
+      health_check_interval: "30s"
+      
+      # Timeout before triggering failover
+      failover_timeout: "10s"
+      
+      # Retry interval for failed connections
+      retry_interval: "5s"
+      
+      # Maximum retry attempts before giving up
+      max_retries: 3
+      
+      # Fall back to writer if reader fails
+      reader_to_writer_fallback: true
+  
+  # Common database settings
+  settings:
+    # Log all SQL queries (useful for debugging)
+    log_queries: true
+    
+    # Database operation timeout
+    timeout: "30s"
+    
+    # Number of retry attempts for failed operations
+    retry_attempts: 3
+    
+    # Delay between retry attempts
+    retry_delay: "1s"
+  
+  # Legacy pool configuration (for backward compatibility)
+  pool:
+    max_connections: 10
+    max_idle_connections: 5
+    connection_max_lifetime: "1h"
+
+# ============================================================================
+# Menu and User Interface Configuration
+# ============================================================================
+# Controls the text-based menu system and banners users see
+menu:
+  # Banner file paths (text files with template variables)
+  banners:
+    # Banner shown to anonymous (not logged in) users
+    main_anon: "./configs/development/banners/main_anon.txt"
+    
+    # Banner shown to authenticated users
+    main_user: "./configs/development/banners/main_user.txt"
+    
+    # Banner for the game spectating menu
+    watch_menu: "./configs/development/banners/watch_menu.txt"
+    
+  # Menu options configuration
+  options:
+    # Options available to anonymous users
+    anonymous:
+      - key: "l"           # Key user presses
+        label: "Login"     # Description shown in menu
+        action: "login"    # Internal action name
+      - key: "r"
+        label: "Register"
+        action: "register"
+      - key: "w"
+        label: "Watch games"
+        action: "watch"
+      - key: "g"
+        label: "List games"
+        action: "list_games"
+      - key: "q"
+        label: "Quit"
+        action: "quit"
+        
+    # Options available to authenticated users
+    authenticated:
+      - key: "p"
+        label: "Play a game"
+        action: "play"
+      - key: "w"
+        label: "Watch games"
+        action: "watch"
+      - key: "e"
+        label: "Edit profile"
+        action: "edit_profile"
+      - key: "l"
+        label: "List games"
+        action: "list_games"
+      - key: "r"
+        label: "View recordings"
+        action: "recordings"
+      - key: "s"
+        label: "Statistics"
+        action: "stats"
+      - key: "x"
+        label: "Reset NetHack save"
+        action: "reset_save"
+      - key: "q"
+        label: "Quit"
+        action: "quit"
+
+# ============================================================================
+# Encryption Configuration
+# ============================================================================
+# Controls data encryption at rest and in transit
+encryption:
+  # Enable/disable encryption (disabled for development)
+  enabled: false
+  
+  # Encryption algorithm to use
+  algorithm: "AES-256-GCM"
+  
+  # How often to rotate encryption keys
+  key_rotation_interval: "24h"
+
+# ============================================================================
+# Service Integration Configuration
+# ============================================================================
+# Endpoints for communicating with other microservices
+services:
+  # User service endpoint for user management operations
+  user_service: "localhost:8084"
+  
+  # Game service endpoint for game management operations
+  game_service: "localhost:50051"
+  
+  # Auth service endpoint for authentication operations
+  auth_service: "localhost:8082"
+
+# ============================================================================
+# Authentication Service Integration
+# ============================================================================
+# Configuration for integrating with the centralized auth service
+auth:
+  # Enable authentication service integration
+  enabled: true
+  
+  # Auth service HTTP endpoint for health checks
+  service_address: "localhost:8081"
+  
+  # Auth service gRPC endpoint for authentication calls
+  grpc_address: "localhost:8082"
+  
+  # JWT secret for token validation (should match auth service)
+  jwt_secret: "dev-secret-please-change-in-production"
+  
+  # JWT issuer name (should match auth service)
+  jwt_issuer: "dungeongate-dev"
+  
+  # How long access tokens are valid
+  access_token_expiration: "15m"
+  
+  # How long refresh tokens are valid
+  refresh_token_expiration: "168h"  # 7 days
+  
+  # Maximum failed login attempts before lockout
+  max_login_attempts: 3
+  
+  # How long to lock out users after max attempts
+  lockout_duration: "15m"
+  
+  # Require JWT tokens for API access
+  require_token_for_api: false
+  
+  # Require JWT tokens for SSH access
+  require_token_for_ssh: false
+
+# ============================================================================
+# Storage Configuration
+# ============================================================================
+# File system paths for various types of data storage
+storage:
+  # Directory for TTY recording files
+  ttyrec_path: "/Users/caboose/Desktop/dungeongate/ttyrec"
+  
+  # Directory for temporary files
+  temp_path: "/Users/caboose/Desktop/dungeongate/tmp"
+
+# ============================================================================
+# Logging Configuration
+# ============================================================================
+# Controls application logging behavior
+logging:
+  # Log level: debug, info, warn, error
+  level: "debug"
+  
+  # Log format: text, json
+  format: "text"
+  
+  # Log output: stdout, stderr, or file path
+  output: "stdout"
+
+# ============================================================================
+# Metrics and Monitoring
+# ============================================================================
+# Prometheus metrics and health monitoring configuration
+metrics:
+  # Enable Prometheus metrics collection
+  enabled: true
+  
+  # Port for metrics endpoint (/metrics)
+  port: 8085
+
+# Health check configuration
+health:
+  # Enable health check endpoint
+  enabled: true
+  
+  # Health check endpoint path
+  path: "/health"
+
+# ============================================================================
+# Security Configuration
+# ============================================================================
+# Security features like rate limiting and brute force protection
+security:
+  # Rate limiting configuration
+  rate_limiting:
+    # Enable rate limiting (disabled for development)
+    enabled: false
+    
+    # Maximum connections per IP address
+    max_connections_per_ip: 100
+    
+    # Time window for connection counting
+    connection_window: "1m"
+    
+  # Brute force protection
+  brute_force_protection:
+    # Enable brute force protection (disabled for development)
+    enabled: false
+    
+    # Maximum failed attempts before blocking
+    max_failed_attempts: 10
+    
+    # How long to block after max attempts
+    lockout_duration: "1m"
+    
+  # Session security settings
+  session_security:
+    # Require encryption for session data
+    require_encryption: false
+    
+    # Length of session tokens
+    session_token_length: 32
+    
+    # Use cryptographically secure random for tokens
+    secure_random: true
+
+# ============================================================================
+# Game Configuration
+# ============================================================================
+# Configuration for available games and their execution parameters
+games:
+  # NetHack configuration
+  - id: "nethack"                    # Unique game identifier
+    name: "NetHack"                  # Display name
+    short_name: "nh"                 # Short identifier
+    version: "3.6.7"                 # Game version
+    enabled: true                    # Whether game is available
+    
+    # Binary execution configuration
+    binary:
+      # Path to game executable
+      path: "/opt/homebrew/bin/nethack"
+      
+      # Command line arguments (${USERNAME} is replaced with actual username)
+      args: ["-u", "${USERNAME}"]
+      
+      # Working directory for game execution
+      working_directory: "/opt/homebrew/Cellar/nethack/3.6.7/libexec"
+      
+      # File permissions for game executable
+      permissions: "0755"
+      
+    # File and directory configuration
+    files:
+      # Directory containing game data files
+      data_directory: "/opt/homebrew/Cellar/nethack/3.6.7/libexec"
+      
+      # Directory for save files
+      save_directory: "/opt/homebrew/Cellar/nethack/3.6.7/libexec/save"
+      
+      # Directory for configuration files
+      config_directory: "/opt/homebrew/Cellar/nethack/3.6.7/libexec"
+      
+      # Directory for game logs
+      log_directory: "/tmp/nethack-logs"
+      
+      # Directory for temporary files
+      temp_directory: "/tmp/nethack-temp"
+      
+      # Shared files required by all users
+      shared_files: ["nhdat", "license", "recover"]
+      
+      # User-specific files (${USERNAME} replaced with actual username)
+      user_files: ["${USERNAME}.nh", "${USERNAME}.0", "${USERNAME}.bak"]
+      
+      # File permissions configuration
+      permissions:
+        data_directory: "0755"
+        save_directory: "0755"
+        user_files: "0644"
+        log_files: "0644"
+        
+    # Game-specific settings
+    settings:
+      # Maximum concurrent players for this game
+      max_players: 50
+      
+      # Maximum time a single game session can run
+      max_session_duration: "4h"
+      
+      # Idle timeout for game sessions
+      idle_timeout: "30m"
+      
+      # How often to auto-save the game
+      save_interval: "5m"
+      
+      # Enable automatic saving
+      auto_save: true
+      
+      # Spectating configuration for this game
+      spectating:
+        # Allow spectating of this game
+        enabled: true
+        
+        # Maximum spectators per game session
+        max_spectators_per_session: 5
+        
+        # Timeout for spectator connections
+        spectator_timeout: "2h"
+        
+      # Recording configuration for this game
+      recording:
+        # Enable session recording
+        enabled: true
+        
+        # Recording format (ttyrec is standard)
+        format: "ttyrec"
+        
+        # Compression for recording files
+        compression: "gzip"
+        
+        # Maximum size per recording file
+        max_file_size: "100MB"
+        
+        # How long to keep recordings
+        retention_days: 30
+        
+        # Automatically clean up old recordings
+        auto_cleanup: true
+        
+      # NetHack-specific game options
+      options:
+        MAXNROFPLAYERS: "50"              # Maximum number of players
+        SEDLEVEL: "5"                     # Security level
+        DUMPLOG: "1"                      # Enable dump logs
+        LIVELOG: "1"                      # Enable live logging
+        XLOGFILE: "/opt/homebrew/Cellar/nethack/3.6.7/libexec/xlogfile"
+        LIVELOGFILE: "/opt/homebrew/Cellar/nethack/3.6.7/libexec/livelog"
+        
+    # Environment variables set when running the game
+    environment:
+      # NetHack options file path
+      NETHACKOPTIONS: "@/opt/homebrew/Cellar/nethack/3.6.7/libexec/${USERNAME}.nethackrc"
+      
+      # NetHack data directory
+      HACKDIR: "/opt/homebrew/Cellar/nethack/3.6.7/libexec"
+      NETHACKDIR: "/opt/homebrew/Cellar/nethack/3.6.7/libexec"
+      
+      # Terminal type for game display
+      TERM: "xterm-256color"
+      
+      # User information
+      USER: "${USERNAME}"
+      HOME: "/opt/homebrew/Cellar/nethack/3.6.7/libexec/${USERNAME}"
+      SHELL: "/bin/sh"
+      
+    # Resource limits for game processes
+    resources:
+      # CPU limit (Kubernetes-style resource limits)
+      cpu_limit: "500m"        # 0.5 CPU cores
+      
+      # Memory limit
+      memory_limit: "256Mi"    # 256 MB
+      
+      # CPU request (guaranteed CPU)
+      cpu_request: "100m"      # 0.1 CPU cores
+      
+      # Memory request (guaranteed memory)
+      memory_request: "64Mi"   # 64 MB
+      
+      # Disk space limit
+      disk_limit: "1Gi"        # 1 GB
+      
+      # Maximum number of processes
+      pids_limit: 50
+      
+    # Container configuration (for containerized game execution)
+    container:
+      # Container image to use
+      image: "dungeongate/nethack"
+      
+      # Image tag/version
+      tag: "3.7.0"
+      
+      # Container registry
+      registry: "ghcr.io"
+      
+      # Image pull policy
+      pull_policy: "IfNotPresent"
+      
+      # Volume mounts for the container
+      volumes:
+        - name: "nethack-data"
+          host_path: "/opt/homebrew/share/nethack"
+          mount_path: "/opt/homebrew/share/nethack"
+          read_only: false
+        - name: "nethack-saves"
+          host_path: "/opt/homebrew/share/nethack/save"
+          mount_path: "/opt/homebrew/share/nethack/save"
+          read_only: false
+          
+      # Environment variables for container
+      environment:
+        GAME: "nethack"
+        USERNAME: "${USERNAME}"
+        TERM: "xterm-256color"
+        
+      # Security context for container
+      security_context:
+        # User ID to run container as
+        run_as_user: 1000
+        
+        # Group ID to run container as
+        run_as_group: 1000
+        
+        # Make root filesystem read-only
+        read_only_root_filesystem: true
+        
+        # Don't run in privileged mode
+        privileged: false
+        
+      # Network mode for container
+      network_mode: "none"
+      
+    # Network isolation configuration
+    networking:
+      # Network isolation mode
+      mode: "isolated"

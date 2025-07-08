@@ -9,9 +9,6 @@ DungeonGate is a over-engineered microserviced application inspired by [dgamelau
 Supported games
 - NetHack
 
-YELLOW
-BLACK
-
 ## 🚀 Quick Start
 
 ### Prerequisites

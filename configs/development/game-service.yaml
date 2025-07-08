@@ -1,82 +1,455 @@
+# ============================================================================
+# DungeonGate Game Service Configuration
+# ============================================================================
+# This configuration file controls the game management service that handles
+# game execution, process/container management, resource allocation, and
+# game-specific settings for all supported games in the platform.
+# ============================================================================
+
+# Configuration file format version
 version: "1.0"
 
+# ============================================================================
+# HTTP/gRPC Server Configuration
+# ============================================================================
+# Controls the game service HTTP API and gRPC endpoints
 server:
-  port: 8084
-  grpc_port: 50051
-
-database:
-  driver: "sqlite"
-  host: "localhost"
-  port: 5432
-  name: "dungeongate-dev"
-  user: "dungeongate"
-  password: "password"
-  ssl_mode: "disable"
-  max_open_connections: 25
-  max_idle_connections: 5
-  connection_max_lifetime: "1h"
-  sqlite:
-    file_path: "./data/sqlite/dungeongate-dev.db"
-
-game_engine:
-  mode: "process"  # process, container, or hybrid
+  # HTTP API server port (REST endpoints for game management)
+  port: 8085          
   
+  # gRPC server port (game requests from session service)
+  grpc_port: 50051    
+  
+  # Bind address (localhost for development, 0.0.0.0 for production)
+  host: "localhost"
+  
+  # Request timeout for HTTP/gRPC operations
+  timeout: "30s"
+  
+  # Maximum concurrent connections
+  max_connections: 100
+
+# ============================================================================
+# Database Configuration  
+# ============================================================================
+# Game service database for storing game states, sessions, and configurations
+database:
+  # Database mode: "embedded" for SQLite, "external" for PostgreSQL/MySQL
+  mode: "embedded"
+  
+  # Database type: sqlite, postgresql, mysql
+  type: "sqlite"
+  
+  # Embedded Database Configuration (SQLite for development/small deployments)
+  embedded:
+    # Database engine type
+    type: "sqlite"
+    
+    # Path to SQLite database file (shared with other services)
+    path: "./data/sqlite/dungeongate-dev.db"
+    
+    # Directory containing database migration files
+    migration_path: "./migrations"
+    
+    # Enable automatic database backups
+    backup_enabled: false
+    
+    # SQLite Write-Ahead Logging mode (better concurrency)
+    wal_mode: true
+    
+    # Database caching configuration (important for game state lookups)
+    cache:
+      # Enable query result caching for game data
+      enabled: true
+      
+      # Cache size in MB
+      size: 64
+      
+      # Time-to-live for cached entries
+      ttl: "1h"
+      
+      # Cache type: memory, redis
+      type: "memory"
+  
+  # External Database Configuration (PostgreSQL/MySQL for production)
+  external:
+    # Database type for external mode
+    type: "postgresql"
+    
+    # Writer database endpoint (primary/master database)
+    writer_endpoint: "localhost:5432"
+    
+    # Whether to use writer endpoint for read operations
+    reader_use_writer: true
+    
+    # Reader database endpoint (replica/slave, only used if reader_use_writer is false)
+    reader_endpoint: "localhost:5432"
+    
+    # Database name to connect to
+    database: "postgres"
+    
+    # Database username
+    username: "postgres"
+    
+    # Database password (use environment variables in production)
+    password: "mysecretpassword"
+    
+    # SSL mode: disable, require, verify-ca, verify-full
+    ssl_mode: "disable"
+    
+    # Maximum total database connections
+    max_connections: 25
+    
+    # Maximum idle connections in pool
+    max_idle_conns: 10
+    
+    # Maximum lifetime for database connections
+    conn_max_lifetime: "1h"
+    
+    # Maximum connections for read operations
+    reader_max_connections: 15
+    
+    # Maximum idle connections for readers
+    reader_max_idle_conns: 5
+    
+    # Path to database migration files
+    migration_path: "./migrations"
+    
+    # Database schema name
+    schema: "public"
+    
+    # Database failover configuration
+    failover:
+      # Enable automatic failover on connection issues
+      enabled: true
+      
+      # How often to check database health
+      health_check_interval: "30s"
+      
+      # Timeout before triggering failover
+      failover_timeout: "10s"
+      
+      # Retry interval for failed connections
+      retry_interval: "5s"
+      
+      # Maximum retry attempts before giving up
+      max_retries: 3
+      
+      # Fall back to writer if reader fails
+      reader_to_writer_fallback: true
+  
+  # Common database settings
+  settings:
+    # Log all SQL queries (useful for debugging)
+    log_queries: true
+    
+    # Database operation timeout
+    timeout: "30s"
+    
+    # Number of retry attempts for failed operations
+    retry_attempts: 3
+    
+    # Delay between retry attempts
+    retry_delay: "1s"
+  
+  # Legacy pool configuration (for backward compatibility)
+  pool:
+    max_connections: 10
+    max_idle_connections: 5
+    connection_max_lifetime: "1h"
+
+# ============================================================================
+# Game Engine Configuration
+# ============================================================================
+# Controls how games are executed: as processes, containers, or hybrid
+game_engine:
+  # Execution mode: "process" (native), "container" (isolated), "hybrid" (mixed)
+  mode: "process"
+  
+  # Process pool configuration (for "process" and "hybrid" modes)
   process_pool:
+    # Maximum number of worker processes for game execution
     max_workers: 100
+    
+    # Timeout for worker process operations
     worker_timeout: "30s"
     
+  # Security and isolation configuration
   isolation:
+    # Enable Linux namespaces for process isolation (Linux only)
     enable_namespaces: false
+    
+    # Enable cgroups for resource limiting (Linux only)
     enable_cgroups: false
     
+  # Default resource limits for all games (can be overridden per-game)
   resources:
+    # Default CPU limit (Kubernetes-style: 1000m = 1 CPU core)
     default_cpu_limit: "1000m"
+    
+    # Default memory limit (Kubernetes-style: Mi = mebibytes)
     default_memory_limit: "512Mi"
+    
+    # Default timeout for game sessions
     default_timeout: "3600s"
 
+# ============================================================================
+# Game Definitions
+# ============================================================================
+# Configuration for each supported game
 games:
-  - id: "nethack"
-    name: "NetHack"
-    short_name: "NH"
-    version: "3.6.7"
-    enabled: true
+  # NetHack Configuration
+  - id: "nethack"                        # Unique identifier for the game
+    name: "NetHack"                       # Display name shown to users
+    short_name: "NH"                      # Short name for logs/UI
+    version: "3.6.7"                      # Game version
+    enabled: true                         # Whether this game is available
+    
+    # Game executable configuration
     binary:
+      # Path to the game executable
       path: "/usr/games/nethack"
+      
+      # Command line arguments passed to the game
       args: []
+      
+      # Working directory for game execution
       working_directory: "/tmp"
+      
+    # Game-specific settings
     settings:
+      # Maximum concurrent players for this game
       max_players: 50
+      
+      # Maximum duration for a single game session
       max_session_duration: "8h"
+      
+      # Idle timeout before terminating inactive sessions
       idle_timeout: "30m"
+      
+      # Enable automatic saving of game state
       auto_save: true
       
-  - id: "dcss"
-    name: "Dungeon Crawl Stone Soup"
-    short_name: "DCSS"
-    version: "0.30"
-    enabled: true
+    # Path configuration for NetHack
+    paths:
+      # Auto-detect system paths using `nethack --showpaths`
+      auto_detect: true
+      
+      # System-level paths (detected automatically or configured manually)
+      system:
+        # Directory containing score files
+        score_dir: "/opt/homebrew/share/nethack/"
+        
+        # System configuration file
+        sysconf_file: "/opt/homebrew/Cellar/nethack/3.6.7/libexec/sysconf"
+        
+        # Symbols file for display
+        symbols_file: "/opt/homebrew/Cellar/nethack/3.6.7/libexec/symbols"
+        
+        # Main data file
+        data_file: "nhdat"
+        
+      # User-specific paths (relative to user's home directory)
+      user:
+        # Base directory for user's game data
+        base_dir: "games/nethack"
+        
+        # Directory for save files
+        save_dir: "games/nethack/saves"
+        
+        # Directory for user configuration
+        config_dir: "games/nethack/config"
+        
+        # Directory for bones files (shared ghosts)
+        bones_dir: "games/nethack/bones"
+        
+        # Directory for level files
+        level_dir: "games/nethack/levels"
+        
+        # Directory for lock files (prevent multiple instances)
+        lock_dir: "games/nethack/locks"
+        
+        # Directory for trouble/recovery files
+        trouble_dir: "games/nethack/trouble"
+        
+    # Game setup configuration (run when user first plays)
+    setup:
+      # Create user-specific directories
+      create_user_dirs: true
+      
+      # Copy default configuration files to user directory
+      copy_default_config: true
+      
+      # Initialize shared game files if needed
+      initialize_shared: true
+      
+      # Validate that all paths exist and are accessible
+      validate_paths: true
+      
+      # Set proper file permissions
+      set_permissions: true
+      
+      # Detect system paths automatically
+      detect_system_paths: true
+      
+      # Create symbolic links for save files
+      create_save_links: true
+      
+    # Game cleanup configuration (run when user stops playing)
+    cleanup:
+      # Remove user directories on cleanup (usually false)
+      remove_user_dirs: false
+      
+      # Clear temporary files
+      clear_temp_files: true
+      
+      # Remove lock files to allow restart
+      remove_lock_files: true
+      
+      # Clear personal bones files (usually false)
+      clear_personal_bones: false
+      
+      # Preserve user configuration files
+      preserve_config: true
+      
+      # Backup save files before cleanup
+      backup_saves: true
+      
+      # Clean up save file symbolic links
+      cleanup_save_links: true
+      
+      # Validate cleanup operations
+      validate_cleanup: true
+      
+  # Dungeon Crawl Stone Soup Configuration  
+  - id: "dcss"                           # Unique identifier
+    name: "Dungeon Crawl Stone Soup"      # Display name
+    short_name: "DCSS"                    # Short name
+    version: "0.30"                       # Game version
+    enabled: true                         # Available to users
+    
+    # DCSS executable configuration
     binary:
+      # Path to crawl executable
       path: "/usr/games/crawl"
+      
+      # Command line arguments
       args: []
+      
+      # Working directory
       working_directory: "/tmp"
+      
+    # DCSS-specific settings
     settings:
+      # Maximum concurrent DCSS players
       max_players: 30
+      
+      # DCSS sessions can be very long
       max_session_duration: "12h"
+      
+      # Longer idle timeout for DCSS
       idle_timeout: "45m"
+      
+      # Enable automatic saving
       auto_save: true
+      
+    # DCSS path configuration
+    paths:
+      # DCSS doesn't support --showpaths like NetHack
+      auto_detect: false
+      
+      # System paths for DCSS (manually configured)
+      system:
+        # DCSS score directory
+        score_dir: "/var/games/crawl"
+        
+        # System configuration file
+        sysconf_file: "/etc/crawl/init.txt"
+        
+        # Symbols/tiles directory
+        symbols_file: "/usr/share/crawl/dat/tiles"
+        
+        # Data file identifier
+        data_file: "crawl_data"
+        
+      # User-specific paths for DCSS
+      user:
+        base_dir: "games/dcss"
+        save_dir: "games/dcss/saves"
+        config_dir: "games/dcss/config"
+        bones_dir: "games/dcss/bones"
+        level_dir: "games/dcss/levels"
+        lock_dir: "games/dcss/locks"
+        trouble_dir: "games/dcss/trouble"
+        
+    # DCSS setup configuration
+    setup:
+      create_user_dirs: true
+      copy_default_config: true
+      initialize_shared: true
+      
+      # Don't validate DCSS paths as they may not exist in all installations
+      validate_paths: false
+      
+      set_permissions: true
+      
+      # DCSS doesn't support auto-detection
+      detect_system_paths: false
+      
+      # DCSS doesn't use save links like NetHack
+      create_save_links: false
+      
+    # DCSS cleanup configuration
+    cleanup:
+      remove_user_dirs: false
+      clear_temp_files: true
+      remove_lock_files: true
+      clear_personal_bones: false
+      preserve_config: true
+      backup_saves: true
+      
+      # No save links to clean up
+      cleanup_save_links: false
+      
+      validate_cleanup: true
 
+# ============================================================================
+# Logging Configuration
+# ============================================================================
+# Game service logging for debugging and monitoring
 logging:
+  # Log level: debug, info, warn, error
   level: "info"
+  
+  # Log format: text (human readable), json (machine readable)
   format: "json"
   
+# ============================================================================
+# Metrics and Monitoring
+# ============================================================================
+# Prometheus metrics and health monitoring for game service
 metrics:
+  # Enable Prometheus metrics collection
   enabled: true
+  
+  # Port for metrics endpoint (/metrics)
   port: 9090
   
+# Health check configuration
 health:
+  # Enable health check endpoint
   enabled: true
+  
+  # Port for health check endpoint
   port: 8085
 
+# ============================================================================
+# Security Configuration
+# ============================================================================
+# Security settings for game execution
 security:
+  # Enable encryption for game data
   enable_encryption: false
+  
+  # Enable process/container isolation
   enable_isolation: false
