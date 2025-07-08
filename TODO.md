@@ -24,7 +24,7 @@
 - Logging implementation
 - Add TCP socket tuning (TCP_NODELAY, SO_RCVBUF, SO_SNDBUF) for SSH connections
 - Replace string concatenation with strings.Builder in query detection (database.go:431-458)
-- added messages when session or game servers it at capacity 
+- added messages when session or game servers it at capacity
 
 ## Medium Tasks 🟡
 - add intialization functions to loop-fail gracefully if not all componetns are up: database connections, auth service, game service, user

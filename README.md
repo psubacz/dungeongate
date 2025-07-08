@@ -53,14 +53,19 @@ games:
 
 3. **Build and run:**
 ```bash
-make test-run
+# Run only the session service (basic functionality)
+make run-session
+
+# OR run all services together (full functionality)
+make run-all
 ```
 
 This will:
-- Build the session service binary
+- Build the required service binaries
 - Start the SSH server on port 2222 (non-privileged)
 - Use SQLite database in `./data/sqlite/`
 - Enable anonymous access for testing
+- `run-all` starts all services: auth (8082), game (50051), user (8084), session (2222)
 
 ### Connect and Play
 
@@ -89,21 +94,46 @@ Open your browser to: http://localhost:8083/metrics
 Essential commands for development:
 
 ```bash
-make deps      # Install Go dependencies
-make build     # Build the session service binary
-make dev       # Run with auto-restart (requires air)
-make test      # Run all tests
-make fmt       # Format Go code
-make lint      # Run linter (requires golangci-lint)
-make vuln      # Check for vulnerabilities (requires govulncheck)
-make test-run  # Start SSH server on port 2222 for testing
+# Dependencies and setup
+make deps           # Install Go dependencies
+make deps-tools     # Install development tools (air, golangci-lint, govulncheck)
+
+# Building individual services
+make build-session  # Build session service binary
+make build-auth     # Build auth service binary
+make build-game     # Build game service binary
+make build-user     # Build user service binary
+make build-all      # Build all service binaries
+
+# Running individual services
+make run-session    # Build and run session service (port 2222)
+make run-auth       # Build and run auth service (port 8082)
+make run-game       # Build and run game service (port 50051)
+make run-user       # Build and run user service (port 8084)
+make run-all        # Build and run all services together
+
+# Testing and quality
+make test           # Run all tests
+make fmt            # Format Go code
+make lint           # Run linter (requires golangci-lint)
+make vuln           # Check for vulnerabilities (requires govulncheck)
+make verify         # Run all verification checks (format, vet, lint, test)
 ```
 
-### Testing the SSH Service
+### Testing the Services
 
 ```bash
-make test-run          # Starts SSH server on port 2222
-ssh -p 2222 localhost  # Connect to test the service
+# Test individual services
+make run-session       # Start session service only (limited functionality)
+make run-auth          # Start auth service only
+make run-game          # Start game service only
+make run-user          # Start user service only
+
+# Test complete system
+make run-all           # Start all services with full functionality
+
+# Connect to test
+ssh -p 2222 localhost  # Connect to test the SSH service
 ```
 
 ### Troubleshooting
@@ -200,22 +230,27 @@ go install github.com/air-verse/air@latest
 
 DungeonGate uses a microservices architecture with the following services:
 
-- **Session Service** - Handles SSH connections, PTY management, and user sessions
-- **User Service** - Manages user registration, authentication, and profiles  
-- **Auth Service** - Authentication, authorization, automated password reset, misc admin functions (planned)
-- **Game Service** - Game management, loading, saving, and configuration (planned)
+- **Session Service** - Handles SSH connections, PTY management, and user sessions (port 2222)
+- **Auth Service** - Centralized authentication and authorization via gRPC (port 8082)
+- **Game Service** - Game management, loading, saving, and configuration (port 50051)
+- **User Service** - User registration, profile management, and user data (port 8084)
+
+Each service can be built and run independently, or all services can be run together using `make run-all`.
 
 ## 📁 Project Structure
 
 ```
 dungeongate/
 ├── cmd/
-│   └── session-service/      # Main application entry point
+│   ├── session-service/      # Session service entry point
+│   ├── auth-service/         # Auth service entry point
+│   ├── game-service/         # Game service entry point
+│   └── user-service/         # User service entry point
 ├── internal/
 │   ├── session/             # SSH server, PTY bridging, session management
-│   ├── user/               # User registration and management
-│   ├── auth/               # Authentication service (planned)
-│   └── games/              # Game management (planned)
+│   ├── auth/               # Authentication service implementation
+│   ├── games/              # Game management implementation
+│   └── user/               # User registration and management
 ├── pkg/
 │   ├── config/             # Configuration management with dual-mode database
 │   ├── database/           # Database abstraction layer (SQLite/PostgreSQL)
@@ -386,14 +421,22 @@ make deps                    # Install dependencies
 make test                    # Run all tests
 make fmt                     # Format code
 make lint                    # Run linter
-make test-run               # Start test server
+make run-all                 # Start all services
 
 # Live development with auto-reload
 make dev                     # Requires air for live reload
 
-# Manual build and run
-make build                   # Build binary to ./build/
+# Manual build and run individual services
+make build-session           # Build session service binary
+make build-auth             # Build auth service binary
+make build-game             # Build game service binary
+make build-user             # Build user service binary
+
+# Run individual services manually
 ./build/dungeongate-session-service -config=configs/development/local.yaml
+./build/dungeongate-auth-service -config=configs/development/local.yaml
+./build/dungeongate-game-service -config=configs/development/local.yaml
+./build/dungeongate-user-service -config=configs/development/local.yaml
 ```
 
 ### External Database Setup
@@ -422,7 +465,14 @@ database:
 
 3. **Run with production config:**
 ```bash
+# Run individual services
 ./build/dungeongate-session-service -config=configs/production/config.yaml
+./build/dungeongate-auth-service -config=configs/production/config.yaml
+./build/dungeongate-game-service -config=configs/production/config.yaml
+./build/dungeongate-user-service -config=configs/production/config.yaml
+
+# Or run all services together
+make run-all
 ```
 
 
