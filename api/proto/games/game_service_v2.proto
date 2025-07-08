@@ -1,11 +1,11 @@
 syntax = "proto3";
 
-package dungeongate.games.v1;
+package dungeongate.games.v2;
 
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/empty.proto";
 
-option go_package = "github.com/dungeongate/pkg/api/games/v1";
+option go_package = "github.com/dungeongate/api/proto/games/v2";
 
 // GameService provides game management operations
 service GameService {
