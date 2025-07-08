@@ -1,7 +1,7 @@
 # Air configuration for hot reload during development
 
 root = "."
-testdata_dir = "test-data"
+testdata_dir = "data"
 tmp_dir = "tmp"
 
 [build]
@@ -9,7 +9,7 @@ tmp_dir = "tmp"
   bin = "./tmp/main"
   cmd = "go build -o ./tmp/main ./cmd/session-service"
   delay = 1000
-  exclude_dir = ["assets", "tmp", "vendor", "test-data", "build", "docs"]
+  exclude_dir = ["assets", "tmp", "vendor", "data", "build", "docs"]
   exclude_file = []
   exclude_regex = ["_test.go"]
   exclude_unchanged = false

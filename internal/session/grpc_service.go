@@ -90,71 +90,6 @@ func (c *userServiceClientEnhanced) UpdateLastLogin(ctx context.Context, userID 
 	return nil
 }
 
-type gameServiceClientEnhanced struct {
-	address string
-	// conn field removed - not currently used
-}
-
-func NewGameServiceClientEnhanced(address string) GameServiceClient {
-	return &gameServiceClientEnhanced{address: address}
-}
-
-func (c *gameServiceClientEnhanced) ListGames(ctx context.Context) ([]*Game, error) {
-	// TODO: Implement actual gRPC client call
-	return []*Game{
-		{ID: "nethack", Name: "NetHack 3.7.0", Description: "The classic dungeon adventure", Enabled: true},
-		{ID: "bash", Name: "Bash Shell", Description: "Interactive command line", Enabled: true},
-		{ID: "nano", Name: "Nano Editor", Description: "Text editor with sample file", Enabled: true},
-		{ID: "crawl", Name: "Dungeon Crawl Stone Soup", Description: "Modern roguelike adventure", Enabled: true},
-	}, nil
-}
-
-func (c *gameServiceClientEnhanced) GetGame(ctx context.Context, gameID string) (*Game, error) {
-	// TODO: Implement actual gRPC client call
-	games := map[string]*Game{
-		"nethack": {ID: "nethack", Name: "NetHack 3.7.0", Description: "The classic dungeon adventure", Enabled: true},
-		"bash":    {ID: "bash", Name: "Bash Shell", Description: "Interactive command line", Enabled: true},
-		"nano":    {ID: "nano", Name: "Nano Editor", Description: "Text editor with sample file", Enabled: true},
-		"crawl":   {ID: "crawl", Name: "Dungeon Crawl Stone Soup", Description: "Modern roguelike adventure", Enabled: true},
-	}
-
-	if game, exists := games[gameID]; exists {
-		return game, nil
-	}
-
-	return nil, fmt.Errorf("game not found: %s", gameID)
-}
-
-func (c *gameServiceClientEnhanced) StartGame(ctx context.Context, req *StartGameRequest) (*GameSession, error) {
-	// TODO: Implement actual gRPC client call
-	return &GameSession{
-		ID:       "game_session_" + req.GameID,
-		UserID:   req.UserID,
-		Username: req.Username,
-		GameID:   req.GameID,
-	}, nil
-}
-
-func (c *gameServiceClientEnhanced) StopGame(ctx context.Context, gameSessionID string) error {
-	// TODO: Implement actual gRPC client call
-	return nil
-}
-
-func (c *gameServiceClientEnhanced) GetGameStatus(ctx context.Context, sessionID string) (*GameSession, error) {
-	// TODO: Implement actual gRPC client call
-	return &GameSession{
-		ID:       sessionID,
-		UserID:   1,
-		Username: "testuser",
-		GameID:   "nethack",
-	}, nil
-}
-
-func (c *gameServiceClientEnhanced) UpdateGameConfig(ctx context.Context, gameID string, config *Game) error {
-	// TODO: Implement actual gRPC client call
-	return nil
-}
-
 // gRPC connection management
 
 type GRPCClientManager struct {
@@ -216,7 +151,6 @@ func (m *GRPCClientManager) Close() error {
 
 // Error handling for gRPC
 
-
 // Service health checking
 
 type ServiceHealthChecker struct {
@@ -253,8 +187,8 @@ func (h *ServiceHealthChecker) checkUserService(ctx context.Context) error {
 }
 
 func (h *ServiceHealthChecker) checkGameService(ctx context.Context) error {
-	// Try to list games
-	_, err := h.gameClient.ListGames(ctx)
+	// Try to health check the game service
+	_, err := h.gameClient.HealthCheck(ctx)
 	return err
 }
 

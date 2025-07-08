@@ -27,7 +27,7 @@ var (
 
 func main() {
 	var (
-		configFile  = flag.String("config", "configs/development/local.yaml", "Path to configuration file")
+		configFile  = flag.String("config", "configs/development/session-service.yaml", "Path to configuration file")
 		showVersion = flag.Bool("version", false, "Show version information")
 	)
 	flag.Parse()
@@ -77,7 +77,7 @@ func main() {
 	// Setup auth middleware if enabled
 	var authMiddleware *session.AuthMiddleware
 	if cfg.Auth != nil && cfg.Auth.Enabled {
-		authMiddleware, err = session.NewAuthMiddleware(cfg.Auth.ServiceAddress, cfg.Auth.Enabled)
+		authMiddleware, err = session.NewAuthMiddleware(cfg.Auth.GRPCAddress, cfg.Auth.Enabled)
 		if err != nil {
 			log.Printf("Warning: Failed to initialize auth middleware: %v", err)
 			log.Printf("Falling back to direct user service authentication")

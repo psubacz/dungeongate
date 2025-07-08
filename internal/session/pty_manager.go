@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -37,11 +38,18 @@ type PTYSession struct {
 	// I/O buffers
 	inputBuffer  []byte
 	outputBuffer []byte
+	// errorBuffer  []byte // Capture stderr separately - commented out for now
+
+	// Crash detection - commented out for now
+	// crashDetected bool
+	// crashReason   string
+	// lastSignal    syscall.Signal
 
 	// Synchronization
 	mutex      sync.RWMutex
 	inputChan  chan []byte
 	outputChan chan []byte
+	// errorChan  chan []byte // Channel for stderr data - commented out for now
 	doneChan   chan struct{}
 }
 
@@ -91,15 +99,17 @@ func (pm *PTYManager) AllocatePTY(sessionID, username, gameID string, windowSize
 		StartTime:    time.Now(),
 		inputBuffer:  make([]byte, 0, 4096),
 		outputBuffer: make([]byte, 0, 4096),
+		// errorBuffer:  make([]byte, 0, 4096), // Commented out for now
 		inputChan:    make(chan []byte, 100),
 		outputChan:   make(chan []byte, 100),
+		// errorChan:    make(chan []byte, 100), // Commented out for now
 		doneChan:     make(chan struct{}),
 	}
 
 	// Set default environment variables
 	session.Environment["TERM"] = "xterm-256color"
-	session.Environment["COLUMNS"] = fmt.Sprintf("%d", windowSize.Width)
-	session.Environment["LINES"] = fmt.Sprintf("%d", windowSize.Height)
+	session.Environment["COLUMNS"] = fmt.Sprintf("%d", max(windowSize.Width, 80))
+	session.Environment["LINES"] = fmt.Sprintf("%d", max(windowSize.Height, 24))
 	session.Environment["USER"] = username
 	session.Environment["HOME"] = fmt.Sprintf("/tmp/%s", username) // Use /tmp for safety
 	session.Environment["SHELL"] = "/bin/bash"
@@ -107,6 +117,7 @@ func (pm *PTYManager) AllocatePTY(sessionID, username, gameID string, windowSize
 	// Start I/O handling
 	go session.handleInput()
 	go session.handleOutput()
+	// go session.handleError() // Commented out for now
 
 	// Store session
 	pm.sessions[sessionID] = session
@@ -201,14 +212,20 @@ func (ps *PTYSession) StartCommand(command string, args []string) error {
 
 	// Set up process group
 	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Setsid:  true,
-		Setctty: true,
+		Setsid: true,
+		// Remove Setctty for compatibility with NetHack
 	}
 
 	// Connect to PTY
 	cmd.Stdin = ps.TTY
 	cmd.Stdout = ps.TTY
-	cmd.Stderr = ps.TTY
+	// Keep stderr separate for crash analysis (especially for NetHack)
+	// Commented out for now - using standard PTY stderr
+	// stderrPipe, err := cmd.StderrPipe()
+	// if err != nil {
+	//	return fmt.Errorf("failed to create stderr pipe: %w", err)
+	// }
+	cmd.Stderr = ps.TTY // Use standard PTY for now
 
 	// Start command
 	if err := cmd.Start(); err != nil {
@@ -219,6 +236,9 @@ func (ps *PTYSession) StartCommand(command string, args []string) error {
 	ps.ProcessPID = cmd.Process.Pid
 
 	log.Printf("Command started in PTY session %s: %s (PID: %d)", ps.SessionID, command, ps.ProcessPID)
+
+	// Start stderr monitoring
+	// go ps.monitorStderr(stderrPipe) // Commented out for now
 
 	// Monitor process
 	go ps.monitorProcess()
@@ -252,14 +272,20 @@ func (ps *PTYSession) StartCommandWithDir(command string, args []string, working
 
 	// Set up process group
 	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Setsid:  true,
-		Setctty: true,
+		Setsid: true,
+		// Remove Setctty for compatibility with NetHack
 	}
 
 	// Connect to PTY
 	cmd.Stdin = ps.TTY
 	cmd.Stdout = ps.TTY
-	cmd.Stderr = ps.TTY
+	// Keep stderr separate for crash analysis (especially for NetHack)
+	// Commented out for now - using standard PTY stderr
+	// stderrPipe, err := cmd.StderrPipe()
+	// if err != nil {
+	//	return fmt.Errorf("failed to create stderr pipe: %w", err)
+	// }
+	cmd.Stderr = ps.TTY // Use standard PTY for now
 
 	// Start command
 	if err := cmd.Start(); err != nil {
@@ -270,6 +296,13 @@ func (ps *PTYSession) StartCommandWithDir(command string, args []string, working
 	ps.ProcessPID = cmd.Process.Pid
 
 	log.Printf("Command started in PTY session %s: %s (PID: %d) in directory: %s", ps.SessionID, command, ps.ProcessPID, workingDir)
+	// Debug: Show COLUMNS and LINES for NetHack debugging
+	if strings.Contains(command, "nethack") {
+		log.Printf("NetHack Environment: COLUMNS=%s, LINES=%s", ps.Environment["COLUMNS"], ps.Environment["LINES"])
+	}
+
+	// Start stderr monitoring
+	// go ps.monitorStderr(stderrPipe) // Commented out for now
 
 	// Monitor process
 	go ps.monitorProcess()
@@ -588,3 +621,12 @@ func isTimeoutError(err error) bool {
 
 	return false
 }
+
+// Crash detection methods - commented out for now
+
+/*
+// handleError handles stderr processing and crash detection
+// analyzeCrashPatterns analyzes stderr data for common crash patterns
+// monitorStderr monitors stderr from a pipe
+// GetCrashInfo returns crash information if a crash was detected
+*/

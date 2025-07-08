@@ -62,15 +62,15 @@ func TestUserConversionInAuthFlow(t *testing.T) {
 	// This tests the conversion logic from ssh.go lines 1232-1243
 	lastLogin := time.Now()
 	userServiceUser := &user.User{
-		ID:           42,
-		Username:     "fallbackuser",
-		Email:        "fallback@example.com",
-		IsActive:     true,
-		Flags:        user.UserFlagModerator | user.UserFlagBeta, // No admin flag
-		CreatedAt:    time.Now().Add(-24 * time.Hour),
-		UpdatedAt:    time.Now().Add(-1 * time.Hour),
-		LastLogin:    &lastLogin,
-		LoginCount:   10,
+		ID:            42,
+		Username:      "fallbackuser",
+		Email:         "fallback@example.com",
+		IsActive:      true,
+		Flags:         user.UserFlagModerator | user.UserFlagBeta, // No admin flag
+		CreatedAt:     time.Now().Add(-24 * time.Hour),
+		UpdatedAt:     time.Now().Add(-1 * time.Hour),
+		LastLogin:     &lastLogin,
+		LoginCount:    10,
 		EmailVerified: true,
 	}
 
@@ -122,11 +122,11 @@ func TestUserConversionInAuthFlow(t *testing.T) {
 func TestAuthenticationErrorHandling(t *testing.T) {
 	// Test cases that simulate error handling from ssh.go lines 1202-1215
 	tests := []struct {
-		name              string
-		errorString       string
-		expectedMessage   string
-		expectedLabel     string
-		shouldRetry       bool
+		name            string
+		errorString     string
+		expectedMessage string
+		expectedLabel   string
+		shouldRetry     bool
 	}{
 		{
 			name:            "Username not found error",
@@ -318,7 +318,7 @@ func TestFallbackAuthenticationFlow(t *testing.T) {
 	// Step 1: Check that auth middleware is not available
 	authMiddlewareAvailable := false // Simulating s.sessionService.authMiddleware != nil
 
-	// Step 2: Check that user service is available  
+	// Step 2: Check that user service is available
 	userServiceAvailable := true // Simulating s.sessionService.userService != nil
 
 	// Step 3: Determine authentication path
@@ -346,12 +346,12 @@ func TestFallbackAuthenticationFlow(t *testing.T) {
 	// In the real code, this comes from userService.AuthenticateUser
 	lastLogin := time.Now()
 	userServiceUser := &user.User{
-		ID:           789,
-		Username:     "fallbacktestuser",
-		Email:        "fallback@test.com",
-		IsActive:     true,
-		Flags:        user.UserFlagNone,
-		LastLogin:    &lastLogin,
+		ID:        789,
+		Username:  "fallbacktestuser",
+		Email:     "fallback@test.com",
+		IsActive:  true,
+		Flags:     user.UserFlagNone,
+		LastLogin: &lastLogin,
 	}
 
 	// Convert to session user (ssh.go lines 1232-1243)
@@ -384,6 +384,6 @@ func TestFallbackAuthenticationFlow(t *testing.T) {
 		t.Error("Expected user to not be admin (no admin flag set)")
 	}
 
-	t.Logf("Fallback authentication flow completed successfully for user: %s (ID: %d)", 
+	t.Logf("Fallback authentication flow completed successfully for user: %s (ID: %d)",
 		sessionUser.Username, sessionUser.ID)
 }

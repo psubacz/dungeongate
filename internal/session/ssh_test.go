@@ -700,7 +700,6 @@ func BenchmarkSSHHostKeyGeneration(b *testing.B) {
 
 // Test helper functions
 
-
 // TestSSHEndToEnd tests SSH end-to-end functionality
 func TestSSHEndToEnd(t *testing.T) {
 	// Skip this test in short mode
@@ -856,7 +855,7 @@ func TestNetHackLaunch(t *testing.T) {
 
 	// Test command building
 	command, args := sshServer.buildGameCommand(game, sessionCtx)
-	
+
 	if command != "/opt/homebrew/bin/nethack" {
 		t.Errorf("Expected command '/opt/homebrew/bin/nethack', got '%s'", command)
 	}
@@ -908,7 +907,7 @@ func TestNetHackLaunch(t *testing.T) {
 // createTestConfigWithNetHack creates a test configuration that includes NetHack
 func createTestConfigWithNetHack() *config.SessionServiceConfig {
 	cfg := createTestConfig()
-	
+
 	// Add NetHack game configuration
 	cfg.Games = []*config.GameConfig{
 		{
@@ -918,8 +917,8 @@ func createTestConfigWithNetHack() *config.SessionServiceConfig {
 			Version:   "3.6.7",
 			Enabled:   true,
 			Binary: &config.BinaryConfig{
-				Path: "/opt/homebrew/bin/nethack",
-				Args: []string{"-u", "${USERNAME}"},
+				Path:             "/opt/homebrew/bin/nethack",
+				Args:             []string{"-u", "${USERNAME}"},
 				WorkingDirectory: "/opt/homebrew/share/nethack",
 				Permissions:      "0755",
 			},
@@ -942,6 +941,6 @@ func createTestConfigWithNetHack() *config.SessionServiceConfig {
 			},
 		},
 	}
-	
+
 	return cfg
 }

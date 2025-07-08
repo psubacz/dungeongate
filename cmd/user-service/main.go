@@ -25,7 +25,7 @@ var (
 
 func main() {
 	var (
-		configFile  = flag.String("config", "configs/development/local.yaml", "Path to configuration file")
+		configFile  = flag.String("config", "configs/development/user-service.yaml", "Path to configuration file")
 		showVersion = flag.Bool("version", false, "Show version information")
 	)
 	flag.Parse()
@@ -77,9 +77,15 @@ func main() {
 	_, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	// Get port from config or use default
+	port := 8084 // default port
+	if cfg.Server != nil && cfg.Server.Port > 0 {
+		port = cfg.Server.Port
+	}
+
 	// Setup HTTP server
 	httpServer := &http.Server{
-		Addr: fmt.Sprintf(":%d", 8082),
+		Addr: fmt.Sprintf(":%d", port),
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if r.URL.Path == "/health" {
 				w.WriteHeader(http.StatusOK)
@@ -92,7 +98,7 @@ func main() {
 	}
 
 	go func() {
-		log.Printf("Starting User Service HTTP server on port 8082")
+		log.Printf("Starting User Service HTTP server on port %d", port)
 		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Printf("HTTP server error: %v", err)
 		}

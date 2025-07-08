@@ -11,11 +11,15 @@ GOMOD=$(GOCMD) mod
 GOFMT=gofmt
 
 # Build parameters
-BINARY_NAME=dungeongate-session-service
+SESSION_BINARY_NAME=dungeongate-session-service
 AUTH_BINARY_NAME=dungeongate-auth-service
+GAME_BINARY_NAME=dungeongate-game-service
+USER_BINARY_NAME=dungeongate-user-service
 BUILD_DIR=build
-MAIN_PATH=./cmd/session-service
+SESSION_MAIN_PATH=./cmd/session-service
 AUTH_MAIN_PATH=./cmd/auth-service
+GAME_MAIN_PATH=./cmd/game-service
+USER_MAIN_PATH=./cmd/user-service
 TEST_DATA_DIR=test-data
 CONFIG_DIR=configs
 
@@ -28,7 +32,11 @@ GIT_COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 LDFLAGS=-ldflags "-s -w -X main.version=$(VERSION) -X main.buildTime=$(BUILD_TIME) -X main.gitCommit=$(GIT_COMMIT)"
 
 # Test configuration
-TEST_CONFIG=configs/development/local.yaml
+SESSION_CONFIG=configs/development/session-service.yaml
+AUTH_CONFIG=configs/development/auth-service.yaml
+GAME_CONFIG=configs/development/game-service.yaml
+USER_CONFIG=configs/development/user-service.yaml
+# Legacy config (deprecated - use service-specific configs)
 TEST_TIMEOUT=30s
 TEST_COVERAGE_DIR=coverage
 
@@ -62,14 +70,14 @@ deps-tools: ## Install development tools
 	@which golangci-lint > /dev/null || go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 	@which govulncheck > /dev/null || go install golang.org/x/vuln/cmd/govulncheck@latest
 
-##@ Build
+##@ Build Individual Services
 
-.PHONY: build
-build: deps ## Build the session service binary
-	@echo "$(GREEN)Building $(BINARY_NAME)...$(NC)"
+.PHONY: build-session
+build-session: deps ## Build the session service binary
+	@echo "$(GREEN)Building $(SESSION_BINARY_NAME)...$(NC)"
 	@mkdir -p $(BUILD_DIR)
-	$(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME) $(MAIN_PATH)
-	@echo "$(GREEN)Build completed: $(BUILD_DIR)/$(BINARY_NAME)$(NC)"
+	$(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(SESSION_BINARY_NAME) $(SESSION_MAIN_PATH)
+	@echo "$(GREEN)Build completed: $(BUILD_DIR)/$(SESSION_BINARY_NAME)$(NC)"
 
 .PHONY: build-auth
 build-auth: deps ## Build the auth service binary
@@ -78,20 +86,38 @@ build-auth: deps ## Build the auth service binary
 	$(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(AUTH_BINARY_NAME) $(AUTH_MAIN_PATH)
 	@echo "$(GREEN)Build completed: $(BUILD_DIR)/$(AUTH_BINARY_NAME)$(NC)"
 
+.PHONY: build-game
+build-game: deps ## Build the game service binary
+	@echo "$(GREEN)Building $(GAME_BINARY_NAME)...$(NC)"
+	@mkdir -p $(BUILD_DIR)
+	$(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(GAME_BINARY_NAME) $(GAME_MAIN_PATH)
+	@echo "$(GREEN)Build completed: $(BUILD_DIR)/$(GAME_BINARY_NAME)$(NC)"
+
+.PHONY: build-user
+build-user: deps ## Build the user service binary
+	@echo "$(GREEN)Building $(USER_BINARY_NAME)...$(NC)"
+	@mkdir -p $(BUILD_DIR)
+	$(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(USER_BINARY_NAME) $(USER_MAIN_PATH)
+	@echo "$(GREEN)Build completed: $(BUILD_DIR)/$(USER_BINARY_NAME)$(NC)"
+
 .PHONY: build-all
-build-all: build build-auth ## Build all service binaries
+build-all: build-session build-auth build-game build-user ## Build all service binaries
+
+# Legacy alias for backward compatibility
+.PHONY: build
+build: build-session ## Build the session service binary (legacy alias)
 
 .PHONY: build-debug
-build-debug: deps ## Build with debug symbols
-	@echo "$(GREEN)Building $(BINARY_NAME) with debug symbols...$(NC)"
+build-debug: deps ## Build session service with debug symbols
+	@echo "$(GREEN)Building $(SESSION_BINARY_NAME) with debug symbols...$(NC)"
 	@mkdir -p $(BUILD_DIR)
-	$(GOBUILD) -gcflags="all=-N -l" -o $(BUILD_DIR)/$(BINARY_NAME)-debug $(MAIN_PATH)
+	$(GOBUILD) -gcflags="all=-N -l" -o $(BUILD_DIR)/$(SESSION_BINARY_NAME)-debug $(SESSION_MAIN_PATH)
 
 .PHONY: build-race
-build-race: deps ## Build with race detection
-	@echo "$(GREEN)Building $(BINARY_NAME) with race detection...$(NC)"
+build-race: deps ## Build session service with race detection
+	@echo "$(GREEN)Building $(SESSION_BINARY_NAME) with race detection...$(NC)"
 	@mkdir -p $(BUILD_DIR)
-	$(GOBUILD) $(LDFLAGS) -race -o $(BUILD_DIR)/$(BINARY_NAME)-race $(MAIN_PATH)
+	$(GOBUILD) $(LDFLAGS) -race -o $(BUILD_DIR)/$(SESSION_BINARY_NAME)-race $(SESSION_MAIN_PATH)
 
 ##@ Testing
 
@@ -149,7 +175,7 @@ test-coverage: ## Run tests with coverage report
 	@echo "$(GREEN)Coverage report: $(TEST_COVERAGE_DIR)/coverage.html$(NC)"
 
 .PHONY: test-integration
-test-integration: build setup-test-env ## Run integration tests
+test-integration: build-session setup-test-env ## Run integration tests
 	@echo "$(GREEN)Running integration tests...$(NC)"
 	@./scripts/test-integration.sh
 
@@ -243,45 +269,68 @@ clean-test-env: ## Clean test environment
 	@rm -rf $(TEST_DATA_DIR)
 	@rm -rf $(TEST_COVERAGE_DIR)
 
-##@ Running
+##@ Running Individual Services
 
-.PHONY: run
-run: build ## Build and run the application
+.PHONY: run-session
+run-session: build-session setup-test-env ## Build and run the session service
 	@echo "$(GREEN)Starting DungeonGate Session Service...$(NC)"
-	./$(BUILD_DIR)/$(BINARY_NAME) -config=$(TEST_CONFIG)
+	./$(BUILD_DIR)/$(SESSION_BINARY_NAME) -config=$(SESSION_CONFIG)
+
+.PHONY: run-auth
+run-auth: build-auth ## Build and run the auth service
+	@echo "$(GREEN)Starting DungeonGate Auth Service...$(NC)"
+	./$(BUILD_DIR)/$(AUTH_BINARY_NAME) -config=$(AUTH_CONFIG)
+
+.PHONY: run-game
+run-game: build-game ## Build and run the game service
+	@echo "$(GREEN)Starting DungeonGate Game Service...$(NC)"
+	./$(BUILD_DIR)/$(GAME_BINARY_NAME) -config=$(GAME_CONFIG)
+
+.PHONY: run-user
+run-user: build-user ## Build and run the user service
+	@echo "$(GREEN)Starting DungeonGate User Service...$(NC)"
+	./$(BUILD_DIR)/$(USER_BINARY_NAME) -config=$(USER_CONFIG)
+
+.PHONY: run-all
+run-all: build-all setup-test-env ## Build and run all services
+	@echo "$(GREEN)Starting all DungeonGate services...$(NC)"
+	@echo "$(YELLOW)Auth service will run on port 8081/8082$(NC)"
+	@echo "$(YELLOW)Game service will run on port 8085/50051$(NC)"
+	@echo "$(YELLOW)User service will run on port 8084/9084$(NC)"
+	@echo "$(YELLOW)Session service will run on port 8083/2222$(NC)"
+	@echo "$(YELLOW)Use Ctrl+C to stop all services$(NC)"
+	@(./$(BUILD_DIR)/$(AUTH_BINARY_NAME) -config=$(AUTH_CONFIG) &) && \
+	 sleep 2 && \
+	 (./$(BUILD_DIR)/$(GAME_BINARY_NAME) -config=$(GAME_CONFIG) &) && \
+	 sleep 2 && \
+	 (./$(BUILD_DIR)/$(USER_BINARY_NAME) -config=$(USER_CONFIG) &) && \
+	 sleep 2 && \
+	 ./$(BUILD_DIR)/$(SESSION_BINARY_NAME) -config=$(SESSION_CONFIG)
 
 .PHONY: run-debug
-run-debug: build-debug ## Run with debug build
+run-debug: build-debug ## Run session service with debug build
 	@echo "$(GREEN)Starting DungeonGate Session Service (debug)...$(NC)"
-	./$(BUILD_DIR)/$(BINARY_NAME)-debug -config=$(TEST_CONFIG)
+	./$(BUILD_DIR)/$(SESSION_BINARY_NAME)-debug -config=$(TEST_CONFIG)
 
-.PHONY: dev
-dev: deps-tools ## Run development server with auto-restart
-	@echo "$(GREEN)Starting development server...$(NC)"
-	@which air > /dev/null || (echo "$(RED)air not installed. Run 'make deps-tools'$(NC)" && exit 1)
-	air
+# Legacy alias for backward compatibility
+.PHONY: run
+run: run-session ## Run the session service (legacy alias)
 
+
+##@ Legacy Aliases
+
+# Legacy test aliases (deprecated - use run-* targets instead)
 .PHONY: test-run
-test-run: build setup-test-env ## Run test session service on port 2222
-	@echo "$(GREEN)Starting test session service...$(NC)"
-	@cp $(TEST_CONFIG) /tmp/dungeongate-session-service.yaml
-	./$(BUILD_DIR)/$(BINARY_NAME) -config=/tmp/dungeongate-session-service.yaml
+test-run: run-session ## Run session service (legacy alias)
 
 .PHONY: test-run-auth
-test-run-auth: build-auth ## Run test auth service on port 8082
-	@echo "$(GREEN)Starting test auth service...$(NC)"
-	./$(BUILD_DIR)/$(AUTH_BINARY_NAME) -config=$(TEST_CONFIG)
+test-run-auth: run-auth ## Run auth service (legacy alias)
+
+.PHONY: test-run-game
+test-run-game: run-game ## Run game service (legacy alias)
 
 .PHONY: test-run-all
-test-run-all: build-all setup-test-env ## Run both session and auth services for testing
-	@echo "$(GREEN)Starting both test services...$(NC)"
-	@echo "$(YELLOW)Auth service will run on port 8082$(NC)"
-	@echo "$(YELLOW)Session service will run on port 2222$(NC)"
-	@echo "$(YELLOW)Use Ctrl+C to stop both services$(NC)"
-	@cp $(TEST_CONFIG) /tmp/dungeongate-session-service.yaml
-	@(./$(BUILD_DIR)/$(AUTH_BINARY_NAME) -config=$(TEST_CONFIG) &) && \
-	 sleep 2 && \
-	 ./$(BUILD_DIR)/$(BINARY_NAME) -config=/tmp/dungeongate-session-service.yaml
+test-run-all: run-all ## Run all services (legacy alias)
 
 ##@ Docker
 
@@ -385,7 +434,10 @@ deps-check: ## Check dependency status
 .PHONY: info
 info: version ## Show project information
 	@echo "Project: DungeonGate"
-	@echo "Binary: $(BINARY_NAME)"
+	@echo "Session Binary: $(SESSION_BINARY_NAME)"
+	@echo "Auth Binary: $(AUTH_BINARY_NAME)"
+	@echo "Game Binary: $(GAME_BINARY_NAME)"
+	@echo "User Binary: $(USER_BINARY_NAME)"
 	@echo "Build Directory: $(BUILD_DIR)"
 	@echo "Test Config: $(TEST_CONFIG)"
 	@echo "Go Version: $$(go version)"
@@ -397,19 +449,21 @@ release-check: verify test-coverage vuln ## Run all checks for release
 	@echo "$(GREEN)All release checks passed!$(NC)"
 
 .PHONY: release-build
-release-build: ## Build release binaries
+release-build: ## Build release binaries for all services
 	@echo "$(GREEN)Building release binaries...$(NC)"
 	@mkdir -p $(BUILD_DIR)/release
-	@for os in linux darwin windows; do \
-		for arch in amd64 arm64; do \
-			if [ "$$os" = "windows" ]; then \
-				ext=".exe"; \
-			else \
-				ext=""; \
-			fi; \
-			echo "Building $$os/$$arch..."; \
-			GOOS=$$os GOARCH=$$arch $(GOBUILD) $(LDFLAGS) \
-				-o $(BUILD_DIR)/release/$(BINARY_NAME)-$$os-$$arch$$ext $(MAIN_PATH); \
+	@for service in session auth game user; do \
+		for os in linux darwin windows; do \
+			for arch in amd64 arm64; do \
+				if [ "$$os" = "windows" ]; then \
+					ext=".exe"; \
+				else \
+					ext=""; \
+				fi; \
+				echo "Building $$service service for $$os/$$arch..."; \
+				GOOS=$$os GOARCH=$$arch $(GOBUILD) $(LDFLAGS) \
+					-o $(BUILD_DIR)/release/dungeongate-$$service-service-$$os-$$arch$$ext ./cmd/$$service-service; \
+			done; \
 		done; \
 	done
 	@echo "$(GREEN)Release binaries built in $(BUILD_DIR)/release/$(NC)"
@@ -454,3 +508,38 @@ demo-spectating: build setup-test-env ## Demo spectating functionality
 	@echo "Press Enter to continue..."
 	@read
 	@$(MAKE) test-run
+
+# Protocol Buffers
+PROTOC=protoc
+PROTO_DIR=api/proto
+GO_OUT_DIR=pkg/api
+
+.PHONY: proto-gen
+proto-gen: ## Generate Go code from Protocol Buffers
+	@echo "$(GREEN)Generating Go code from protobuf definitions...$(NC)"
+	@mkdir -p $(GO_OUT_DIR)
+	$(PROTOC) --go_out=$(GO_OUT_DIR) --go_opt=paths=source_relative \
+		--go-grpc_out=$(GO_OUT_DIR) --go-grpc_opt=paths=source_relative \
+		-I $(PROTO_DIR) $(PROTO_DIR)/auth/auth_service.proto
+	$(PROTOC) --go_out=$(GO_OUT_DIR) --go_opt=paths=source_relative \
+		--go-grpc_out=$(GO_OUT_DIR) --go-grpc_opt=paths=source_relative \
+		-I $(PROTO_DIR) $(PROTO_DIR)/games/game_service_v1.proto
+	$(PROTOC) --go_out=$(GO_OUT_DIR) --go_opt=paths=source_relative \
+		--go-grpc_out=$(GO_OUT_DIR) --go-grpc_opt=paths=source_relative \
+		-I $(PROTO_DIR) $(PROTO_DIR)/games/game_service_v2.proto
+
+.PHONY: proto-clean
+proto-clean: ## Clean generated protobuf files
+	@echo "$(GREEN)Cleaning generated protobuf files...$(NC)"
+	@rm -rf $(GO_OUT_DIR)/auth $(GO_OUT_DIR)/games
+
+
+.PHONY: test-game-service
+test-game-service: ## Test game service
+	@echo "$(GREEN)Testing game service...$(NC)"
+	$(GOTEST) -v -timeout=30s ./internal/games/...
+
+.PHONY: test-run-game
+test-run-game: build-game-service ## Run test game service on port 50051
+	@echo "$(GREEN)Starting test game service...$(NC)"
+	./$(BUILD_DIR)/dungeongate-game-service -config=$(TEST_CONFIG)

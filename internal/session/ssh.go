@@ -19,11 +19,15 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/dungeongate/internal/games/saves"
 	"github.com/dungeongate/internal/user"
 	"github.com/dungeongate/pkg/config"
 	"github.com/dungeongate/pkg/metrics"
 	"golang.org/x/crypto/ssh"
 )
+
+// NewSaveManager creates a new save manager (alias to the extracted function)
+var NewSaveManager = saves.NewSaveManager
 
 // WindowSize represents terminal window dimensions
 type WindowSize struct {
@@ -208,12 +212,8 @@ func (s *SSHServer) initializeClients() {
 	s.authClient = NewAuthServiceClient(authServiceAddr)
 	s.userClient = NewUserServiceClient(userServiceAddr)
 
-	// Use games from config if available
-	if len(s.config.Games) > 0 {
-		s.gameClient = NewGameServiceClientWithConfig(gameServiceAddr, s.config.Games)
-	} else {
-		s.gameClient = NewGameServiceClient(gameServiceAddr)
-	}
+	// Game service client - configuration is now handled by the game service itself
+	s.gameClient = NewGameServiceClient(gameServiceAddr)
 }
 
 // Start starts the SSH server
@@ -687,6 +687,15 @@ func (s *SSHServer) replaceBannerPlaceholders(bannerText, username string) strin
 }
 
 // addBannerFooter adds a hardcoded footer to the banner content
+//   Left side (Danger):
+//   - ᛞ (Dagaz) - day/danger/transformation
+//   - ᚦ (Thurisaz) - thorn/giant/destructive force
+//   - ᛁ (Isa) - ice/standstill/danger
+
+// Right side (Luck):
+// - ᚠ (Fehu) - wealth/prosperity/good fortune
+// - ᛟ (Othala) - inheritance/legacy/ancestral luck
+// - ᚹ (Wunjo) - joy/harmony/wish fulfillment
 func (s *SSHServer) addBannerFooter(bannerText string) string {
 	version := "0.0.2" // default fallback
 	if s.config != nil && s.config.Version != "" {
@@ -696,8 +705,8 @@ func (s *SSHServer) addBannerFooter(bannerText string) string {
 	footer := fmt.Sprintf(`
 
 	
-  ## Powered by ᚠ ᚢ ᚦ ᚨ ᚱ ᚷ ᚹ ᛞ ᛉ ᛏ   DungeonGate   ᛃ ᛇ ᛒ ᛗ ᛚ ᛝ %s
-  ## See https://github.com/psubacz/dungeongate`, version)
+Powered by ᛞ ᚦ ᛁ   DungeonGate   ᚠ ᛟ ᚹ %s
+https://github.com/psubacz/dungeongate`, version)
 
 	return bannerText + footer
 }
@@ -917,49 +926,6 @@ func (s *SSHServer) showMenu(sessionCtx *SSHSessionContext) {
 	s.showDynamicMenu(sessionCtx, menuWidth)
 }
 
-// // showMenu displays the main menu
-// func (s *SSHServer) showMenu(sessionCtx *SSHSessionContext) {
-// 	s.clearScreen(sessionCtx)
-
-// 	menu := `
-// ╔══════════════════════════════════════════════════════════════════════════════╗
-// ║                            DungeonGate - SSH Edition                         ║
-// ╠══════════════════════════════════════════════════════════════════════════════╣
-// ║                                                                              ║
-// `
-
-// 	if sessionCtx.IsAuthenticated && sessionCtx.AuthenticatedUser != nil {
-// 		menu += fmt.Sprintf("║  Welcome, %s!%-60s║\r\n",
-// 			sessionCtx.AuthenticatedUser.Username,
-// 			strings.Repeat(" ", 60-len(sessionCtx.AuthenticatedUser.Username)-10))
-// 		menu += `║                                                                              ║
-// ║  [p] Play a game                                                             ║
-// ║  [w] Watch games                                                             ║
-// ║  [e] Edit profile                                                            ║
-// ║  [l] List games                                                              ║
-// ║  [r] View recordings                                                         ║
-// ║  [s] Statistics                                                              ║
-// ║  [q] Quit                                                                    ║
-// `
-// 	} else {
-// 		menu += `║  Welcome, anonymous user!                                                    ║
-// ║                                                                              ║
-// ║  [l] Login                                                                   ║
-// ║  [r] Register                                                                ║
-// ║  [w] Watch games                                                             ║
-// ║  [g] List games                                                              ║
-// ║  [q] Quit                                                                    ║
-// `
-// 	}
-
-// 	menu += `║                                                                              ║
-// ╚══════════════════════════════════════════════════════════════════════════════╝
-
-// Choice: `
-
-// 	s.writeToSession(sessionCtx, menu)
-// }
-
 // readUserInput reads user input from the SSH session
 func (s *SSHServer) readUserInput(sessionCtx *SSHSessionContext) (string, error) {
 	buffer := make([]byte, 1)
@@ -1127,7 +1093,7 @@ func (s *SSHServer) handleLogin(ctx context.Context, sessionCtx *SSHSessionConte
 		for s.sessionService.authMiddleware == nil {
 			s.writeToSession(sessionCtx, "Authentication service is starting up, please wait...\r\n")
 			time.Sleep(2 * time.Second)
-			
+
 			// Check if connection is still alive
 			if sessionCtx.Channel == nil {
 				return true // Connection was closed
@@ -1362,7 +1328,6 @@ func (s *SSHServer) handleRegisterEnhanced(ctx context.Context, sessionCtx *SSHS
 		return true
 	}
 }
-
 
 // handlePlayGame handles game selection and launching
 func (s *SSHServer) handlePlayGame(ctx context.Context, sessionCtx *SSHSessionContext) bool {
@@ -2380,7 +2345,7 @@ func (s *SSHServer) handleNetHackGame(ctx context.Context, sessionCtx *SSHSessio
 			size, hashInfo, userSave.UpdatedAt.Format("2006-01-02 15:04:05")))
 	} else {
 		// Start new game
-		s.writeToSession(sessionCtx, "Starting new NetHack game...\r\n")
+		s.writeToSession(sessionCtx, "Starting new NetHack game, standby...\r\n")
 	}
 
 	// Start NetHack

@@ -120,6 +120,7 @@ type CacheConfig struct {
 
 // UserServiceConfig represents user service configuration
 type UserServiceConfig struct {
+	Server         *ServerConfig       `yaml:"server"`
 	Database       *DatabaseConfig     `yaml:"database"`
 	Registration   *RegistrationConfig `yaml:"registration"`
 	Authentication *AuthConfig         `yaml:"authentication"`
@@ -600,6 +601,13 @@ func NewDatabaseConfig() *DatabaseConfig {
 // NewUserServiceConfig creates a new user service configuration with defaults
 func NewUserServiceConfig() *UserServiceConfig {
 	return &UserServiceConfig{
+		Server: &ServerConfig{
+			Port:           8084,
+			GRPCPort:       9084,
+			Host:           "localhost",
+			Timeout:        "30s",
+			MaxConnections: 100,
+		},
 		Database: NewDatabaseConfig(),
 		Registration: &RegistrationConfig{
 			Enabled:           true,

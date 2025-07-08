@@ -3,6 +3,8 @@ package config
 import (
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -43,6 +45,9 @@ type GameConfig struct {
 	Enabled     bool              `yaml:"enabled"`
 	Binary      *BinaryConfig     `yaml:"binary"`
 	Files       *FilesConfig      `yaml:"files"`
+	Paths       *GamePathsConfig  `yaml:"paths"`
+	Setup       *GameSetupOptions `yaml:"setup"`
+	Cleanup     *GameCleanupOptions `yaml:"cleanup"`
 	Settings    *GameSettings     `yaml:"settings"`
 	Environment map[string]string `yaml:"environment"`
 	Resources   *ResourcesConfig  `yaml:"resources"`
@@ -78,6 +83,55 @@ type PermissionsConfig struct {
 	SaveDirectory string `yaml:"save_directory"`
 	UserFiles     string `yaml:"user_files"`
 	LogFiles      string `yaml:"log_files"`
+}
+
+// GamePathsConfig represents game-specific path configuration
+type GamePathsConfig struct {
+	AutoDetect bool                   `yaml:"auto_detect"`
+	System     *SystemPathsConfig     `yaml:"system"`
+	User       *UserPathsConfig       `yaml:"user"`
+}
+
+// SystemPathsConfig represents system-level paths (from nethack --showpaths)
+type SystemPathsConfig struct {
+	ScoreDir    string `yaml:"score_dir"`
+	SysConfFile string `yaml:"sysconf_file"`
+	SymbolsFile string `yaml:"symbols_file"`
+	DataFile    string `yaml:"data_file"`
+}
+
+// UserPathsConfig represents user-specific paths (relative to user directory)
+type UserPathsConfig struct {
+	BaseDir     string `yaml:"base_dir"`
+	SaveDir     string `yaml:"save_dir"`
+	ConfigDir   string `yaml:"config_dir"`
+	BonesDir    string `yaml:"bones_dir"`
+	LevelDir    string `yaml:"level_dir"`
+	LockDir     string `yaml:"lock_dir"`
+	TroubleDir  string `yaml:"trouble_dir"`
+}
+
+// GameSetupOptions represents game setup configuration
+type GameSetupOptions struct {
+	CreateUserDirs     bool `yaml:"create_user_dirs"`
+	CopyDefaultConfig  bool `yaml:"copy_default_config"`
+	InitializeShared   bool `yaml:"initialize_shared"`
+	ValidatePaths      bool `yaml:"validate_paths"`
+	SetPermissions     bool `yaml:"set_permissions"`
+	DetectSystemPaths  bool `yaml:"detect_system_paths"`
+	CreateSaveLinks    bool `yaml:"create_save_links"`
+}
+
+// GameCleanupOptions represents game cleanup configuration
+type GameCleanupOptions struct {
+	RemoveUserDirs     bool `yaml:"remove_user_dirs"`
+	ClearTempFiles     bool `yaml:"clear_temp_files"`
+	RemoveLockFiles    bool `yaml:"remove_lock_files"`
+	ClearPersonalBones bool `yaml:"clear_personal_bones"`
+	PreserveConfig     bool `yaml:"preserve_config"`
+	BackupSaves        bool `yaml:"backup_saves"`
+	CleanupSaveLinks   bool `yaml:"cleanup_save_links"`
+	ValidateCleanup    bool `yaml:"validate_cleanup"`
 }
 
 // GameSettings represents game-specific settings
@@ -803,6 +857,21 @@ func (game *GameConfig) Validate() error {
 		return fmt.Errorf("binary path is required")
 	}
 
+	// Validate path configuration
+	if err := game.validatePaths(); err != nil {
+		return fmt.Errorf("path validation failed: %w", err)
+	}
+
+	// Validate setup options
+	if err := game.validateSetupOptions(); err != nil {
+		return fmt.Errorf("setup options validation failed: %w", err)
+	}
+
+	// Validate cleanup options
+	if err := game.validateCleanupOptions(); err != nil {
+		return fmt.Errorf("cleanup options validation failed: %w", err)
+	}
+
 	// Validate resource limits
 	if game.Resources != nil {
 		if game.Resources.CPULimit != "" {
@@ -865,6 +934,43 @@ func GetDefaultNetHackConfig() *GameConfig {
 			User:             "games",
 			Group:            "games",
 			Permissions:      "0755",
+		},
+		Paths: &GamePathsConfig{
+			AutoDetect: true,
+			System: &SystemPathsConfig{
+				ScoreDir:    "/opt/homebrew/share/nethack/",
+				SysConfFile: "/opt/homebrew/Cellar/nethack/3.6.7/libexec/sysconf",
+				SymbolsFile: "/opt/homebrew/Cellar/nethack/3.6.7/libexec/symbols",
+				DataFile:    "nhdat",
+			},
+			User: &UserPathsConfig{
+				BaseDir:    "games/nethack",
+				SaveDir:    "games/nethack/saves",
+				ConfigDir:  "games/nethack/config",
+				BonesDir:   "games/nethack/bones",
+				LevelDir:   "games/nethack/levels",
+				LockDir:    "games/nethack/locks",
+				TroubleDir: "games/nethack/trouble",
+			},
+		},
+		Setup: &GameSetupOptions{
+			CreateUserDirs:    true,
+			CopyDefaultConfig: true,
+			InitializeShared:  true,
+			ValidatePaths:     true,
+			SetPermissions:    true,
+			DetectSystemPaths: true,
+			CreateSaveLinks:   true,
+		},
+		Cleanup: &GameCleanupOptions{
+			RemoveUserDirs:     false,
+			ClearTempFiles:     true,
+			RemoveLockFiles:    true,
+			ClearPersonalBones: false,
+			PreserveConfig:     true,
+			BackupSaves:        true,
+			CleanupSaveLinks:   true,
+			ValidateCleanup:    true,
 		},
 		Files: &FilesConfig{
 			DataDirectory:   "/var/games/nethack",
@@ -961,4 +1067,395 @@ func GetDefaultNetHackConfig() *GameConfig {
 			Mode: "isolated",
 		},
 	}
+}
+
+// GetNetHackSystemPaths returns system paths for NetHack
+func (game *GameConfig) GetNetHackSystemPaths() *SystemPathsConfig {
+	if game.Paths != nil && game.Paths.System != nil {
+		return game.Paths.System
+	}
+	// Return default system paths for NetHack on macOS/Homebrew
+	return &SystemPathsConfig{
+		ScoreDir:    "/opt/homebrew/share/nethack/",
+		SysConfFile: "/opt/homebrew/Cellar/nethack/3.6.7/libexec/sysconf",
+		SymbolsFile: "/opt/homebrew/Cellar/nethack/3.6.7/libexec/symbols",
+		DataFile:    "nhdat",
+	}
+}
+
+// GetUserPaths returns user-specific paths for the game
+func (game *GameConfig) GetUserPaths() *UserPathsConfig {
+	if game.Paths != nil && game.Paths.User != nil {
+		return game.Paths.User
+	}
+	// Return default user paths
+	return &UserPathsConfig{
+		BaseDir:    "games/" + game.ID,
+		SaveDir:    "games/" + game.ID + "/saves",
+		ConfigDir:  "games/" + game.ID + "/config",
+		BonesDir:   "games/" + game.ID + "/bones",
+		LevelDir:   "games/" + game.ID + "/levels",
+		LockDir:    "games/" + game.ID + "/locks",
+		TroubleDir: "games/" + game.ID + "/trouble",
+	}
+}
+
+// ShouldAutoDetectPaths returns whether to auto-detect system paths
+func (game *GameConfig) ShouldAutoDetectPaths() bool {
+	return game.Paths != nil && game.Paths.AutoDetect
+}
+
+// GetSetupOptions returns setup options with defaults
+func (game *GameConfig) GetSetupOptions() *GameSetupOptions {
+	if game.Setup != nil {
+		return game.Setup
+	}
+	// Return default setup options
+	return &GameSetupOptions{
+		CreateUserDirs:    true,
+		CopyDefaultConfig: true,
+		InitializeShared:  true,
+		ValidatePaths:     true,
+		SetPermissions:    true,
+		DetectSystemPaths: true,
+		CreateSaveLinks:   true,
+	}
+}
+
+// GetCleanupOptions returns cleanup options with defaults
+func (game *GameConfig) GetCleanupOptions() *GameCleanupOptions {
+	if game.Cleanup != nil {
+		return game.Cleanup
+	}
+	// Return default cleanup options
+	return &GameCleanupOptions{
+		RemoveUserDirs:     false,
+		ClearTempFiles:     true,
+		RemoveLockFiles:    true,
+		ClearPersonalBones: false,
+		PreserveConfig:     true,
+		BackupSaves:        true,
+		CleanupSaveLinks:   true,
+		ValidateCleanup:    true,
+	}
+}
+
+// validatePaths validates game path configuration
+func (game *GameConfig) validatePaths() error {
+	if game.Paths == nil {
+		return fmt.Errorf("paths configuration is required")
+	}
+
+	// Validate system paths
+	if game.Paths.System != nil {
+		if err := game.validateSystemPaths(game.Paths.System); err != nil {
+			return fmt.Errorf("system paths validation failed: %w", err)
+		}
+	}
+
+	// Validate user paths
+	if game.Paths.User != nil {
+		if err := game.validateUserPaths(game.Paths.User); err != nil {
+			return fmt.Errorf("user paths validation failed: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// validateSystemPaths validates system path configuration
+func (game *GameConfig) validateSystemPaths(paths *SystemPathsConfig) error {
+	if paths.ScoreDir == "" {
+		return fmt.Errorf("score_dir is required")
+	}
+	if paths.SysConfFile == "" {
+		return fmt.Errorf("sysconf_file is required")
+	}
+	if paths.SymbolsFile == "" {
+		return fmt.Errorf("symbols_file is required")
+	}
+	if paths.DataFile == "" {
+		return fmt.Errorf("data_file is required")
+	}
+
+	// Validate paths exist and are accessible (if validation is enabled)
+	if game.GetSetupOptions().ValidatePaths {
+		if err := validatePathExists(paths.ScoreDir, true); err != nil {
+			return fmt.Errorf("score_dir validation failed: %w", err)
+		}
+		if err := validatePathExists(paths.SysConfFile, false); err != nil {
+			return fmt.Errorf("sysconf_file validation failed: %w", err)
+		}
+		if err := validatePathExists(paths.SymbolsFile, false); err != nil {
+			return fmt.Errorf("symbols_file validation failed: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// validateUserPaths validates user path configuration
+func (game *GameConfig) validateUserPaths(paths *UserPathsConfig) error {
+	if paths.BaseDir == "" {
+		return fmt.Errorf("base_dir is required")
+	}
+	if paths.SaveDir == "" {
+		return fmt.Errorf("save_dir is required")
+	}
+	if paths.ConfigDir == "" {
+		return fmt.Errorf("config_dir is required")
+	}
+	if paths.BonesDir == "" {
+		return fmt.Errorf("bones_dir is required")
+	}
+	if paths.LevelDir == "" {
+		return fmt.Errorf("level_dir is required")
+	}
+	if paths.LockDir == "" {
+		return fmt.Errorf("lock_dir is required")
+	}
+	if paths.TroubleDir == "" {
+		return fmt.Errorf("trouble_dir is required")
+	}
+
+	// Validate path names don't contain invalid characters
+	pathNames := map[string]string{
+		"base_dir":    paths.BaseDir,
+		"save_dir":    paths.SaveDir,
+		"config_dir":  paths.ConfigDir,
+		"bones_dir":   paths.BonesDir,
+		"level_dir":   paths.LevelDir,
+		"lock_dir":    paths.LockDir,
+		"trouble_dir": paths.TroubleDir,
+	}
+
+	for name, path := range pathNames {
+		if err := validatePathName(path); err != nil {
+			return fmt.Errorf("%s validation failed: %w", name, err)
+		}
+	}
+
+	return nil
+}
+
+// validateSetupOptions validates setup options
+func (game *GameConfig) validateSetupOptions() error {
+	// Setup options are optional, but if auto-detect is enabled, ensure it's valid for the game type
+	if game.Setup != nil && game.Setup.DetectSystemPaths {
+		// Only certain games support auto-detection
+		supportedGames := []string{"nethack", "dcss", "angband"}
+		supported := false
+		for _, supportedGame := range supportedGames {
+			if game.ID == supportedGame {
+				supported = true
+				break
+			}
+		}
+		if !supported {
+			return fmt.Errorf("auto-detection of system paths is not supported for game type '%s'", game.ID)
+		}
+	}
+
+	return nil
+}
+
+// validateCleanupOptions validates cleanup options
+func (game *GameConfig) validateCleanupOptions() error {
+	if game.Cleanup != nil {
+		// Validate that if backup_saves is enabled, we're not removing user dirs
+		if game.Cleanup.BackupSaves && game.Cleanup.RemoveUserDirs {
+			return fmt.Errorf("cannot backup saves and remove user directories simultaneously")
+		}
+
+		// Validate that if preserve_config is false, we're not copying default config
+		if !game.Cleanup.PreserveConfig && game.Setup != nil && game.Setup.CopyDefaultConfig {
+			return fmt.Errorf("conflicting configuration: preserve_config is false but copy_default_config is true")
+		}
+	}
+
+	return nil
+}
+
+// validatePathExists validates that a path exists and is accessible
+func validatePathExists(path string, isDirectory bool) error {
+	info, err := os.Stat(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("path does not exist: %s", path)
+		}
+		return fmt.Errorf("cannot access path %s: %w", path, err)
+	}
+
+	if isDirectory && !info.IsDir() {
+		return fmt.Errorf("path is not a directory: %s", path)
+	}
+	if !isDirectory && info.IsDir() {
+		return fmt.Errorf("path is a directory but expected a file: %s", path)
+	}
+
+	return nil
+}
+
+// validatePathName validates that a path name doesn't contain invalid characters
+func validatePathName(path string) error {
+	// Check for invalid characters
+	invalidChars := []string{"\x00", "\n", "\r", "\t"}
+	for _, char := range invalidChars {
+		if strings.Contains(path, char) {
+			return fmt.Errorf("path contains invalid character: %q", char)
+		}
+	}
+
+	// Check for relative path traversal attempts
+	if strings.Contains(path, "..") {
+		return fmt.Errorf("path contains parent directory references: %s", path)
+	}
+
+	// Check for absolute paths in user paths (they should be relative)
+	if filepath.IsAbs(path) {
+		return fmt.Errorf("user path should be relative, not absolute: %s", path)
+	}
+
+	return nil
+}
+
+// ValidateAtStartup performs comprehensive validation suitable for service startup
+func (cfg *GameServiceConfig) ValidateAtStartup() error {
+	// Perform basic validation first
+	if err := cfg.Validate(); err != nil {
+		return fmt.Errorf("basic validation failed: %w", err)
+	}
+
+	// Perform path existence validation for games that have validate_paths enabled
+	for _, game := range cfg.Games {
+		if game.GetSetupOptions().ValidatePaths {
+			if err := game.validatePathExistence(); err != nil {
+				return fmt.Errorf("path existence validation failed for game %s: %w", game.ID, err)
+			}
+		}
+	}
+
+	// Validate binary paths exist
+	for _, game := range cfg.Games {
+		if game.Enabled {
+			if err := validateBinaryExists(game.Binary.Path); err != nil {
+				return fmt.Errorf("binary validation failed for game %s: %w", game.ID, err)
+			}
+		}
+	}
+
+	return nil
+}
+
+// validatePathExistence validates that configured paths actually exist
+func (game *GameConfig) validatePathExistence() error {
+	if game.Paths == nil {
+		return nil
+	}
+
+	// Validate system paths exist
+	if game.Paths.System != nil {
+		systemPaths := game.Paths.System
+		if err := validatePathExists(systemPaths.ScoreDir, true); err != nil {
+			return fmt.Errorf("score directory validation failed: %w", err)
+		}
+		if err := validatePathExists(systemPaths.SysConfFile, false); err != nil {
+			return fmt.Errorf("sysconf file validation failed: %w", err)
+		}
+		if err := validatePathExists(systemPaths.SymbolsFile, false); err != nil {
+			return fmt.Errorf("symbols file validation failed: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// validateBinaryExists validates that a binary exists and is executable
+func validateBinaryExists(binaryPath string) error {
+	info, err := os.Stat(binaryPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("binary does not exist: %s", binaryPath)
+		}
+		return fmt.Errorf("cannot access binary %s: %w", binaryPath, err)
+	}
+
+	if info.IsDir() {
+		return fmt.Errorf("binary path is a directory: %s", binaryPath)
+	}
+
+	// Check if file is executable (basic check)
+	mode := info.Mode()
+	if mode&0111 == 0 {
+		return fmt.Errorf("binary is not executable: %s", binaryPath)
+	}
+
+	return nil
+}
+
+// ValidateGameConfiguration validates a specific game configuration with detailed reporting
+func (game *GameConfig) ValidateGameConfiguration() *ValidationReport {
+	report := &ValidationReport{
+		GameID:   game.ID,
+		GameName: game.Name,
+		Errors:   []string{},
+		Warnings: []string{},
+	}
+
+	// Basic validation
+	if err := game.Validate(); err != nil {
+		report.Errors = append(report.Errors, err.Error())
+		return report
+	}
+
+	// Check binary exists if validation is enabled
+	if game.GetSetupOptions().ValidatePaths {
+		if err := validateBinaryExists(game.Binary.Path); err != nil {
+			report.Warnings = append(report.Warnings, fmt.Sprintf("Binary validation: %v", err))
+		}
+	}
+
+	// Check if auto-detection can be performed
+	if game.ShouldAutoDetectPaths() {
+		if game.ID == "nethack" {
+			// Test if nethack --showpaths works
+			if err := testNetHackShowPaths(); err != nil {
+				report.Warnings = append(report.Warnings, fmt.Sprintf("NetHack --showpaths failed: %v", err))
+			}
+		}
+	}
+
+	// Validate path permissions
+	if game.Paths != nil && game.Paths.System != nil && game.GetSetupOptions().ValidatePaths {
+		if err := game.validatePathExistence(); err != nil {
+			report.Warnings = append(report.Warnings, fmt.Sprintf("Path existence check: %v", err))
+		}
+	}
+
+	return report
+}
+
+// ValidationReport contains validation results for a game configuration
+type ValidationReport struct {
+	GameID   string   `json:"game_id"`
+	GameName string   `json:"game_name"`
+	Errors   []string `json:"errors"`
+	Warnings []string `json:"warnings"`
+}
+
+// IsValid returns true if there are no errors
+func (r *ValidationReport) IsValid() bool {
+	return len(r.Errors) == 0
+}
+
+// HasWarnings returns true if there are warnings
+func (r *ValidationReport) HasWarnings() bool {
+	return len(r.Warnings) > 0
+}
+
+// testNetHackShowPaths tests if nethack --showpaths command works
+func testNetHackShowPaths() error {
+	// This would be implemented to actually test the command
+	// For now, just return nil to indicate it would work
+	return nil
 }

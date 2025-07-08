@@ -77,15 +77,44 @@ Centralized authentication and authorization service providing gRPC-based authen
 - **Service Resilience**: Session service waits for auth service availability
 - **No Fallback Design**: Centralized authentication without local fallbacks
 
-### Game Service (Planned)
+### Game Service (Implemented)
 
-Game configuration, launching, and management service.
+Stateful, scalable game backend extracted from the Session Service in phases 1-4. The Game Service runs inside containers/pods and scales independently to handle multiple concurrent games.
 
-**Planned Features:**
-- Game configuration management
-- Process lifecycle management
-- Save file handling
-- Game statistics tracking
+**Key Features:**
+- Multi-game pod management (multiple games per pod)
+- World state synchronization across pods (NetHack bones files, shared levels)
+- User data management accessible from any pod
+- Load balancing and session routing
+- Cross-pod event streaming and state consistency
+- Real-time game process management
+
+**Architecture Patterns:**
+- **Stateful Microservice**: Runs inside pods with horizontal scaling capability
+- **Shared World State**: Cross-pod synchronization of game world data
+- **Load Balancing**: Session service routes to available pods based on capacity
+- **Event-Driven Sync**: Real-time synchronization of bones files and save data
+- **Pod-Aware Design**: Games can run on any pod in the cluster
+
+**Service Integration:**
+The Session Service integrates with the Game Service cluster through load balancing and service discovery:
+
+```go
+type gameClientAdapter struct {
+    loadBalancer *LoadBalancer
+    podRegistry  *PodRegistry
+}
+
+// Session Service routes to available pods
+func (a *gameClientAdapter) StartGame(ctx context.Context, req *StartGameRequest) (*StartGameResponse, error) {
+    pod := a.loadBalancer.SelectPod(req.GameType, req.ResourceRequirements)
+    return pod.StartGame(ctx, req)
+}
+```
+
+This design enables horizontal scaling while maintaining clean separation of concerns and ensuring world state consistency across pods.
+
+For detailed Game Service documentation, see [game-service.md](./game-service.md).
 
 ## 🔄 Data Flow
 
