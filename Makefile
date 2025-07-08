@@ -32,7 +32,11 @@ GIT_COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 LDFLAGS=-ldflags "-s -w -X main.version=$(VERSION) -X main.buildTime=$(BUILD_TIME) -X main.gitCommit=$(GIT_COMMIT)"
 
 # Test configuration
-TEST_CONFIG=configs/development/local.yaml
+SESSION_CONFIG=configs/development/session-service.yaml
+AUTH_CONFIG=configs/development/auth-service.yaml
+GAME_CONFIG=configs/development/game-service.yaml
+USER_CONFIG=configs/development/user-service.yaml
+# Legacy config (deprecated - use service-specific configs)
 TEST_TIMEOUT=30s
 TEST_COVERAGE_DIR=coverage
 
@@ -270,40 +274,38 @@ clean-test-env: ## Clean test environment
 .PHONY: run-session
 run-session: build-session setup-test-env ## Build and run the session service
 	@echo "$(GREEN)Starting DungeonGate Session Service...$(NC)"
-	@cp $(TEST_CONFIG) configs/development/local.yaml
-	./$(BUILD_DIR)/$(SESSION_BINARY_NAME) -config=/configs/development/local.yaml
+	./$(BUILD_DIR)/$(SESSION_BINARY_NAME) -config=$(SESSION_CONFIG)
 
 .PHONY: run-auth
 run-auth: build-auth ## Build and run the auth service
 	@echo "$(GREEN)Starting DungeonGate Auth Service...$(NC)"
-	./$(BUILD_DIR)/$(AUTH_BINARY_NAME) -config=$(TEST_CONFIG)
+	./$(BUILD_DIR)/$(AUTH_BINARY_NAME) -config=$(AUTH_CONFIG)
 
 .PHONY: run-game
 run-game: build-game ## Build and run the game service
 	@echo "$(GREEN)Starting DungeonGate Game Service...$(NC)"
-	./$(BUILD_DIR)/$(GAME_BINARY_NAME) -config=$(TEST_CONFIG)
+	./$(BUILD_DIR)/$(GAME_BINARY_NAME) -config=$(GAME_CONFIG)
 
 .PHONY: run-user
 run-user: build-user ## Build and run the user service
 	@echo "$(GREEN)Starting DungeonGate User Service...$(NC)"
-	./$(BUILD_DIR)/$(USER_BINARY_NAME) -config=$(TEST_CONFIG)
+	./$(BUILD_DIR)/$(USER_BINARY_NAME) -config=$(USER_CONFIG)
 
 .PHONY: run-all
 run-all: build-all setup-test-env ## Build and run all services
 	@echo "$(GREEN)Starting all DungeonGate services...$(NC)"
-	@echo "$(YELLOW)Auth service will run on port 8082$(NC)"
-	@echo "$(YELLOW)Game service will run on port 50051$(NC)"
-	@echo "$(YELLOW)User service will run on port 8084$(NC)"
-	@echo "$(YELLOW)Session service will run on port 2222$(NC)"
+	@echo "$(YELLOW)Auth service will run on port 8081/8082$(NC)"
+	@echo "$(YELLOW)Game service will run on port 8085/50051$(NC)"
+	@echo "$(YELLOW)User service will run on port 8084/9084$(NC)"
+	@echo "$(YELLOW)Session service will run on port 8083/2222$(NC)"
 	@echo "$(YELLOW)Use Ctrl+C to stop all services$(NC)"
-	@cp $(TEST_CONFIG) /tmp/dungeongate-session-service.yaml
-	@(./$(BUILD_DIR)/$(AUTH_BINARY_NAME) -config=$(TEST_CONFIG) &) && \
+	@(./$(BUILD_DIR)/$(AUTH_BINARY_NAME) -config=$(AUTH_CONFIG) &) && \
 	 sleep 2 && \
-	 (./$(BUILD_DIR)/$(GAME_BINARY_NAME) -config=$(TEST_CONFIG) &) && \
+	 (./$(BUILD_DIR)/$(GAME_BINARY_NAME) -config=$(GAME_CONFIG) &) && \
 	 sleep 2 && \
-	 (./$(BUILD_DIR)/$(USER_BINARY_NAME) -config=$(TEST_CONFIG) &) && \
+	 (./$(BUILD_DIR)/$(USER_BINARY_NAME) -config=$(USER_CONFIG) &) && \
 	 sleep 2 && \
-	 ./$(BUILD_DIR)/$(SESSION_BINARY_NAME) -config=/tmp/dungeongate-session-service.yaml
+	 ./$(BUILD_DIR)/$(SESSION_BINARY_NAME) -config=$(SESSION_CONFIG)
 
 .PHONY: run-debug
 run-debug: build-debug ## Run session service with debug build
