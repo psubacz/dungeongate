@@ -77,7 +77,7 @@ func main() {
 	// Setup auth middleware if enabled
 	var authMiddleware *session.AuthMiddleware
 	if cfg.Auth != nil && cfg.Auth.Enabled {
-		authMiddleware, err = session.NewAuthMiddleware(cfg.Auth.ServiceAddress, cfg.Auth.Enabled)
+		authMiddleware, err = session.NewAuthMiddleware(cfg.Auth.GRPCAddress, cfg.Auth.Enabled)
 		if err != nil {
 			log.Printf("Warning: Failed to initialize auth middleware: %v", err)
 			log.Printf("Falling back to direct user service authentication")

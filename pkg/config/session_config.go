@@ -139,6 +139,7 @@ type SessionSecurityConfig struct {
 type AuthServiceConfig struct {
 	Enabled                bool   `yaml:"enabled"`
 	ServiceAddress         string `yaml:"service_address"`
+	GRPCAddress            string `yaml:"grpc_address"`
 	JWTSecret              string `yaml:"jwt_secret"`
 	JWTIssuer              string `yaml:"jwt_issuer"`
 	AccessTokenExpiration  string `yaml:"access_token_expiration"`
