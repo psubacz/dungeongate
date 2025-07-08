@@ -32,7 +32,7 @@ var (
 
 func main() {
 	var (
-		configFile  = flag.String("config", "configs/development/local.yaml", "Path to configuration file")
+		configFile  = flag.String("config", "configs/development/auth-service.yaml", "Path to configuration file")
 		showVersion = flag.Bool("version", false, "Show version information")
 	)
 	flag.Parse()
@@ -107,22 +107,36 @@ func main() {
 	proto.RegisterAuthServiceServer(grpcServer, authService)
 	reflection.Register(grpcServer)
 
+	// Get gRPC port from config or use default
+	grpcPort := 8082 // default port
+	if cfg.Server != nil && cfg.Server.GRPCPort > 0 {
+		grpcPort = cfg.Server.GRPCPort
+	} else if cfg.Server != nil && cfg.Server.Port > 0 {
+		grpcPort = cfg.Server.Port // fallback to main port
+	}
+
 	// Start gRPC server
-	grpcListener, err := net.Listen("tcp", ":8082")
+	grpcListener, err := net.Listen("tcp", fmt.Sprintf(":%d", grpcPort))
 	if err != nil {
-		log.Fatalf("Failed to listen on port 8082: %v", err)
+		log.Fatalf("Failed to listen on port %d: %v", grpcPort, err)
 	}
 
 	go func() {
-		log.Printf("Starting Auth Service gRPC server on port 8082")
+		log.Printf("Starting Auth Service gRPC server on port %d", grpcPort)
 		if err := grpcServer.Serve(grpcListener); err != nil {
 			log.Printf("gRPC server error: %v", err)
 		}
 	}()
 
+	// Get HTTP port from config or use default
+	httpPort := 8081 // default port
+	if cfg.Server != nil && cfg.Server.Port > 0 {
+		httpPort = cfg.Server.Port
+	}
+
 	// Setup HTTP server for health checks
 	httpServer := &http.Server{
-		Addr: fmt.Sprintf(":%d", 8081),
+		Addr: fmt.Sprintf(":%d", httpPort),
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if r.URL.Path == "/health" {
 				w.WriteHeader(http.StatusOK)
@@ -130,12 +144,12 @@ func main() {
 				return
 			}
 			w.WriteHeader(http.StatusNotImplemented)
-			fmt.Fprintf(w, "Auth Service - gRPC API available on port 8082")
+			fmt.Fprintf(w, "Auth Service - gRPC API available on port %d", grpcPort)
 		}),
 	}
 
 	go func() {
-		log.Printf("Starting Auth Service HTTP server on port 8081")
+		log.Printf("Starting Auth Service HTTP server on port %d", httpPort)
 		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Printf("HTTP server error: %v", err)
 		}

@@ -25,7 +25,7 @@ var (
 
 func main() {
 	var (
-		configFile  = flag.String("config", "configs/development/local.yaml", "Path to configuration file")
+		configFile  = flag.String("config", "configs/development/user-service.yaml", "Path to configuration file")
 		showVersion = flag.Bool("version", false, "Show version information")
 	)
 	flag.Parse()
