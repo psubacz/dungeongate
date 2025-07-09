@@ -70,11 +70,11 @@ func TestGameDirectoryManager(t *testing.T) {
 
 	// Test cleanup
 	cleanupOptions := &GameCleanupOptions{
-		ClearTempFiles:     true,
-		RemoveLockFiles:    false, // Skip for test
-		BackupSaves:        false, // Skip for test
-		CleanupSaveLinks:   false, // Skip for test
-		ValidateCleanup:    true,
+		ClearTempFiles:   true,
+		RemoveLockFiles:  false, // Skip for test
+		BackupSaves:      false, // Skip for test
+		CleanupSaveLinks: false, // Skip for test
+		ValidateCleanup:  true,
 	}
 
 	err = manager.CleanupGame(gameID, cleanupOptions)
@@ -131,7 +131,7 @@ func TestGameConfigValidator(t *testing.T) {
 
 	// Test missing required path
 	invalidPaths := &NetHackPaths{
-		SaveDir: "", // Missing required path
+		SaveDir:   "", // Missing required path
 		ConfigDir: configDir,
 	}
 

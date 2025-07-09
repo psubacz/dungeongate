@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"time"
 
-	proto "github.com/dungeongate/pkg/api/auth/v1"
 	"github.com/dungeongate/internal/user"
+	proto "github.com/dungeongate/pkg/api/auth/v1"
 	"github.com/dungeongate/pkg/database"
 	"github.com/dungeongate/pkg/encryption"
 	"github.com/golang-jwt/jwt/v5"

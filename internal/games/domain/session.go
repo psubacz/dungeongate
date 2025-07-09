@@ -373,3 +373,13 @@ func (s *GameSession) CreatedAt() time.Time {
 func (s *GameSession) UpdatedAt() time.Time {
 	return s.updatedAt
 }
+
+// LastActivity returns when the session was last active
+func (s *GameSession) LastActivity() time.Time {
+	return s.lastActivity
+}
+
+// Encoding returns the session's encoding
+func (s *GameSession) Encoding() string {
+	return s.encoding
+}

@@ -271,6 +271,15 @@ clean-test-env: ## Clean test environment
 
 ##@ Running Individual Services
 
+.PHONY: stop
+stop: ## Stop all running DungeonGate services
+	@echo "$(GREEN)Stopping all DungeonGate services...$(NC)"
+	@pkill -f "dungeongate-session-service" 2>/dev/null || true
+	@pkill -f "dungeongate-auth-service" 2>/dev/null || true
+	@pkill -f "dungeongate-game-service" 2>/dev/null || true
+	@pkill -f "dungeongate-user-service" 2>/dev/null || true
+	@echo "$(GREEN)All DungeonGate services stopped$(NC)"
+
 .PHONY: run-session
 run-session: build-session setup-test-env ## Build and run the session service
 	@echo "$(GREEN)Starting DungeonGate Session Service...$(NC)"

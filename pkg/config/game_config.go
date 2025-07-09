@@ -38,21 +38,21 @@ type GameEngineConfig struct {
 
 // GameConfig represents a specific game configuration
 type GameConfig struct {
-	ID          string            `yaml:"id"`
-	Name        string            `yaml:"name"`
-	ShortName   string            `yaml:"short_name"`
-	Version     string            `yaml:"version"`
-	Enabled     bool              `yaml:"enabled"`
-	Binary      *BinaryConfig     `yaml:"binary"`
-	Files       *FilesConfig      `yaml:"files"`
-	Paths       *GamePathsConfig  `yaml:"paths"`
-	Setup       *GameSetupOptions `yaml:"setup"`
+	ID          string              `yaml:"id"`
+	Name        string              `yaml:"name"`
+	ShortName   string              `yaml:"short_name"`
+	Version     string              `yaml:"version"`
+	Enabled     bool                `yaml:"enabled"`
+	Binary      *BinaryConfig       `yaml:"binary"`
+	Files       *FilesConfig        `yaml:"files"`
+	Paths       *GamePathsConfig    `yaml:"paths"`
+	Setup       *GameSetupOptions   `yaml:"setup"`
 	Cleanup     *GameCleanupOptions `yaml:"cleanup"`
-	Settings    *GameSettings     `yaml:"settings"`
-	Environment map[string]string `yaml:"environment"`
-	Resources   *ResourcesConfig  `yaml:"resources"`
-	Container   *ContainerConfig  `yaml:"container"`
-	Networking  *NetworkingConfig `yaml:"networking"`
+	Settings    *GameSettings       `yaml:"settings"`
+	Environment map[string]string   `yaml:"environment"`
+	Resources   *ResourcesConfig    `yaml:"resources"`
+	Container   *ContainerConfig    `yaml:"container"`
+	Networking  *NetworkingConfig   `yaml:"networking"`
 }
 
 // BinaryConfig represents binary configuration
@@ -87,9 +87,9 @@ type PermissionsConfig struct {
 
 // GamePathsConfig represents game-specific path configuration
 type GamePathsConfig struct {
-	AutoDetect bool                   `yaml:"auto_detect"`
-	System     *SystemPathsConfig     `yaml:"system"`
-	User       *UserPathsConfig       `yaml:"user"`
+	AutoDetect bool               `yaml:"auto_detect"`
+	System     *SystemPathsConfig `yaml:"system"`
+	User       *UserPathsConfig   `yaml:"user"`
 }
 
 // SystemPathsConfig represents system-level paths (from nethack --showpaths)
@@ -102,24 +102,24 @@ type SystemPathsConfig struct {
 
 // UserPathsConfig represents user-specific paths (relative to user directory)
 type UserPathsConfig struct {
-	BaseDir     string `yaml:"base_dir"`
-	SaveDir     string `yaml:"save_dir"`
-	ConfigDir   string `yaml:"config_dir"`
-	BonesDir    string `yaml:"bones_dir"`
-	LevelDir    string `yaml:"level_dir"`
-	LockDir     string `yaml:"lock_dir"`
-	TroubleDir  string `yaml:"trouble_dir"`
+	BaseDir    string `yaml:"base_dir"`
+	SaveDir    string `yaml:"save_dir"`
+	ConfigDir  string `yaml:"config_dir"`
+	BonesDir   string `yaml:"bones_dir"`
+	LevelDir   string `yaml:"level_dir"`
+	LockDir    string `yaml:"lock_dir"`
+	TroubleDir string `yaml:"trouble_dir"`
 }
 
 // GameSetupOptions represents game setup configuration
 type GameSetupOptions struct {
-	CreateUserDirs     bool `yaml:"create_user_dirs"`
-	CopyDefaultConfig  bool `yaml:"copy_default_config"`
-	InitializeShared   bool `yaml:"initialize_shared"`
-	ValidatePaths      bool `yaml:"validate_paths"`
-	SetPermissions     bool `yaml:"set_permissions"`
-	DetectSystemPaths  bool `yaml:"detect_system_paths"`
-	CreateSaveLinks    bool `yaml:"create_save_links"`
+	CreateUserDirs    bool `yaml:"create_user_dirs"`
+	CopyDefaultConfig bool `yaml:"copy_default_config"`
+	InitializeShared  bool `yaml:"initialize_shared"`
+	ValidatePaths     bool `yaml:"validate_paths"`
+	SetPermissions    bool `yaml:"set_permissions"`
+	DetectSystemPaths bool `yaml:"detect_system_paths"`
+	CreateSaveLinks   bool `yaml:"create_save_links"`
 }
 
 // GameCleanupOptions represents game cleanup configuration

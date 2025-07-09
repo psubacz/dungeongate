@@ -9,13 +9,13 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	_ "github.com/mattn/go-sqlite3"
 
 	"github.com/dungeongate/internal/games/domain"
-	"github.com/dungeongate/pkg/database"
 	"github.com/dungeongate/pkg/config"
+	"github.com/dungeongate/pkg/database"
 )
 
 // Integration test setup
@@ -248,7 +248,7 @@ func TestSaveRepository_Integration_CRUD(t *testing.T) {
 	saveID := domain.NewSaveID(uuid.New().String())
 	userID := domain.NewUserID(1)
 	gameID := domain.NewGameID("1")
-	
+
 	saveData := []byte("test save data")
 	filePath := "/tmp/test_save.dat"
 	metadata := domain.SaveMetadata{
@@ -312,7 +312,7 @@ func TestSaveRepository_Integration_BackupManagement(t *testing.T) {
 
 	// Create test save
 	saveID := uuid.New()
-	
+
 	// Insert save directly into database
 	_, err := db.ExecContext(ctx, `
 		INSERT INTO game_saves (id, user_id, game_id, name, file_path, file_size, checksum, metadata)
@@ -364,7 +364,7 @@ func BenchmarkSessionRepository_Create(b *testing.B) {
 		terminalSize := domain.TerminalSize{Width: 80, Height: 24}
 
 		session := domain.NewGameSession(sessionID, userID, "testuser", gameID, domain.GameConfig{}, terminalSize)
-		
+
 		err := repo.Create(ctx, session)
 		if err != nil {
 			b.Fatalf("Create failed: %v", err)
@@ -389,7 +389,7 @@ func BenchmarkSaveRepository_Create(b *testing.B) {
 		saveID := domain.NewSaveID(uuid.New().String())
 		userID := domain.NewUserID(1)
 		gameID := domain.NewGameID("1")
-		
+
 		metadata := domain.SaveMetadata{
 			GameVersion: "1.0",
 			Character:   fmt.Sprintf("Hero_%d", i),
@@ -400,7 +400,7 @@ func BenchmarkSaveRepository_Create(b *testing.B) {
 		}
 
 		save := domain.NewGameSave(saveID, userID, gameID, saveData, fmt.Sprintf("/tmp/save_%d.dat", i), metadata)
-		
+
 		err := repo.Create(ctx, save)
 		if err != nil {
 			b.Fatalf("Create failed: %v", err)
@@ -426,7 +426,7 @@ func TestSessionRepository_Concurrent_Operations(t *testing.T) {
 	const sessionsPerGoroutine = 5
 
 	errChan := make(chan error, numGoroutines)
-	
+
 	for g := 0; g < numGoroutines; g++ {
 		go func(goroutineID int) {
 			for i := 0; i < sessionsPerGoroutine; i++ {
@@ -436,7 +436,7 @@ func TestSessionRepository_Concurrent_Operations(t *testing.T) {
 				terminalSize := domain.TerminalSize{Width: 80, Height: 24}
 
 				session := domain.NewGameSession(sessionID, userID, fmt.Sprintf("user_%d_%d", goroutineID, i), gameID, domain.GameConfig{}, terminalSize)
-				
+
 				err := repo.Create(ctx, session)
 				if err != nil {
 					errChan <- fmt.Errorf("goroutine %d, session %d: %w", goroutineID, i, err)

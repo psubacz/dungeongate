@@ -33,6 +33,8 @@ const (
 	GameService_LoadGame_FullMethodName         = "/dungeongate.games.v2.GameService/LoadGame"
 	GameService_DeleteSave_FullMethodName       = "/dungeongate.games.v2.GameService/DeleteSave"
 	GameService_ListSaves_FullMethodName        = "/dungeongate.games.v2.GameService/ListSaves"
+	GameService_StreamGameIO_FullMethodName     = "/dungeongate.games.v2.GameService/StreamGameIO"
+	GameService_ResizeTerminal_FullMethodName   = "/dungeongate.games.v2.GameService/ResizeTerminal"
 	GameService_Health_FullMethodName           = "/dungeongate.games.v2.GameService/Health"
 )
 
@@ -58,6 +60,9 @@ type GameServiceClient interface {
 	LoadGame(ctx context.Context, in *LoadGameRequest, opts ...grpc.CallOption) (*LoadGameResponse, error)
 	DeleteSave(ctx context.Context, in *DeleteSaveRequest, opts ...grpc.CallOption) (*DeleteSaveResponse, error)
 	ListSaves(ctx context.Context, in *ListSavesRequest, opts ...grpc.CallOption) (*ListSavesResponse, error)
+	// PTY streaming for terminal I/O
+	StreamGameIO(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[GameIORequest, GameIOResponse], error)
+	ResizeTerminal(ctx context.Context, in *ResizeTerminalRequest, opts ...grpc.CallOption) (*ResizeTerminalResponse, error)
 	// Health check
 	Health(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*HealthResponse, error)
 }
@@ -200,6 +205,29 @@ func (c *gameServiceClient) ListSaves(ctx context.Context, in *ListSavesRequest,
 	return out, nil
 }
 
+func (c *gameServiceClient) StreamGameIO(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[GameIORequest, GameIOResponse], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &GameService_ServiceDesc.Streams[0], GameService_StreamGameIO_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[GameIORequest, GameIOResponse]{ClientStream: stream}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type GameService_StreamGameIOClient = grpc.BidiStreamingClient[GameIORequest, GameIOResponse]
+
+func (c *gameServiceClient) ResizeTerminal(ctx context.Context, in *ResizeTerminalRequest, opts ...grpc.CallOption) (*ResizeTerminalResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ResizeTerminalResponse)
+	err := c.cc.Invoke(ctx, GameService_ResizeTerminal_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *gameServiceClient) Health(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*HealthResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(HealthResponse)
@@ -232,6 +260,9 @@ type GameServiceServer interface {
 	LoadGame(context.Context, *LoadGameRequest) (*LoadGameResponse, error)
 	DeleteSave(context.Context, *DeleteSaveRequest) (*DeleteSaveResponse, error)
 	ListSaves(context.Context, *ListSavesRequest) (*ListSavesResponse, error)
+	// PTY streaming for terminal I/O
+	StreamGameIO(grpc.BidiStreamingServer[GameIORequest, GameIOResponse]) error
+	ResizeTerminal(context.Context, *ResizeTerminalRequest) (*ResizeTerminalResponse, error)
 	// Health check
 	Health(context.Context, *emptypb.Empty) (*HealthResponse, error)
 	mustEmbedUnimplementedGameServiceServer()
@@ -282,6 +313,12 @@ func (UnimplementedGameServiceServer) DeleteSave(context.Context, *DeleteSaveReq
 }
 func (UnimplementedGameServiceServer) ListSaves(context.Context, *ListSavesRequest) (*ListSavesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListSaves not implemented")
+}
+func (UnimplementedGameServiceServer) StreamGameIO(grpc.BidiStreamingServer[GameIORequest, GameIOResponse]) error {
+	return status.Errorf(codes.Unimplemented, "method StreamGameIO not implemented")
+}
+func (UnimplementedGameServiceServer) ResizeTerminal(context.Context, *ResizeTerminalRequest) (*ResizeTerminalResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ResizeTerminal not implemented")
 }
 func (UnimplementedGameServiceServer) Health(context.Context, *emptypb.Empty) (*HealthResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Health not implemented")
@@ -541,6 +578,31 @@ func _GameService_ListSaves_Handler(srv interface{}, ctx context.Context, dec fu
 	return interceptor(ctx, in, info, handler)
 }
 
+func _GameService_StreamGameIO_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(GameServiceServer).StreamGameIO(&grpc.GenericServerStream[GameIORequest, GameIOResponse]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type GameService_StreamGameIOServer = grpc.BidiStreamingServer[GameIORequest, GameIOResponse]
+
+func _GameService_ResizeTerminal_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ResizeTerminalRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GameServiceServer).ResizeTerminal(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GameService_ResizeTerminal_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GameServiceServer).ResizeTerminal(ctx, req.(*ResizeTerminalRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _GameService_Health_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(emptypb.Empty)
 	if err := dec(in); err != nil {
@@ -619,10 +681,21 @@ var GameService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _GameService_ListSaves_Handler,
 		},
 		{
+			MethodName: "ResizeTerminal",
+			Handler:    _GameService_ResizeTerminal_Handler,
+		},
+		{
 			MethodName: "Health",
 			Handler:    _GameService_Health_Handler,
 		},
 	},
-	Streams:  []grpc.StreamDesc{},
+	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "StreamGameIO",
+			Handler:       _GameService_StreamGameIO_Handler,
+			ServerStreams: true,
+			ClientStreams: true,
+		},
+	},
 	Metadata: "games/game_service_v2.proto",
 }

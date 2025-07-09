@@ -79,6 +79,7 @@ Protocol Buffers with versioned APIs:
 ## Current Implementation Status
 
 ### ✅ Completed Features
+- **Stateless Session Service**: Complete refactor to stateless architecture for horizontal scaling
 - SSH server with terminal session management
 - Centralized auth service with JWT tokens
 - User registration and authentication flows
@@ -90,6 +91,7 @@ Protocol Buffers with versioned APIs:
 - Versioned Protocol Buffer APIs
 
 ### 🚧 In Progress
+- Comprehensive test suite for Session Service
 - Game service domain implementation
 - Save file management
 - Game configuration and path management
@@ -131,6 +133,63 @@ The project supports dual-mode database operation:
   - `configs/testing/` - Database testing configurations
 
 ## Testing the Platform
+
+### Test Structure and Organization
+
+The project follows Go standard layout with tests organized as follows:
+
+- **Unit Tests**: Co-located with source files (`*_test.go`)
+- **Integration Tests**: In `/test` directory for larger test suites
+- **Test Data**: Uses `/test/data` or `/test/testdata` for fixtures
+- **Mock Objects**: Extensive use of `testify/mock` for dependency isolation
+
+### Core Test Commands
+
+```bash
+# Run all tests
+make test
+
+# Run with coverage report
+make test-coverage
+
+# Run specific test suites
+make test-ssh          # SSH server functionality
+make test-auth         # Authentication system
+make test-spectating   # Spectating system
+make test-race         # Race condition detection
+make test-short        # Quick tests only
+```
+
+### Session Service Testing
+
+The stateless Session Service includes comprehensive test coverage:
+
+- **Connection Management**: Connection lifecycle, rate limiting, cleanup
+- **SSH Server**: Authentication, channel handling, PTY management
+- **Game Client**: gRPC communication with Game Service
+- **Auth Client**: gRPC communication with Auth Service
+- **Terminal Manager**: PTY creation, resizing, process management
+- **Streaming Manager**: Spectator streaming, stream lifecycle
+- **Service Integration**: End-to-end service functionality
+
+### Test Categories
+
+#### Unit Tests
+- **Components**: Individual service components and managers
+- **Business Logic**: Core functionality and edge cases
+- **Error Handling**: Proper error propagation and recovery
+- **Concurrency**: Thread safety and race condition prevention
+
+#### Integration Tests
+- **Service Communication**: gRPC client-server interactions
+- **Database Operations**: Repository patterns and data persistence
+- **File System**: PTY management and session cleanup
+- **Network**: SSH connections and protocol handling
+
+#### Performance Tests
+- **Benchmarks**: Critical path performance measurement
+- **Load Testing**: Connection limits and resource management
+- **Memory Usage**: Memory leak detection and optimization
 
 ### Quick Start Testing
 ```bash

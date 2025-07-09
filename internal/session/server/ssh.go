@@ -1,0 +1,219 @@
+package server
+
+import (
+	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
+	"fmt"
+	"log/slog"
+	"net"
+	"os"
+	"path/filepath"
+
+	"github.com/dungeongate/internal/session/banner"
+	"github.com/dungeongate/internal/session/client"
+	"github.com/dungeongate/internal/session/connection"
+	"github.com/dungeongate/internal/session/menu"
+	"golang.org/x/crypto/ssh"
+)
+
+// SSHServer provides stateless SSH server functionality
+type SSHServer struct {
+	config      *SSHConfig
+	listener    net.Listener
+	sshConfig   *ssh.ServerConfig
+	handler     *connection.Handler
+	connManager *connection.Manager
+	logger      *slog.Logger
+}
+
+// SSHConfig holds SSH server configuration
+type SSHConfig struct {
+	Address       string
+	Port          int
+	HostKey       string
+	MaxConns      int
+	IdleTimeout   string
+	PasswordAuth  bool
+	PublicKeyAuth bool
+	AllowAnonymous bool
+	BannerMainAnon  string
+	BannerMainUser  string
+	BannerWatchMenu string
+}
+
+// NewSSHServer creates a new SSH server
+func NewSSHServer(config *SSHConfig, gameClient *client.GameClient, authClient *client.AuthClient, logger *slog.Logger) (*SSHServer, error) {
+	// Create connection manager
+	connManager := connection.NewManager(config.MaxConns, logger)
+
+	// Create banner manager
+	bannerConfig := &banner.BannerConfig{
+		MainAnon:  config.BannerMainAnon,
+		MainUser:  config.BannerMainUser,
+		WatchMenu: config.BannerWatchMenu,
+	}
+	bannerManager := banner.NewBannerManager(bannerConfig)
+
+	// Create menu handler
+	menuHandler := menu.NewMenuHandler(bannerManager, gameClient, authClient, logger)
+
+	// Create connection handler
+	handler := connection.NewHandler(connManager, gameClient, authClient, menuHandler, logger)
+
+	// Create SSH server config
+	sshConfig := &ssh.ServerConfig{
+		NoClientAuth: config.AllowAnonymous,
+	}
+
+	// Create auth handler
+	authHandler := connection.NewAuthHandler(authClient, logger)
+
+	// Set authentication callbacks based on configuration
+	if config.PasswordAuth {
+		sshConfig.PasswordCallback = authHandler.PasswordCallback
+	}
+	if config.PublicKeyAuth {
+		sshConfig.PublicKeyCallback = authHandler.PublicKeyCallback
+	}
+
+	// Load or generate host key
+	hostKey, err := loadOrGenerateHostKey(config.HostKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load host key: %w", err)
+	}
+	sshConfig.AddHostKey(hostKey)
+
+	server := &SSHServer{
+		config:      config,
+		sshConfig:   sshConfig,
+		handler:     handler,
+		connManager: connManager,
+		logger:      logger,
+	}
+
+	return server, nil
+}
+
+// Start starts the SSH server
+func (s *SSHServer) Start(ctx context.Context) error {
+	addr := fmt.Sprintf("%s:%d", s.config.Address, s.config.Port)
+
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		return fmt.Errorf("failed to listen on %s: %w", addr, err)
+	}
+	s.listener = listener
+
+	s.logger.Info("SSH server starting", "address", addr)
+
+	// Start connection manager
+	if err := s.connManager.Start(ctx); err != nil {
+		return fmt.Errorf("failed to start connection manager: %w", err)
+	}
+
+	// Accept connections
+	go s.acceptConnections(ctx)
+
+	return nil
+}
+
+// Stop stops the SSH server
+func (s *SSHServer) Stop(ctx context.Context) error {
+	if s.listener != nil {
+		s.logger.Info("SSH server stopping")
+		return s.listener.Close()
+	}
+	return nil
+}
+
+// acceptConnections accepts incoming SSH connections
+func (s *SSHServer) acceptConnections(ctx context.Context) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			conn, err := s.listener.Accept()
+			if err != nil {
+				s.logger.Error("Failed to accept connection", "error", err)
+				continue
+			}
+
+			// Handle connection in goroutine
+			go s.handler.HandleConnection(ctx, conn, s.sshConfig)
+		}
+	}
+}
+
+// generateHostKey generates a new RSA host key
+func generateHostKey() (ssh.Signer, error) {
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		return nil, err
+	}
+
+	signer, err := ssh.NewSignerFromKey(key)
+	if err != nil {
+		return nil, err
+	}
+
+	return signer, nil
+}
+
+// loadOrGenerateHostKey loads an existing host key or generates a new one
+func loadOrGenerateHostKey(hostKeyPath string) (ssh.Signer, error) {
+	// If no path is specified, generate a new key
+	if hostKeyPath == "" {
+		return generateHostKey()
+	}
+
+	// Try to load existing key
+	if _, err := os.Stat(hostKeyPath); err == nil {
+		// Key file exists, try to load it
+		keyBytes, err := os.ReadFile(hostKeyPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read host key file: %w", err)
+		}
+
+		// Parse the private key
+		signer, err := ssh.ParsePrivateKey(keyBytes)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse host key: %w", err)
+		}
+
+		return signer, nil
+	}
+
+	// Key file doesn't exist, generate a new one and save it
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate host key: %w", err)
+	}
+
+	// Create directory if it doesn't exist
+	if err := os.MkdirAll(filepath.Dir(hostKeyPath), 0700); err != nil {
+		return nil, fmt.Errorf("failed to create host key directory: %w", err)
+	}
+
+	// Convert to PEM format
+	keyPEM := pem.EncodeToMemory(&pem.Block{
+		Type:  "RSA PRIVATE KEY",
+		Bytes: x509.MarshalPKCS1PrivateKey(key),
+	})
+
+	// Write to file
+	if err := os.WriteFile(hostKeyPath, keyPEM, 0600); err != nil {
+		return nil, fmt.Errorf("failed to write host key file: %w", err)
+	}
+
+	// Create signer from the key
+	signer, err := ssh.NewSignerFromKey(key)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create signer from key: %w", err)
+	}
+
+	return signer, nil
+}

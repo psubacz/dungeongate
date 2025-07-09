@@ -200,13 +200,13 @@ func TestCleanupService_PeriodicCleanup(t *testing.T) {
 
 func createMockSessionWithProcess(userID int, gameID string, pid int) *domain.GameSession {
 	session := createMockSession(userID, gameID)
-	
+
 	// Start session with process info
 	session.Start(domain.ProcessInfo{
 		PID:     pid,
 		PodName: "test-pod",
 	})
-	
+
 	return session
 }
 
@@ -214,7 +214,7 @@ func createMockSaveWithFile(tempDir string, userID int, gameID, filename string,
 	// Create actual file for testing
 	filePath := filepath.Join(tempDir, filename)
 	os.WriteFile(filePath, data, 0644)
-	
+
 	return createMockSave(userID, gameID, filePath, data)
 }
 
@@ -294,7 +294,7 @@ func TestSessionManager_Integration_SaveLifecycle(t *testing.T) {
 	sessionDir1 := filepath.Join(tempDir, "sessions", session1.ID().String())
 	saveDir1 := filepath.Join(sessionDir1, "save")
 	os.MkdirAll(saveDir1, 0755)
-	
+
 	saveData1 := []byte("game progress data v1")
 	saveFile1 := filepath.Join(saveDir1, "save.dat")
 	os.WriteFile(saveFile1, saveData1, 0644)

@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/dungeongate/internal/games/domain"
 	"github.com/dungeongate/pkg/database"
+	"github.com/google/uuid"
 )
 
 type PostgreSQLSessionRepository struct {

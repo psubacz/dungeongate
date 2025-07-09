@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -18,6 +19,7 @@ import (
 
 	"github.com/dungeongate/internal/games/application"
 	grpc_service "github.com/dungeongate/internal/games/infrastructure/grpc"
+	"github.com/dungeongate/internal/games/infrastructure/repository"
 	games_pb "github.com/dungeongate/pkg/api/games/v2"
 	"github.com/dungeongate/pkg/config"
 	"github.com/dungeongate/pkg/database"
@@ -141,6 +143,47 @@ func initializeDatabase(cfg *config.GameServiceConfig) (*database.Connection, er
 	return db, nil
 }
 
+// initializeDefaultGames adds default games to the repository for development
+func initializeDefaultGames(gameService *application.GameService) {
+	ctx := context.Background()
+	
+	// Add NetHack as a default game
+	nethackReq := &application.CreateGameRequest{
+		ID:          "nethack",
+		Name:        "NetHack",
+		ShortName:   "nh",
+		Description: "The classic dungeon exploration game",
+		Category:    "roguelike",
+		Tags:        []string{"roguelike", "classic", "dungeon"},
+		Version:     "3.6.7",
+		Difficulty:  7,
+		BinaryPath:  "/opt/homebrew/bin/nethack",
+		BinaryArgs:  []string{"-u", "${USERNAME}"},
+		WorkingDirectory: "/opt/homebrew/Cellar/nethack/3.6.7/libexec",
+		Environment: map[string]string{
+			"TERM":           "xterm-256color",
+			"USER":           "${USERNAME}",
+			"HOME":           "/opt/homebrew/Cellar/nethack/3.6.7/libexec/${USERNAME}",
+			"HACKDIR":        "/opt/homebrew/Cellar/nethack/3.6.7/libexec",
+			"NETHACKDIR":     "/opt/homebrew/Cellar/nethack/3.6.7/libexec",
+			"NETHACKOPTIONS": "@/opt/homebrew/Cellar/nethack/3.6.7/libexec/${USERNAME}.nethackrc",
+		},
+		CPULimit:       "500m",
+		MemoryLimit:    "256Mi",
+		DiskLimit:      "1Gi",
+		TimeoutSeconds: 14400, // 4 hours
+		RunAsUser:      1000,
+		RunAsGroup:     1000,
+		ReadOnlyRootFilesystem:   false,
+		AllowPrivilegeEscalation: false,
+		NetworkIsolated:          true,
+		BlockInternet:            true,
+	}
+	
+	// Try to create the game, ignore errors if it already exists
+	gameService.CreateGame(ctx, nethackReq)
+}
+
 // ApplicationServices holds all application services
 type ApplicationServices struct {
 	GameService    *application.GameService
@@ -149,10 +192,25 @@ type ApplicationServices struct {
 
 // initializeApplicationServices initializes all application services
 func initializeApplicationServices(db *database.Connection) *ApplicationServices {
-	// For now, use stub implementations until repositories are fully implemented
+	// Initialize stub repositories for development
+	gameRepo := repository.NewStubGameRepository()
+	sessionRepo := repository.NewStubSessionRepository()
+	saveRepo := repository.NewStubSaveRepository()
+	eventRepo := repository.NewStubEventRepository()
+	
+	// Create unit of work
+	uow := repository.NewStubUnitOfWork(gameRepo, sessionRepo, saveRepo, eventRepo)
+	
+	// Initialize application services
+	gameService := application.NewGameService(gameRepo, sessionRepo, saveRepo, eventRepo, uow)
+	sessionService := application.NewSessionService(sessionRepo, gameRepo, saveRepo, eventRepo, uow)
+	
+	// Add default games for development
+	initializeDefaultGames(gameService)
+	
 	return &ApplicationServices{
-		GameService:    nil, // TODO: Initialize with repositories
-		SessionService: nil, // TODO: Initialize with repositories
+		GameService:    gameService,
+		SessionService: sessionService,
 	}
 }
 
@@ -166,7 +224,8 @@ func initializeGRPCServer(appServices *ApplicationServices) *grpc.Server {
 	healthServer.SetServingStatus("", grpc_health_v1.HealthCheckResponse_SERVING)
 
 	// Register game service
-	gameServiceServer := grpc_service.NewGameServiceServer(appServices.GameService, appServices.SessionService)
+	logger := slog.Default() // TODO: Use proper logger configuration
+	gameServiceServer := grpc_service.NewGameServiceServer(appServices.GameService, appServices.SessionService, logger)
 	games_pb.RegisterGameServiceServer(server, gameServiceServer)
 
 	return server

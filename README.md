@@ -1,13 +1,13 @@
 # DungeonGate
 
-> This repo barely works and various states of working, borked, and not working. Be advised.
-
 **A SSH-based gateway to terminal gaming adventures written in Go**
 
 DungeonGate is a over-engineered microserviced application inspired by [dgamelaunch](https://github.com/paxed/dgamelaunch) for hosting terminal games like NetHack. This software fronts terminal games with a network ssh front end that users can login to play or spectate games in progress.
 
 Supported games
 - NetHack
+
+
 
 ## 🚀 Quick Start
 
@@ -134,6 +134,12 @@ ssh -p 2222 localhost  # Connect to test the SSH service
 ```
 
 ### Troubleshooting
+
+**Services already running:**
+Kill all previous runs before starting new ones:
+```bash
+make stop
+```
 
 **Port 2222 in use:**
 ```bash

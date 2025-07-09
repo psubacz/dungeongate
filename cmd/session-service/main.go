@@ -1,22 +1,15 @@
 package main
 
 import (
-	"context"
 	"flag"
 	"fmt"
-	"log"
-	"net/http"
+	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/dungeongate/internal/session"
-	"github.com/dungeongate/internal/user"
 	"github.com/dungeongate/pkg/config"
-	"github.com/dungeongate/pkg/database"
-	"github.com/dungeongate/pkg/encryption"
-	"github.com/dungeongate/pkg/ttyrec"
 )
 
 var (
@@ -33,113 +26,103 @@ func main() {
 	flag.Parse()
 
 	if *showVersion {
-		fmt.Printf("DungeonGate Session Service\n")
+		fmt.Printf("DungeonGate Session Service (Stateless)\n")
 		fmt.Printf("Version: %s\n", version)
 		fmt.Printf("Build Time: %s\n", buildTime)
 		fmt.Printf("Git Commit: %s\n", gitCommit)
 		return
 	}
 
+	// Setup structured logging
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+		Level: slog.LevelInfo,
+	}))
+
 	// Load configuration
 	cfg, err := config.LoadSessionServiceConfig(*configFile)
 	if err != nil {
-		log.Fatalf("Failed to load configuration: %v", err)
+		logger.Error("Failed to load configuration", "error", err)
+		os.Exit(1)
 	}
 
-	// Setup database
-	db, err := database.NewConnection(cfg.Database)
+	// Convert to session config format
+	sessionConfig := &session.Config{
+		GameService: struct {
+			Address string `yaml:"address" default:"localhost:50051"`
+		}{
+			Address: cfg.Services.GameService,
+		},
+		AuthService: struct {
+			Address string `yaml:"address" default:"localhost:8082"`
+		}{
+			Address: cfg.Services.AuthService,
+		},
+		SSH: struct {
+			Address       string `yaml:"address" default:"0.0.0.0"`
+			Port          int    `yaml:"port" default:"2222"`
+			IdleTimeout   string `yaml:"idle_timeout" default:"1h"`
+			HostKey       string `yaml:"host_key" default:""`
+			PasswordAuth  bool   `yaml:"password_auth" default:"true"`
+			PublicKeyAuth bool   `yaml:"public_key_auth" default:"false"`
+			AllowAnonymous bool  `yaml:"allow_anonymous" default:"true"`
+		}{
+			Address:       cfg.SSH.Host,
+			Port:          cfg.SSH.Port,
+			IdleTimeout:   "1h",
+			HostKey:       cfg.SSH.HostKeyPath,
+			PasswordAuth:  cfg.SSH.Auth.PasswordAuth,
+			PublicKeyAuth: cfg.SSH.Auth.PublicKeyAuth,
+			AllowAnonymous: cfg.SSH.Auth.AllowAnonymous,
+		},
+		HTTP: struct {
+			Address string `yaml:"address" default:"0.0.0.0"`
+			Port    int    `yaml:"port" default:"8083"`
+		}{
+			Address: "0.0.0.0",
+			Port:    cfg.Server.Port,
+		},
+		GRPC: struct {
+			Address string `yaml:"address" default:"0.0.0.0"`
+			Port    int    `yaml:"port" default:"9093"`
+		}{
+			Address: "0.0.0.0",
+			Port:    cfg.Server.Port + 1000, // Use different port for gRPC
+		},
+		MaxConnections: 1000,
+		MaxPTYs:        500,
+	}
+
+	// Create stateless session service
+	sessionService, err := session.New(sessionConfig, logger)
 	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
-	}
-	defer db.Close()
-
-	// Setup encryption
-	encryptor, err := encryption.New(cfg.Encryption)
-	if err != nil {
-		log.Fatalf("Failed to initialize encryption: %v", err)
+		logger.Error("Failed to create session service", "error", err)
+		os.Exit(1)
 	}
 
-	// Setup TTY recorder
-	recorder, err := ttyrec.NewRecorder(cfg.SessionManagement.TTYRec)
-	if err != nil {
-		log.Fatalf("Failed to initialize TTY recorder: %v", err)
+	// Start the service
+	if err := sessionService.Start(); err != nil {
+		logger.Error("Failed to start session service", "error", err)
+		os.Exit(1)
 	}
 
-	// Setup user service
-	userConfig := &config.UserServiceConfig{
-		Database: cfg.Database,
-	}
-	userService, err := user.NewService(db, userConfig, cfg)
-	if err != nil {
-		log.Fatalf("Failed to initialize user service: %v", err)
-	}
-
-	// Setup auth middleware if enabled
-	var authMiddleware *session.AuthMiddleware
-	if cfg.Auth != nil && cfg.Auth.Enabled {
-		authMiddleware, err = session.NewAuthMiddleware(cfg.Auth.GRPCAddress, cfg.Auth.Enabled)
-		if err != nil {
-			log.Printf("Warning: Failed to initialize auth middleware: %v", err)
-			log.Printf("Falling back to direct user service authentication")
-		}
-	}
-
-	// Setup session service with or without auth middleware
-	var sessionService *session.Service
-	if authMiddleware != nil {
-		sessionService = session.NewServiceWithAuth(db, encryptor, recorder, cfg, userService, authMiddleware)
-	} else {
-		sessionService = session.NewService(db, encryptor, recorder, cfg, userService)
-	}
-
-	// Setup context for graceful shutdown
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	// Start SSH server
-	sshServer, err := session.NewSSHServer(sessionService, cfg)
-	if err != nil {
-		log.Fatalf("Failed to create SSH server: %v", err)
-	}
-
-	go func() {
-		log.Printf("Starting SSH server on %s:%d", cfg.SSH.Host, cfg.SSH.Port)
-		if err := sshServer.Start(ctx, cfg.SSH.Port); err != nil {
-			log.Printf("SSH server error: %v", err)
-		}
-	}()
-
-	// Start HTTP server
-	httpHandler := session.NewHTTPHandler(sessionService)
-	httpServer := &http.Server{
-		Addr:    fmt.Sprintf(":%d", cfg.Server.Port),
-		Handler: httpHandler,
-	}
-
-	go func() {
-		log.Printf("Starting HTTP server on port %d", cfg.Server.Port)
-		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Printf("HTTP server error: %v", err)
-		}
-	}()
+	logger.Info("Session Service started",
+		"ssh_port", sessionConfig.SSH.Port,
+		"http_port", sessionConfig.HTTP.Port,
+		"grpc_port", sessionConfig.GRPC.Port,
+		"max_connections", sessionConfig.MaxConnections,
+	)
 
 	// Wait for interrupt signal
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
 	<-sigChan
-	log.Println("Shutting down gracefully...")
+	logger.Info("Shutting down gracefully...")
 
-	// Shutdown HTTP server
-	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer shutdownCancel()
-
-	if err := httpServer.Shutdown(shutdownCtx); err != nil {
-		log.Printf("HTTP server shutdown error: %v", err)
+	// Shutdown the service
+	if err := sessionService.Stop(); err != nil {
+		logger.Error("Error during shutdown", "error", err)
 	}
 
-	// Cancel context to stop SSH server and other services
-	cancel()
-
-	log.Println("Server stopped")
+	logger.Info("Session Service stopped")
 }

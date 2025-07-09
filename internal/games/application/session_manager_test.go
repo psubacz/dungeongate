@@ -297,14 +297,14 @@ func createTestSessionManager(t *testing.T) (*SessionManager, *MockSessionReposi
 	saveRepo := &MockSaveRepository{}
 	gameRepo := &MockGameRepository{}
 	eventRepo := &MockEventRepository{}
-	
+
 	// Create temporary directory for testing
 	tempDir := t.TempDir()
-	
+
 	logger := createTestLogger(t)
-	
+
 	sm := NewSessionManager(sessionRepo, saveRepo, gameRepo, eventRepo, tempDir, logger)
-	
+
 	return sm, sessionRepo, saveRepo, gameRepo, eventRepo, tempDir
 }
 
@@ -324,7 +324,7 @@ func TestSessionManager_StartGameSession_NewUser(t *testing.T) {
 
 	// Create mock game
 	game := createMockGame(gameID)
-	
+
 	// Set up mock expectations
 	gameRepo.On("FindByID", ctx, domain.NewGameID(gameID)).Return(game, nil)
 	saveRepo.On("FindByUserAndGame", ctx, domain.NewUserID(userID), domain.NewGameID(gameID)).Return(nil, fmt.Errorf("not found"))
@@ -498,7 +498,7 @@ func createMockSave(userID int, gameID, filePath string, data []byte) *domain.Ga
 	saveID := domain.NewSaveID(uuid.New().String())
 	userIDDomain := domain.NewUserID(userID)
 	gameIDDomain := domain.NewGameID(gameID)
-	
+
 	metadata := domain.SaveMetadata{
 		GameVersion: "1.0",
 		Character:   "TestCharacter",
@@ -507,7 +507,7 @@ func createMockSave(userID int, gameID, filePath string, data []byte) *domain.Ga
 		PlayTime:    time.Hour,
 		Location:    "Test Dungeon",
 	}
-	
+
 	return domain.NewGameSave(saveID, userIDDomain, gameIDDomain, data, filePath, metadata)
 }
 
@@ -516,11 +516,11 @@ func createMockSession(userID int, gameID string) *domain.GameSession {
 	userIDDomain := domain.NewUserID(userID)
 	gameIDDomain := domain.NewGameID(gameID)
 	terminalSize := domain.TerminalSize{Width: 80, Height: 24}
-	
+
 	session := domain.NewGameSession(sessionID, userIDDomain, "testuser", gameIDDomain, domain.GameConfig{}, terminalSize)
-	
+
 	// Start the session to make it active
 	session.Start(domain.ProcessInfo{PID: 12345, PodName: "test-pod"})
-	
+
 	return session
 }
