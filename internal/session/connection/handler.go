@@ -13,6 +13,7 @@ import (
 	"github.com/dungeongate/internal/session/menu"
 	"github.com/dungeongate/internal/session/types"
 	authv1 "github.com/dungeongate/pkg/api/auth/v1"
+	gamev2 "github.com/dungeongate/pkg/api/games/v2"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -187,7 +188,11 @@ func (h *Handler) handleSessionChannel(ctx context.Context, newChannel ssh.NewCh
 			if sessionID != "" && len(req.Payload) > 0 {
 				cols, rows := h.parseWindowChange(req.Payload)
 				h.logger.Debug("Terminal resize", "session_id", sessionID, "cols", cols, "rows", rows)
-				// In a real implementation, we'd send this to the Game Service
+				
+				// Send resize request to Game Service
+				if err := h.gameClient.ResizeTerminal(ctx, sessionID, cols, rows); err != nil {
+					h.logger.Error("Failed to resize terminal", "error", err, "session_id", sessionID)
+				}
 			}
 			req.Reply(true, nil)
 
@@ -217,32 +222,148 @@ func (h *Handler) getUserInfo(ctx context.Context, username string) (*authv1.Use
 	return resp.User, nil
 }
 
-// handleGameIO handles I/O between SSH channel and game session
+// handleGameIO handles I/O between SSH channel and game session via gRPC streaming
 func (h *Handler) handleGameIO(ctx context.Context, channel ssh.Channel, sessionID, connID string) {
-	// This is a placeholder implementation
-	// In a real implementation, we'd need to:
-	// 1. Connect to the game process PTY
-	// 2. Forward data between SSH channel and game PTY
-	// 3. Handle terminal control sequences
-
 	h.logger.Info("Starting game I/O handling", "session_id", sessionID, "connection_id", connID)
 
-	// Send welcome message
-	welcome := fmt.Sprintf("Welcome to DungeonGate!\r\nStarting session %s...\r\n", sessionID)
-	channel.Write([]byte(welcome))
-
-	// Simple echo loop for testing
-	buffer := make([]byte, 4096)
-	for {
-		n, err := channel.Read(buffer)
-		if err != nil {
-			h.logger.Debug("Channel read error", "error", err, "session_id", sessionID)
-			break
-		}
-
-		// Echo back for now
-		channel.Write(buffer[:n])
+	// Create gRPC stream to Game Service
+	stream, err := h.gameClient.StreamGameIO(ctx)
+	if err != nil {
+		h.logger.Error("Failed to create game I/O stream", "error", err, "session_id", sessionID)
+		channel.Write([]byte("Failed to connect to game session\r\n"))
+		return
 	}
+	defer stream.CloseSend()
+
+	// Send connect request
+	connectReq := &gamev2.GameIORequest{
+		Request: &gamev2.GameIORequest_Connect{
+			Connect: &gamev2.ConnectPTYRequest{
+				SessionId: sessionID,
+			},
+		},
+	}
+	
+	if err := stream.Send(connectReq); err != nil {
+		h.logger.Error("Failed to send connect request", "error", err, "session_id", sessionID)
+		channel.Write([]byte("Failed to connect to game session\r\n"))
+		return
+	}
+
+	// Wait for connect response
+	resp, err := stream.Recv()
+	if err != nil {
+		h.logger.Error("Failed to receive connect response", "error", err, "session_id", sessionID)
+		channel.Write([]byte("Failed to connect to game session\r\n"))
+		return
+	}
+
+	// Check if connection was successful
+	connectResp := resp.GetConnected()
+	if connectResp == nil || !connectResp.Success {
+		errorMsg := "Unknown error"
+		if connectResp != nil {
+			errorMsg = connectResp.Error
+		}
+		h.logger.Error("Failed to connect to PTY", "error", errorMsg, "session_id", sessionID)
+		channel.Write([]byte(fmt.Sprintf("Failed to connect to game session: %s\r\n", errorMsg)))
+		return
+	}
+
+	h.logger.Info("Successfully connected to PTY", "session_id", sessionID, "pty_id", connectResp.PtyId)
+
+	// Set up bidirectional I/O
+	done := make(chan error, 2)
+
+	// Goroutine to handle SSH channel -> gRPC stream (user input)
+	go func() {
+		buffer := make([]byte, 4096)
+		for {
+			n, err := channel.Read(buffer)
+			if err != nil {
+				h.logger.Debug("SSH channel read error", "error", err, "session_id", sessionID)
+				done <- err
+				return
+			}
+
+			// Send input to game via gRPC
+			inputReq := &gamev2.GameIORequest{
+				Request: &gamev2.GameIORequest_Input{
+					Input: &gamev2.PTYInput{
+						SessionId: sessionID,
+						Data:      buffer[:n],
+					},
+				},
+			}
+
+			if err := stream.Send(inputReq); err != nil {
+				h.logger.Error("Failed to send input to game", "error", err, "session_id", sessionID)
+				done <- err
+				return
+			}
+		}
+	}()
+
+	// Goroutine to handle gRPC stream -> SSH channel (game output)
+	go func() {
+		for {
+			resp, err := stream.Recv()
+			if err != nil {
+				h.logger.Debug("gRPC stream receive error", "error", err, "session_id", sessionID)
+				done <- err
+				return
+			}
+
+			// Handle different response types
+			switch respType := resp.Response.(type) {
+			case *gamev2.GameIOResponse_Output:
+				// Forward output to SSH channel
+				if _, err := channel.Write(respType.Output.Data); err != nil {
+					h.logger.Error("Failed to write to SSH channel", "error", err, "session_id", sessionID)
+					done <- err
+					return
+				}
+
+			case *gamev2.GameIOResponse_Event:
+				// Handle PTY events
+				event := respType.Event
+				h.logger.Info("Received PTY event", "type", event.Type, "message", event.Message, "session_id", sessionID)
+				
+				// For process exit events, we might want to notify the user
+				if event.Type == gamev2.PTYEventType_PTY_EVENT_PROCESS_EXIT {
+					channel.Write([]byte("\r\n\r\nGame session ended.\r\n"))
+					done <- io.EOF
+					return
+				}
+
+			case *gamev2.GameIOResponse_Disconnected:
+				// PTY disconnected
+				h.logger.Info("PTY disconnected", "session_id", sessionID)
+				done <- io.EOF
+				return
+
+			default:
+				h.logger.Warn("Unknown gRPC response type", "type", fmt.Sprintf("%T", respType), "session_id", sessionID)
+			}
+		}
+	}()
+
+	// Wait for either goroutine to finish
+	err = <-done
+	if err != nil && err != io.EOF {
+		h.logger.Error("Game I/O error", "error", err, "session_id", sessionID)
+	}
+
+	// Send disconnect request
+	disconnectReq := &gamev2.GameIORequest{
+		Request: &gamev2.GameIORequest_Disconnect{
+			Disconnect: &gamev2.DisconnectPTYRequest{
+				SessionId: sessionID,
+				Reason:    "session ended",
+			},
+		},
+	}
+	stream.Send(disconnectReq)
 
 	h.logger.Info("Game I/O handling ended", "session_id", sessionID, "connection_id", connID)
 }

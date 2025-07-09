@@ -11,7 +11,6 @@ import (
 	"github.com/dungeongate/internal/session/connection"
 	"github.com/dungeongate/internal/session/server"
 	"github.com/dungeongate/internal/session/streaming"
-	"github.com/dungeongate/internal/session/terminal"
 )
 
 // Service represents the stateless Session Service
@@ -25,7 +24,6 @@ type Service struct {
 
 	// Core components
 	connectionManager *connection.Manager
-	terminalManager   *terminal.Manager
 	streamingManager  *streaming.Manager
 
 	// Servers
@@ -58,7 +56,6 @@ func New(cfg *Config, logger *slog.Logger) (*Service, error) {
 
 	// Initialize core components
 	connectionManager := connection.NewManager(cfg.MaxConnections, logger)
-	terminalManager := terminal.NewManager(logger)
 	streamingManager := streaming.NewManager(logger)
 
 	// Initialize servers
@@ -99,7 +96,6 @@ func New(cfg *Config, logger *slog.Logger) (*Service, error) {
 		gameClient:        gameClient,
 		authClient:        authClient,
 		connectionManager: connectionManager,
-		terminalManager:   terminalManager,
 		streamingManager:  streamingManager,
 		sshServer:         sshServer,
 		httpServer:        httpServer,
@@ -118,10 +114,6 @@ func (s *Service) Start() error {
 		return fmt.Errorf("failed to start connection manager: %w", err)
 	}
 
-	// Start terminal manager
-	if err := s.terminalManager.Start(s.ctx); err != nil {
-		return fmt.Errorf("failed to start terminal manager: %w", err)
-	}
 
 	// Start streaming manager
 	if err := s.streamingManager.Start(s.ctx); err != nil {
@@ -181,9 +173,6 @@ func (s *Service) Stop() error {
 	if err := s.connectionManager.Stop(s.ctx); err != nil {
 		s.logger.Error("Error stopping connection manager", "error", err)
 	}
-	if err := s.terminalManager.Stop(s.ctx); err != nil {
-		s.logger.Error("Error stopping terminal manager", "error", err)
-	}
 	if err := s.streamingManager.Stop(s.ctx); err != nil {
 		s.logger.Error("Error stopping streaming manager", "error", err)
 	}
@@ -219,7 +208,6 @@ func (s *Service) Health() map[string]interface{} {
 	return map[string]interface{}{
 		"status":      "healthy",
 		"connections": s.connectionManager.GetStats(),
-		"terminals":   s.terminalManager.GetStats(),
 		"streaming":   s.streamingManager.GetStats(),
 	}
 }
