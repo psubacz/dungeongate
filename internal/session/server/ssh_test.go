@@ -20,11 +20,13 @@ func TestNewSSHServer(t *testing.T) {
 	logger := slog.Default()
 	
 	config := &SSHConfig{
-		Address:     "localhost",
-		Port:        2222,
-		HostKey:     "",
-		MaxConns:    100,
-		IdleTimeout: "30m",
+		Address:       "localhost",
+		Port:          2222,
+		HostKey:       "",
+		MaxConns:      100,
+		IdleTimeout:   "30m",
+		PasswordAuth:  true,
+		PublicKeyAuth: true,
 	}
 	
 	// Create clients (may fail if services aren't running)

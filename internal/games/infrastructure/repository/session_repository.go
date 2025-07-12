@@ -82,7 +82,7 @@ func (r *PostgreSQLSessionRepository) Create(ctx context.Context, session *domai
 		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 	`
 
-	_, err = r.db.ExecContext(ctx, query,
+	_, err = r.db.DB(database.QueryTypeWrite).ExecContext(ctx, query,
 		session.ID().String(),
 		session.GameID().String(),
 		session.UserID().Int(),
@@ -159,7 +159,7 @@ func (r *PostgreSQLSessionRepository) Update(ctx context.Context, session *domai
 		WHERE id = $1
 	`
 
-	result, err := r.db.ExecContext(ctx, query,
+	result, err := r.db.DB(database.QueryTypeWrite).ExecContext(ctx, query,
 		session.ID().String(),
 		string(session.Status()),
 		processID,
@@ -216,7 +216,7 @@ func (r *PostgreSQLSessionRepository) FindByID(ctx context.Context, id uuid.UUID
 		WHERE id = $1
 	`
 
-	row := r.db.QueryRowContext(ctx, query, id.String())
+	row := r.db.DB(database.QueryTypeRead).QueryRowContext(ctx, query, id.String())
 	return r.scanSession(row)
 }
 

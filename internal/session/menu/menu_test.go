@@ -10,6 +10,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	"github.com/dungeongate/internal/session/banner"
 	gamev2 "github.com/dungeongate/pkg/api/games/v2"
@@ -85,6 +86,11 @@ func (m *MockSSHChannel) ClearWriteBuffer() {
 	m.writeBuffer = nil
 }
 
+// EnableWriteTracking initializes the write buffer to track written data
+func (m *MockSSHChannel) EnableWriteTracking() {
+	m.writeBuffer = make([]byte, 0)
+}
+
 func TestNewMenuHandler(t *testing.T) {
 	// Create a real banner manager for testing
 	bannerConfig := &banner.BannerConfig{}
@@ -101,8 +107,29 @@ func TestNewMenuHandler(t *testing.T) {
 }
 
 func TestShowAnonymousMenu_Success(t *testing.T) {
-	// Use real banner manager
-	bannerConfig := &banner.BannerConfig{}
+	// Create a temporary banner file for testing
+	tempFile, err := os.CreateTemp("", "test_banner_*.txt")
+	require.NoError(t, err)
+	defer os.Remove(tempFile.Name())
+	
+	bannerContent := `Welcome to DungeonGate
+=====================
+
+Choose an option:
+[L]ogin
+[R]egister  
+[W]atch games
+[G]uest access
+[Q]uit
+`
+	_, err = tempFile.WriteString(bannerContent)
+	require.NoError(t, err)
+	tempFile.Close()
+
+	// Use real banner manager with test banner
+	bannerConfig := &banner.BannerConfig{
+		MainAnon: tempFile.Name(),
+	}
 	bannerManager := banner.NewBannerManager(bannerConfig)
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
 
@@ -110,6 +137,7 @@ func TestShowAnonymousMenu_Success(t *testing.T) {
 
 	// Setup mock channel
 	channel := &MockSSHChannel{}
+	channel.EnableWriteTracking()
 	channel.SetReadData("l") // User selects login
 	channel.On("Write", mock.AnythingOfType("[]uint8")).Return(len("test"), nil)
 
@@ -126,7 +154,7 @@ func TestShowAnonymousMenu_Success(t *testing.T) {
 	// Verify banner was written
 	writtenData := channel.GetWrittenData()
 	assert.Contains(t, writtenData, "DungeonGate")
-	assert.Contains(t, writtenData, "Login")
+	assert.Contains(t, writtenData, "[L]ogin")
 
 	channel.AssertExpectations(t)
 }
@@ -150,13 +178,35 @@ func TestShowAnonymousMenu_AllChoices(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run("input_"+tc.input, func(t *testing.T) {
-			bannerConfig := &banner.BannerConfig{}
+			// Create a temporary banner file for testing
+			tempFile, err := os.CreateTemp("", "test_banner_*.txt")
+			require.NoError(t, err)
+			defer os.Remove(tempFile.Name())
+			
+			bannerContent := `Welcome to DungeonGate
+=====================
+
+Choose an option:
+[L]ogin
+[R]egister  
+[W]atch games
+[G]uest access
+[Q]uit
+`
+			_, err = tempFile.WriteString(bannerContent)
+			require.NoError(t, err)
+			tempFile.Close()
+
+			bannerConfig := &banner.BannerConfig{
+				MainAnon: tempFile.Name(),
+			}
 			bannerManager := banner.NewBannerManager(bannerConfig)
 			logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
 
 			handler := NewMenuHandler(bannerManager, nil, nil, logger)
 
 			channel := &MockSSHChannel{}
+			channel.EnableWriteTracking()
 			channel.SetReadData(tc.input)
 			channel.On("Write", mock.AnythingOfType("[]uint8")).Return(len("test"), nil)
 
@@ -173,16 +223,39 @@ func TestShowAnonymousMenu_AllChoices(t *testing.T) {
 }
 
 func TestShowAnonymousMenu_InvalidChoice(t *testing.T) {
-	bannerConfig := &banner.BannerConfig{}
+	// Create a temporary banner file for testing
+	tempFile, err := os.CreateTemp("", "test_banner_*.txt")
+	require.NoError(t, err)
+	defer os.Remove(tempFile.Name())
+	
+	bannerContent := `Welcome to DungeonGate
+=====================
+
+Choose an option:
+[L]ogin
+[R]egister  
+[W]atch games
+[G]uest access
+[Q]uit
+`
+	_, err = tempFile.WriteString(bannerContent)
+	require.NoError(t, err)
+	tempFile.Close()
+
+	bannerConfig := &banner.BannerConfig{
+		MainAnon: tempFile.Name(),
+	}
 	bannerManager := banner.NewBannerManager(bannerConfig)
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
 
 	handler := NewMenuHandler(bannerManager, nil, nil, logger)
 
 	channel := &MockSSHChannel{}
-	// First send invalid choice, then valid choice
+	// Set up multiple reads: first invalid, then continue reading until timeout
 	channel.SetReadData("x") // Invalid choice
 	channel.On("Write", mock.AnythingOfType("[]uint8")).Return(len("test"), nil)
+	// Allow multiple Read calls for re-prompting after invalid choice
+	channel.On("Read", mock.AnythingOfType("[]uint8")).Return(0, io.EOF).Maybe()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
@@ -196,13 +269,16 @@ func TestShowAnonymousMenu_InvalidChoice(t *testing.T) {
 }
 
 func TestShowUserMenu_Success(t *testing.T) {
-	bannerConfig := &banner.BannerConfig{}
+	bannerConfig := &banner.BannerConfig{
+		MainUser: "/Users/caboose/dungeongate/configs/development/banners/main_user.txt",
+	}
 	bannerManager := banner.NewBannerManager(bannerConfig)
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
 
 	handler := NewMenuHandler(bannerManager, nil, nil, logger)
 
 	channel := &MockSSHChannel{}
+	channel.EnableWriteTracking()
 	channel.SetReadData("p") // User selects play
 	channel.On("Write", mock.AnythingOfType("[]uint8")).Return(len("test"), nil)
 
@@ -247,13 +323,16 @@ func TestShowUserMenu_AllChoices(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run("input_"+tc.input, func(t *testing.T) {
-			bannerConfig := &banner.BannerConfig{}
+			bannerConfig := &banner.BannerConfig{
+				MainUser: "/Users/caboose/dungeongate/configs/development/banners/main_user.txt",
+			}
 			bannerManager := banner.NewBannerManager(bannerConfig)
 			logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
 
 			handler := NewMenuHandler(bannerManager, nil, nil, logger)
 
 			channel := &MockSSHChannel{}
+			channel.EnableWriteTracking()
 			channel.SetReadData(tc.input)
 			channel.On("Write", mock.AnythingOfType("[]uint8")).Return(len("test"), nil)
 
@@ -303,7 +382,9 @@ func TestParseGameChoice(t *testing.T) {
 }
 
 func TestBuildGameSelectionBanner(t *testing.T) {
-	bannerConfig := &banner.BannerConfig{}
+	bannerConfig := &banner.BannerConfig{
+		MainUser: "/Users/caboose/dungeongate/configs/development/banners/main_user.txt",
+	}
 	bannerManager := banner.NewBannerManager(bannerConfig)
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
 

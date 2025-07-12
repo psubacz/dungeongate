@@ -7,3 +7,5 @@ I started this project to test cluade code functionality. Here are a few thought
 - Interrogation; use cluade to inspect the work done from a fresh prompt (no history). 
 - .claude/settings.local.json; setting this up depends on your goals. this project was entirely vibecoded so more permissions were needed. I expect reads are better here.
 - Testing; utilize the output of testing, linting, code coverage, audits to refine the roadmap.
+
+workflows; you can pip the output of something into claude such as `make tests | claude`
