@@ -23,16 +23,16 @@ type PTYManager struct {
 
 // PTYSession represents a PTY session for a game
 type PTYSession struct {
-	SessionID    string
-	PTY          *os.File
-	Cmd          *exec.Cmd
-	Size         *pty.Winsize
-	inputChan    chan []byte
-	outputChan   chan []byte
-	errorChan    chan error
-	closeChan    chan struct{}
-	closeOnce    sync.Once
-	mu           sync.Mutex
+	SessionID  string
+	PTY        *os.File
+	Cmd        *exec.Cmd
+	Size       *pty.Winsize
+	inputChan  chan []byte
+	outputChan chan []byte
+	errorChan  chan error
+	closeChan  chan struct{}
+	closeOnce  sync.Once
+	mu         sync.Mutex
 }
 
 // NewPTYManager creates a new PTY manager
@@ -67,9 +67,9 @@ func (m *PTYManager) CreatePTY(ctx context.Context, session *domain.GameSession,
 
 	// Create PTY session
 	ptySession := &PTYSession{
-		SessionID:  sessionID,
-		PTY:        ptmx,
-		Cmd:        cmd,
+		SessionID: sessionID,
+		PTY:       ptmx,
+		Cmd:       cmd,
 		Size: &pty.Winsize{
 			Rows: uint16(session.TerminalSize().Height),
 			Cols: uint16(session.TerminalSize().Width),
@@ -233,17 +233,17 @@ func (s *PTYSession) Resize(rows, cols uint16) error {
 func (s *PTYSession) Close() {
 	s.closeOnce.Do(func() {
 		close(s.closeChan)
-		
+
 		// Kill the process if it's still running
 		if s.Cmd != nil && s.Cmd.Process != nil {
 			s.Cmd.Process.Signal(syscall.SIGTERM)
 		}
-		
+
 		// Close the PTY
 		if s.PTY != nil {
 			s.PTY.Close()
 		}
-		
+
 		// Close channels
 		close(s.inputChan)
 		close(s.outputChan)
@@ -256,6 +256,6 @@ func (s *PTYSession) GetExitCode() (int, error) {
 	if s.Cmd.ProcessState == nil {
 		return 0, fmt.Errorf("process has not exited")
 	}
-	
+
 	return s.Cmd.ProcessState.ExitCode(), nil
 }

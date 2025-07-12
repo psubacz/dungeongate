@@ -19,7 +19,7 @@ func TestHandler_Integration_GameClient(t *testing.T) {
 	}
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
-	
+
 	// Test if we can create a game client
 	gameClient, err := client.NewGameClient("localhost:50051", logger)
 	if err != nil {
@@ -45,7 +45,7 @@ func TestHandler_Integration_AuthClient(t *testing.T) {
 	}
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
-	
+
 	// Test if we can create an auth client
 	authClient, err := client.NewAuthClient("localhost:8082", logger)
 	if err != nil {
@@ -59,17 +59,17 @@ func TestHandler_Integration_AuthClient(t *testing.T) {
 
 func TestHandler_ConnectionManager_Integration(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
-	
+
 	// Create connection manager
 	manager := NewManager(100, logger)
-	
+
 	// Test lifecycle
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	
+
 	err := manager.Start(ctx)
 	require.NoError(t, err)
-	
+
 	// Test connection statistics
 	stats := manager.GetStats()
 	assert.NotNil(t, stats)
@@ -78,7 +78,7 @@ func TestHandler_ConnectionManager_Integration(t *testing.T) {
 	assert.NotNil(t, stats.ByState)
 	assert.NotNil(t, stats.ByUserID)
 	assert.NotNil(t, stats.ByRemoteIP)
-	
+
 	// Test cleanup
 	err = manager.Stop(ctx)
 	assert.NoError(t, err)
@@ -86,23 +86,23 @@ func TestHandler_ConnectionManager_Integration(t *testing.T) {
 
 func TestHandler_PTYRequest_Parsing(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
-	
+
 	// Create a basic handler for testing utility methods
 	manager := NewManager(100, logger)
-	
+
 	// We'll create mock clients since we just need the handler structure
 	gameClient, err := client.NewGameClient("localhost:50051", logger)
 	if err != nil {
 		t.Skip("Game service not available for testing")
 	}
 	defer gameClient.Close()
-	
+
 	authClient, err := client.NewAuthClient("localhost:8082", logger)
 	if err != nil {
 		t.Skip("Auth service not available for testing")
 	}
 	defer authClient.Close()
-	
+
 	// Create minimal handler - we'll skip the menu handler since it requires more setup
 	handler := &Handler{
 		manager:    manager,
@@ -110,7 +110,7 @@ func TestHandler_PTYRequest_Parsing(t *testing.T) {
 		authClient: authClient,
 		logger:     logger,
 	}
-	
+
 	// Test PTY request parsing with various payloads
 	tests := []struct {
 		name        string
@@ -142,7 +142,7 @@ func TestHandler_PTYRequest_Parsing(t *testing.T) {
 			expectedRow: 24,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cols, rows := handler.parsePTYRequest(tt.payload)
@@ -154,30 +154,30 @@ func TestHandler_PTYRequest_Parsing(t *testing.T) {
 
 func TestHandler_WindowChange_Parsing(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
-	
+
 	// Create a basic handler for testing utility methods
 	manager := NewManager(100, logger)
-	
+
 	// We'll create mock clients since we just need the handler structure
 	gameClient, err := client.NewGameClient("localhost:50051", logger)
 	if err != nil {
 		t.Skip("Game service not available for testing")
 	}
 	defer gameClient.Close()
-	
+
 	authClient, err := client.NewAuthClient("localhost:8082", logger)
 	if err != nil {
 		t.Skip("Auth service not available for testing")
 	}
 	defer authClient.Close()
-	
+
 	handler := &Handler{
 		manager:    manager,
 		gameClient: gameClient,
 		authClient: authClient,
 		logger:     logger,
 	}
-	
+
 	// Test window change parsing
 	tests := []struct {
 		name        string
@@ -216,7 +216,7 @@ func TestHandler_WindowChange_Parsing(t *testing.T) {
 			expectedRow: 40,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cols, rows := handler.parseWindowChange(tt.payload)
@@ -233,7 +233,7 @@ func TestHandler_gRPC_Streaming_Integration(t *testing.T) {
 	}
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
-	
+
 	// Test if we can create a game client and get a stream
 	gameClient, err := client.NewGameClient("localhost:50051", logger)
 	if err != nil {

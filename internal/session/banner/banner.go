@@ -33,7 +33,7 @@ func (bm *BannerManager) RenderMainAnon() (string, error) {
 	if bm.config.MainAnon == "" {
 		return "", fmt.Errorf("main anonymous banner path is not configured")
 	}
-	
+
 	return bm.renderBanner(bm.config.MainAnon, map[string]string{
 		"$SERVERID": "DungeonGate",
 		"$DATE":     time.Now().Format("2006-01-02"),

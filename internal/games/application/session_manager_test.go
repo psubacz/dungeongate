@@ -491,7 +491,7 @@ func createMockGame(gameID string) *domain.Game {
 	// Create a mock game that uses a simple test binary
 	config := domain.GameConfig{
 		Binary: domain.BinaryConfig{
-			Path:             "/bin/sleep", // Use sleep as a safe test binary
+			Path:             "/bin/sleep",  // Use sleep as a safe test binary
 			Args:             []string{"1"}, // Sleep for 1 second
 			WorkingDirectory: "/tmp",
 		},
@@ -515,7 +515,7 @@ func createMockGame(gameID string) *domain.Game {
 			BlockInternet: true,
 		},
 	}
-	
+
 	metadata := domain.GameMetadata{
 		Name:        "Test Game",
 		ShortName:   gameID,
@@ -525,7 +525,7 @@ func createMockGame(gameID string) *domain.Game {
 		Version:     "1.0.0",
 		Difficulty:  1,
 	}
-	
+
 	return domain.NewGame(
 		domain.NewGameID(gameID),
 		metadata,

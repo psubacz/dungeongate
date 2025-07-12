@@ -60,7 +60,7 @@ func (mh *MenuHandler) ShowAnonymousMenu(ctx context.Context, channel ssh.Channe
 		case <-ctx.Done():
 			return nil, ctx.Err()
 		default:
-			// Note: SSH channels don't support SetReadDeadline, 
+			// Note: SSH channels don't support SetReadDeadline,
 			// so we'll use context timeout instead for cancellation
 
 			n, err := channel.Read(buffer)
@@ -118,7 +118,7 @@ func (mh *MenuHandler) ShowUserMenu(ctx context.Context, channel ssh.Channel, us
 		case <-ctx.Done():
 			return nil, ctx.Err()
 		default:
-			// Note: SSH channels don't support SetReadDeadline, 
+			// Note: SSH channels don't support SetReadDeadline,
 			// so we'll use context timeout instead for cancellation
 
 			n, err := channel.Read(buffer)
@@ -234,7 +234,7 @@ func (mh *MenuHandler) ShowGameSelectionMenu(ctx context.Context, channel ssh.Ch
 
 			if n > 0 {
 				choice := strings.TrimSpace(string(buffer[:n]))
-				
+
 				// Handle quit/back option
 				if choice == "q" || choice == "Q" || choice == "b" || choice == "B" {
 					return nil, nil // Return to main menu
@@ -263,14 +263,14 @@ func (mh *MenuHandler) ShowGameSelectionMenu(ctx context.Context, channel ssh.Ch
 func (mh *MenuHandler) buildGameSelectionBanner(games []*gamev2.Game, username string) string {
 	banner := fmt.Sprintf("\r\n=== DungeonGate - Game Selection ===\r\n\r\n")
 	banner += fmt.Sprintf("Welcome, %s! Choose a game to play:\r\n\r\n", username)
-	
+
 	for i, game := range games {
 		status := "Available"
 		if game.Status != gamev2.GameStatus_GAME_STATUS_UNSPECIFIED {
 			// Add status information if available
 			status = fmt.Sprintf("Available (%s)", game.Status.String())
 		}
-		
+
 		banner += fmt.Sprintf("  [%d] %s\r\n", i+1, game.Name)
 		if game.Description != "" {
 			banner += fmt.Sprintf("      %s\r\n", game.Description)
@@ -281,10 +281,10 @@ func (mh *MenuHandler) buildGameSelectionBanner(games []*gamev2.Game, username s
 		}
 		banner += "\r\n"
 	}
-	
+
 	banner += "  [q] Return to main menu\r\n\r\n"
 	banner += "Enter your choice: "
-	
+
 	return banner
 }
 
@@ -294,18 +294,18 @@ func parseGameChoice(input string, maxGames int) (int, error) {
 	if strings.Contains(input, ".") || strings.Contains(input, ",") {
 		return -1, fmt.Errorf("invalid input format: decimal numbers not allowed")
 	}
-	
+
 	choice, err := fmt.Sscanf(input, "%d", new(int))
 	if err != nil || choice != 1 {
 		return -1, fmt.Errorf("invalid input format")
 	}
-	
+
 	var gameIndex int
 	fmt.Sscanf(input, "%d", &gameIndex)
-	
+
 	if gameIndex < 1 || gameIndex > maxGames {
 		return -1, fmt.Errorf("choice out of range")
 	}
-	
+
 	return gameIndex - 1, nil // Convert to 0-based index
 }

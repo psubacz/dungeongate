@@ -90,8 +90,8 @@ func (m *Manager) RegisterConnection(conn net.Conn) string {
 	atomic.AddInt64(&m.activeConnections, 1)
 	atomic.AddInt64(&m.totalConnections, 1)
 
-	m.logger.Info("Connection registered (stateless)", 
-		"connection_id", connID, 
+	m.logger.Info("Connection registered (stateless)",
+		"connection_id", connID,
 		"remote_addr", conn.RemoteAddr(),
 		"active_count", atomic.LoadInt64(&m.activeConnections))
 
@@ -121,7 +121,7 @@ func (m *Manager) UnregisterConnection(connID string, remoteAddr net.Addr) {
 	// Update counter
 	atomic.AddInt64(&m.activeConnections, -1)
 
-	m.logger.Info("Connection unregistered (stateless)", 
+	m.logger.Info("Connection unregistered (stateless)",
 		"connection_id", connID,
 		"active_count", atomic.LoadInt64(&m.activeConnections))
 }
@@ -132,9 +132,9 @@ func (m *Manager) UnregisterConnection(connID string, remoteAddr net.Addr) {
 func (m *Manager) UpdateConnectionState(connID string, state types.ConnectionState, userID string) {
 	// No-op in stateless architecture
 	// Connection state is managed by Game Service
-	m.logger.Debug("Connection state update delegated to Game Service", 
-		"connection_id", connID, 
-		"state", state, 
+	m.logger.Debug("Connection state update delegated to Game Service",
+		"connection_id", connID,
+		"state", state,
 		"user_id", userID)
 }
 

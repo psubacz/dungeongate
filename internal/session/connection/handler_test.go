@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dungeongate/internal/session/banner"
 	"github.com/dungeongate/internal/session/client"
 	"github.com/dungeongate/internal/session/menu"
-	"github.com/dungeongate/internal/session/banner"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/ssh"
@@ -18,17 +18,17 @@ import (
 
 func TestNewHandler(t *testing.T) {
 	logger := slog.Default()
-	
+
 	// Create manager
 	manager := NewManager(100, logger)
-	
+
 	// Note: These will fail if services aren't running, but that's expected in unit tests
 	gameClient, err := client.NewGameClient("localhost:50051", logger)
 	if err != nil {
 		t.Skip("Game service not available for testing")
 	}
 	defer gameClient.Close()
-	
+
 	authClient, err := client.NewAuthClient("localhost:8082", logger)
 	if err != nil {
 		t.Skip("Auth service not available for testing")
@@ -39,7 +39,7 @@ func TestNewHandler(t *testing.T) {
 	bannerConfig := &banner.BannerConfig{}
 	bannerManager := banner.NewBannerManager(bannerConfig)
 	menuHandler := menu.NewMenuHandler(bannerManager, gameClient, authClient, logger)
-	
+
 	handler := NewHandler(manager, gameClient, authClient, menuHandler, logger)
 
 	assert.NotNil(t, handler)
@@ -51,20 +51,20 @@ func TestNewHandler(t *testing.T) {
 
 func TestHandlerHandleConnectionRegistration(t *testing.T) {
 	logger := slog.Default()
-	
+
 	// Create manager
 	manager := NewManager(100, logger)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	
+
 	err := manager.Start(ctx)
 	require.NoError(t, err)
 	defer manager.Stop(ctx)
-	
+
 	// Create minimal clients (will fail gracefully if services not available)
 	gameClient, _ := client.NewGameClient("localhost:50051", logger)
 	authClient, _ := client.NewAuthClient("localhost:8082", logger)
-	
+
 	// Close clients immediately to avoid hanging connections
 	if gameClient != nil {
 		defer gameClient.Close()
@@ -77,7 +77,7 @@ func TestHandlerHandleConnectionRegistration(t *testing.T) {
 	bannerConfig := &banner.BannerConfig{}
 	bannerManager := banner.NewBannerManager(bannerConfig)
 	menuHandler := menu.NewMenuHandler(bannerManager, gameClient, authClient, logger)
-	
+
 	handler := NewHandler(manager, gameClient, authClient, menuHandler, logger)
 
 	// Create mock connection
@@ -105,20 +105,20 @@ func TestHandlerHandleConnectionRegistration(t *testing.T) {
 
 func TestHandlerHandleConnectionMaxConnections(t *testing.T) {
 	logger := slog.Default()
-	
+
 	// Create manager with small limit
 	manager := NewManager(1, logger)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	
+
 	err := manager.Start(ctx)
 	require.NoError(t, err)
 	defer manager.Stop(ctx)
-	
+
 	// Create minimal clients
 	gameClient, _ := client.NewGameClient("localhost:50051", logger)
 	authClient, _ := client.NewAuthClient("localhost:8082", logger)
-	
+
 	if gameClient != nil {
 		defer gameClient.Close()
 	}
@@ -130,18 +130,18 @@ func TestHandlerHandleConnectionMaxConnections(t *testing.T) {
 	bannerConfig := &banner.BannerConfig{}
 	bannerManager := banner.NewBannerManager(bannerConfig)
 	menuHandler := menu.NewMenuHandler(bannerManager, gameClient, authClient, logger)
-	
+
 	handler := NewHandler(manager, gameClient, authClient, menuHandler, logger)
 
 	// Register first connection
 	conn1 := &mockNetConn{
 		remoteAddr: &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 12345},
 	}
-	
+
 	// This should succeed
 	connID1 := manager.RegisterConnection(conn1)
 	assert.NotEmpty(t, connID1)
-	
+
 	// Create second connection
 	conn2 := &mockNetConn{
 		remoteAddr: &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 12346},
@@ -163,31 +163,31 @@ func TestHandlerHandleConnectionMaxConnections(t *testing.T) {
 
 	// Verify second connection was closed due to limit
 	assert.True(t, conn2.closed)
-	
+
 	// Clean up first connection
 	manager.UnregisterConnection(connID1, conn1.RemoteAddr())
 }
 
 func TestAuthHandlerPasswordCallback(t *testing.T) {
 	logger := slog.Default()
-	
+
 	// Skip if auth service not available
 	authClient, err := client.NewAuthClient("localhost:8082", logger)
 	if err != nil {
 		t.Skip("Auth service not available for testing")
 	}
 	defer authClient.Close()
-	
+
 	authHandler := NewAuthHandler(authClient, logger)
-	
+
 	// Create mock connection metadata
 	connMeta := &mockConnMetadata{
 		user: "testuser",
 	}
-	
+
 	// Test password callback (will likely fail without running auth service)
 	permissions, err := authHandler.PasswordCallback(connMeta, []byte("password"))
-	
+
 	// We expect this to fail in unit tests without running services
 	if err != nil {
 		assert.Error(t, err)
@@ -201,23 +201,23 @@ func TestAuthHandlerPasswordCallback(t *testing.T) {
 
 func TestAuthHandlerPublicKeyCallback(t *testing.T) {
 	logger := slog.Default()
-	
+
 	authClient, err := client.NewAuthClient("localhost:8082", logger)
 	if err != nil {
 		t.Skip("Auth service not available for testing")
 	}
 	defer authClient.Close()
-	
+
 	authHandler := NewAuthHandler(authClient, logger)
-	
+
 	// Create mock connection metadata
 	connMeta := &mockConnMetadata{
 		user: "testuser",
 	}
-	
+
 	// Test public key callback (should always fail as not implemented)
 	permissions, err := authHandler.PublicKeyCallback(connMeta, nil)
-	
+
 	assert.Error(t, err)
 	assert.Nil(t, permissions)
 	assert.Contains(t, err.Error(), "not supported")
@@ -228,21 +228,21 @@ func TestParsePTYRequest(t *testing.T) {
 	manager := NewManager(100, logger)
 	gameClient, _ := client.NewGameClient("localhost:50051", logger)
 	authClient, _ := client.NewAuthClient("localhost:8082", logger)
-	
+
 	if gameClient != nil {
 		defer gameClient.Close()
 	}
 	if authClient != nil {
 		defer authClient.Close()
 	}
-	
+
 	// Create a mock menu handler for testing
 	bannerConfig := &banner.BannerConfig{}
 	bannerManager := banner.NewBannerManager(bannerConfig)
 	menuHandler := menu.NewMenuHandler(bannerManager, gameClient, authClient, logger)
-	
+
 	handler := NewHandler(manager, gameClient, authClient, menuHandler, logger)
-	
+
 	tests := []struct {
 		name     string
 		payload  []byte
@@ -268,7 +268,7 @@ func TestParsePTYRequest(t *testing.T) {
 			wantRows: 30,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cols, rows := handler.parsePTYRequest(tt.payload)
@@ -283,21 +283,21 @@ func TestParseWindowChange(t *testing.T) {
 	manager := NewManager(100, logger)
 	gameClient, _ := client.NewGameClient("localhost:50051", logger)
 	authClient, _ := client.NewAuthClient("localhost:8082", logger)
-	
+
 	if gameClient != nil {
 		defer gameClient.Close()
 	}
 	if authClient != nil {
 		defer authClient.Close()
 	}
-	
+
 	// Create a mock menu handler for testing
 	bannerConfig := &banner.BannerConfig{}
 	bannerManager := banner.NewBannerManager(bannerConfig)
 	menuHandler := menu.NewMenuHandler(bannerManager, gameClient, authClient, logger)
-	
+
 	handler := NewHandler(manager, gameClient, authClient, menuHandler, logger)
-	
+
 	tests := []struct {
 		name     string
 		payload  []byte
@@ -323,7 +323,7 @@ func TestParseWindowChange(t *testing.T) {
 			wantRows: 40,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cols, rows := handler.parseWindowChange(tt.payload)

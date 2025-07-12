@@ -190,7 +190,7 @@ func (h *Handler) handleSessionChannel(ctx context.Context, newChannel ssh.NewCh
 			if sessionID != "" && len(req.Payload) > 0 {
 				cols, rows := h.parseWindowChange(req.Payload)
 				h.logger.Debug("Terminal resize", "session_id", sessionID, "cols", cols, "rows", rows)
-				
+
 				// Send resize request to Game Service
 				if err := h.gameClient.ResizeTerminal(ctx, sessionID, cols, rows); err != nil {
 					h.logger.Error("Failed to resize terminal", "error", err, "session_id", sessionID)
@@ -220,12 +220,12 @@ func (h *Handler) getUserInfo(ctx context.Context, sshConn *ssh.ServerConn) (*au
 	if permissions == nil || permissions.Extensions == nil {
 		return nil, fmt.Errorf("no authentication token available")
 	}
-	
+
 	accessToken, ok := permissions.Extensions["access_token"]
 	if !ok || accessToken == "" {
 		return nil, fmt.Errorf("no access token in session")
 	}
-	
+
 	// Validate token with auth service
 	resp, err := h.authClient.GetUserInfo(ctx, accessToken)
 	if err != nil {
@@ -255,7 +255,7 @@ func (h *Handler) handleGameIO(ctx context.Context, channel ssh.Channel, session
 			},
 		},
 	}
-	
+
 	if err := stream.Send(connectReq); err != nil {
 		h.logger.Error("Failed to send connect request", "error", err, "session_id", sessionID)
 		channel.Write([]byte("Failed to connect to game session\r\n"))
@@ -340,7 +340,7 @@ func (h *Handler) handleGameIO(ctx context.Context, channel ssh.Channel, session
 				// Handle PTY events
 				event := respType.Event
 				h.logger.Info("Received PTY event", "type", event.Type, "message", event.Message, "session_id", sessionID)
-				
+
 				// For process exit events, we might want to notify the user
 				if event.Type == gamev2.PTYEventType_PTY_EVENT_PROCESS_EXIT {
 					channel.Write([]byte("\r\n\r\nGame session ended.\r\n"))
@@ -499,13 +499,13 @@ func (h *Handler) handleIdleMode(ctx context.Context, channel ssh.Channel, connI
 	banner += fmt.Sprintf("  [q] - Quit\r\n")
 	banner += fmt.Sprintf("\r\n")
 	banner += fmt.Sprintf("Choice: ")
-	
+
 	channel.Write([]byte(banner))
-	
+
 	// Set up periodic health checks
 	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
-	
+
 	// Handle user input and periodic health checks
 	for {
 		select {
@@ -524,12 +524,12 @@ func (h *Handler) handleIdleMode(ctx context.Context, channel ssh.Channel, connI
 			readChan := make(chan struct{})
 			var n int
 			var err error
-			
+
 			go func() {
 				n, err = channel.Read(buffer)
 				close(readChan)
 			}()
-			
+
 			select {
 			case <-readChan:
 				if err != nil {
@@ -539,7 +539,7 @@ func (h *Handler) handleIdleMode(ctx context.Context, channel ssh.Channel, connI
 					h.logger.Debug("Error reading from channel in idle mode", "error", err, "username", username)
 					return
 				}
-				
+
 				if n > 0 {
 					input := string(buffer[:n])
 					switch strings.ToLower(input) {
@@ -691,24 +691,24 @@ func (h *Handler) startGameSession(ctx context.Context, channel ssh.Channel, use
 // handleLogin handles the login process
 func (h *Handler) handleLogin(ctx context.Context, channel ssh.Channel, connID, currentUsername string) error {
 	channel.Write([]byte("\r\n=== Login ===\r\n"))
-	
+
 	// Flush any pending input from menu selection
 	h.flushInput(channel)
-	
+
 	// Get username
 	channel.Write([]byte("Username: "))
 	username, err := h.readLine(channel)
 	if err != nil {
 		return err
 	}
-	
+
 	// Get password (hidden input)
 	channel.Write([]byte("Password: "))
 	password, err := h.readLine(channel)
 	if err != nil {
 		return err
 	}
-	
+
 	// Attempt login with auth service
 	resp, err := h.authClient.Login(ctx, username, password)
 	if err != nil {
@@ -719,28 +719,28 @@ func (h *Handler) handleLogin(ctx context.Context, channel ssh.Channel, connID, 
 		channel.Read(buffer)
 		return nil
 	}
-	
+
 	// Login successful
 	h.logger.Info("User logged in successfully", "username", username, "user_id", resp.User.Id)
 	channel.Write([]byte("\r\nLogin successful! Welcome back, " + resp.User.Username + "!\r\n"))
-	
+
 	// Update connection state
 	h.manager.UpdateConnectionState(connID, types.ConnectionStateAuthenticated, resp.User.Id)
-	
+
 	channel.Write([]byte("Press any key to continue...\r\n"))
 	buffer := make([]byte, 1)
 	channel.Read(buffer)
-	
+
 	return nil
 }
 
 // handleRegister handles the registration process
 func (h *Handler) handleRegister(ctx context.Context, channel ssh.Channel, connID, currentUsername string) error {
 	channel.Write([]byte("\r\n=== Registration ===\r\n"))
-	
+
 	// Flush any pending input from menu selection
 	h.flushInput(channel)
-	
+
 	// Get username
 	channel.Write([]byte("Choose a username: "))
 	username, err := h.readLine(channel)
@@ -753,14 +753,14 @@ func (h *Handler) handleRegister(ctx context.Context, channel ssh.Channel, connI
 	if err != nil {
 		return err
 	}
-	
+
 	// Get email (optional)
 	channel.Write([]byte("Email (optional): "))
 	email, err := h.readLine(channel)
 	if err != nil {
 		return err
 	}
-	
+
 	// Attempt registration with auth service
 	resp, err := h.authClient.Register(ctx, username, password, email)
 	if err != nil {
@@ -771,7 +771,7 @@ func (h *Handler) handleRegister(ctx context.Context, channel ssh.Channel, connI
 		channel.Read(buffer)
 		return nil
 	}
-	
+
 	if !resp.Success {
 		h.logger.Warn("Registration rejected", "username", username, "error", resp.Error, "error_code", resp.ErrorCode)
 		channel.Write([]byte("\r\nRegistration failed: " + resp.Error + "\r\n"))
@@ -780,19 +780,19 @@ func (h *Handler) handleRegister(ctx context.Context, channel ssh.Channel, connI
 		channel.Read(buffer)
 		return nil
 	}
-	
+
 	// Registration successful
 	h.logger.Info("User registered successfully", "username", username, "user_id", resp.User.Id)
 	channel.Write([]byte("\r\nRegistration successful! Welcome, " + resp.User.Username + "!\r\n"))
 	channel.Write([]byte("You are now logged in.\r\n"))
-	
+
 	// Update connection state
 	h.manager.UpdateConnectionState(connID, types.ConnectionStateAuthenticated, resp.User.Id)
-	
+
 	channel.Write([]byte("Press any key to continue...\r\n"))
 	buffer := make([]byte, 1)
 	channel.Read(buffer)
-	
+
 	return nil
 }
 
@@ -868,13 +868,13 @@ func (h *Handler) readLine(channel ssh.Channel) (string, error) {
 	for {
 		var line []byte
 		buffer := make([]byte, 1)
-		
+
 		for {
 			n, err := channel.Read(buffer)
 			if err != nil {
 				return "", err
 			}
-			
+
 			if n > 0 {
 				char := buffer[0]
 				if char == '\r' || char == '\n' {
@@ -883,7 +883,7 @@ func (h *Handler) readLine(channel ssh.Channel) (string, error) {
 				line = append(line, char)
 			}
 		}
-		
+
 		// If we got a non-empty line, return it
 		if len(line) > 0 {
 			return string(line), nil

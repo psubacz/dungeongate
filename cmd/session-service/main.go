@@ -58,20 +58,20 @@ func main() {
 			Address: cfg.Services.AuthService,
 		},
 		SSH: struct {
-			Address       string `yaml:"address" default:"0.0.0.0"`
-			Port          int    `yaml:"port" default:"2222"`
-			IdleTimeout   string `yaml:"idle_timeout" default:"1h"`
-			HostKey       string `yaml:"host_key" default:""`
-			PasswordAuth  bool   `yaml:"password_auth" default:"true"`
-			PublicKeyAuth bool   `yaml:"public_key_auth" default:"false"`
-			AllowAnonymous bool  `yaml:"allow_anonymous" default:"true"`
+			Address        string `yaml:"address" default:"0.0.0.0"`
+			Port           int    `yaml:"port" default:"2222"`
+			IdleTimeout    string `yaml:"idle_timeout" default:"1h"`
+			HostKey        string `yaml:"host_key" default:""`
+			PasswordAuth   bool   `yaml:"password_auth" default:"true"`
+			PublicKeyAuth  bool   `yaml:"public_key_auth" default:"false"`
+			AllowAnonymous bool   `yaml:"allow_anonymous" default:"true"`
 		}{
-			Address:       cfg.SSH.Host,
-			Port:          cfg.SSH.Port,
-			IdleTimeout:   "1h",
-			HostKey:       cfg.SSH.HostKeyPath,
-			PasswordAuth:  cfg.SSH.Auth.PasswordAuth,
-			PublicKeyAuth: cfg.SSH.Auth.PublicKeyAuth,
+			Address:        cfg.SSH.Host,
+			Port:           cfg.SSH.Port,
+			IdleTimeout:    "1h",
+			HostKey:        cfg.SSH.HostKeyPath,
+			PasswordAuth:   cfg.SSH.Auth.PasswordAuth,
+			PublicKeyAuth:  cfg.SSH.Auth.PublicKeyAuth,
 			AllowAnonymous: cfg.SSH.Auth.AllowAnonymous,
 		},
 		HTTP: struct {

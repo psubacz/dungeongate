@@ -164,7 +164,7 @@ func (c *GameClient) Health(ctx context.Context) (*gamev2.HealthResponse, error)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check game service health: %w", err)
 	}
-	
+
 	return resp, nil
 }
 
@@ -175,7 +175,7 @@ func (c *GameClient) IsHealthy(ctx context.Context) bool {
 		c.logger.Debug("Game service health check failed", "error", err)
 		return false
 	}
-	
+
 	return resp.Status == "healthy" || resp.Status == "ok"
 }
 

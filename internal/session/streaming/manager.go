@@ -70,9 +70,9 @@ func (m *Manager) CreateStream(sessionID, userID string) (*Stream, error) {
 
 	// Stream creation delegated to Game Service
 	// TODO: Add gRPC call to Game Service to create stream
-	m.logger.Info("Stream creation delegated to Game Service", 
-		"stream_id", streamID, 
-		"session_id", sessionID, 
+	m.logger.Info("Stream creation delegated to Game Service",
+		"stream_id", streamID,
+		"session_id", sessionID,
 		"user_id", userID)
 
 	// Return stream info without storing locally
@@ -105,9 +105,9 @@ func (m *Manager) AddSpectator(streamID, userID string) (*Spectator, error) {
 	spectatorID := streamID + "-spectator-" + userID
 
 	// TODO: Add gRPC call to Game Service to add spectator
-	m.logger.Info("Spectator addition delegated to Game Service", 
-		"spectator_id", spectatorID, 
-		"stream_id", streamID, 
+	m.logger.Info("Spectator addition delegated to Game Service",
+		"spectator_id", spectatorID,
+		"stream_id", streamID,
 		"user_id", userID)
 
 	// Return spectator info without storing locally

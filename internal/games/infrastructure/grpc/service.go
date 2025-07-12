@@ -20,18 +20,18 @@ import (
 // GameServiceServer implements the gRPC GameService interface
 type GameServiceServer struct {
 	games_pb.UnimplementedGameServiceServer
-	gameService     *application.GameService
-	sessionService  *application.SessionService
-	ptyManager      *pty.PTYManager
-	streamHandler   *StreamHandler
-	logger          *slog.Logger
+	gameService    *application.GameService
+	sessionService *application.SessionService
+	ptyManager     *pty.PTYManager
+	streamHandler  *StreamHandler
+	logger         *slog.Logger
 }
 
 // NewGameServiceServer creates a new GameServiceServer
 func NewGameServiceServer(gameService *application.GameService, sessionService *application.SessionService, logger *slog.Logger) *GameServiceServer {
 	ptyManager := pty.NewPTYManager(logger)
 	streamHandler := NewStreamHandler(ptyManager, logger)
-	
+
 	return &GameServiceServer{
 		gameService:    gameService,
 		sessionService: sessionService,
@@ -161,11 +161,11 @@ func (s *GameServiceServer) StartGameSession(ctx context.Context, req *games_pb.
 	// TODO: Get actual game binary path and args from game configuration
 	gamePath := "/usr/games/nethack" // Hardcoded for now
 	gameArgs := []string{}
-	gameEnv := append(os.Environ(), 
+	gameEnv := append(os.Environ(),
 		fmt.Sprintf("TERM=%s", "xterm-256color"),
 		fmt.Sprintf("USER=%s", req.Username),
 	)
-	
+
 	_, err = s.ptyManager.CreatePTY(ctx, session, gamePath, gameArgs, gameEnv)
 	if err != nil {
 		s.logger.Error("Failed to create PTY", "error", err, "session_id", session.ID().String())
@@ -256,12 +256,12 @@ func (s *GameServiceServer) domainSessionToPb(session *domain.GameSession) *game
 	}
 
 	pbSession := &games_pb.GameSession{
-		Id:       session.ID().String(),
-		UserId:   int32(session.UserID().Int()),
-		Username: session.Username(),
-		GameId:   session.GameID().String(),
-		Status:   s.domainStatusToPb(session.Status()),
-		StartTime: timestamppb.New(session.StartTime()),
+		Id:           session.ID().String(),
+		UserId:       int32(session.UserID().Int()),
+		Username:     session.Username(),
+		GameId:       session.GameID().String(),
+		Status:       s.domainStatusToPb(session.Status()),
+		StartTime:    timestamppb.New(session.StartTime()),
 		LastActivity: timestamppb.New(session.LastActivity()),
 		TerminalSize: &games_pb.TerminalSize{
 			Width:  int32(session.TerminalSize().Width),
@@ -356,7 +356,7 @@ func (s *GameServiceServer) StreamGameIO(stream games_pb.GameService_StreamGameI
 	if s.streamHandler == nil {
 		return status.Error(codes.Internal, "stream handler not initialized")
 	}
-	
+
 	return s.streamHandler.HandleStream(stream)
 }
 
@@ -368,7 +368,7 @@ func (s *GameServiceServer) ResizeTerminal(ctx context.Context, req *games_pb.Re
 	if req.NewSize == nil {
 		return nil, status.Error(codes.InvalidArgument, "new_size is required")
 	}
-	
+
 	// Resize the PTY
 	err := s.ptyManager.ResizePTY(req.SessionId, uint16(req.NewSize.Height), uint16(req.NewSize.Width))
 	if err != nil {

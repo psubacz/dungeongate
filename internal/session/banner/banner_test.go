@@ -228,7 +228,7 @@ func TestBannerManager_LineEndingConversion(t *testing.T) {
 	// Test rendering
 	result, err := manager.RenderMainAnon()
 	assert.NoError(t, err)
-	
+
 	// Should convert \n to \r\n
 	assert.Contains(t, result, "Line 1\r\n")
 	assert.Contains(t, result, "Line 2\r\n")

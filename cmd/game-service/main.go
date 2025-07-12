@@ -146,19 +146,19 @@ func initializeDatabase(cfg *config.GameServiceConfig) (*database.Connection, er
 // initializeDefaultGames adds default games to the repository for development
 func initializeDefaultGames(gameService *application.GameService) {
 	ctx := context.Background()
-	
+
 	// Add NetHack as a default game
 	nethackReq := &application.CreateGameRequest{
-		ID:          "nethack",
-		Name:        "NetHack",
-		ShortName:   "nh",
-		Description: "The classic dungeon exploration game",
-		Category:    "roguelike",
-		Tags:        []string{"roguelike", "classic", "dungeon"},
-		Version:     "3.6.7",
-		Difficulty:  7,
-		BinaryPath:  "/opt/homebrew/bin/nethack",
-		BinaryArgs:  []string{"-u", "${USERNAME}"},
+		ID:               "nethack",
+		Name:             "NetHack",
+		ShortName:        "nh",
+		Description:      "The classic dungeon exploration game",
+		Category:         "roguelike",
+		Tags:             []string{"roguelike", "classic", "dungeon"},
+		Version:          "3.6.7",
+		Difficulty:       7,
+		BinaryPath:       "/opt/homebrew/bin/nethack",
+		BinaryArgs:       []string{"-u", "${USERNAME}"},
 		WorkingDirectory: "/opt/homebrew/Cellar/nethack/3.6.7/libexec",
 		Environment: map[string]string{
 			"TERM":           "xterm-256color",
@@ -168,18 +168,18 @@ func initializeDefaultGames(gameService *application.GameService) {
 			"NETHACKDIR":     "/opt/homebrew/Cellar/nethack/3.6.7/libexec",
 			"NETHACKOPTIONS": "@/opt/homebrew/Cellar/nethack/3.6.7/libexec/${USERNAME}.nethackrc",
 		},
-		CPULimit:       "500m",
-		MemoryLimit:    "256Mi",
-		DiskLimit:      "1Gi",
-		TimeoutSeconds: 14400, // 4 hours
-		RunAsUser:      1000,
-		RunAsGroup:     1000,
+		CPULimit:                 "500m",
+		MemoryLimit:              "256Mi",
+		DiskLimit:                "1Gi",
+		TimeoutSeconds:           14400, // 4 hours
+		RunAsUser:                1000,
+		RunAsGroup:               1000,
 		ReadOnlyRootFilesystem:   false,
 		AllowPrivilegeEscalation: false,
 		NetworkIsolated:          true,
 		BlockInternet:            true,
 	}
-	
+
 	// Try to create the game, ignore errors if it already exists
 	gameService.CreateGame(ctx, nethackReq)
 }
@@ -197,17 +197,17 @@ func initializeApplicationServices(db *database.Connection) *ApplicationServices
 	sessionRepo := repository.NewStubSessionRepository()
 	saveRepo := repository.NewStubSaveRepository()
 	eventRepo := repository.NewStubEventRepository()
-	
+
 	// Create unit of work
 	uow := repository.NewStubUnitOfWork(gameRepo, sessionRepo, saveRepo, eventRepo)
-	
+
 	// Initialize application services
 	gameService := application.NewGameService(gameRepo, sessionRepo, saveRepo, eventRepo, uow)
 	sessionService := application.NewSessionService(sessionRepo, gameRepo, saveRepo, eventRepo, uow)
-	
+
 	// Add default games for development
 	initializeDefaultGames(gameService)
-	
+
 	return &ApplicationServices{
 		GameService:    gameService,
 		SessionService: sessionService,

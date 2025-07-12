@@ -149,7 +149,7 @@ func (h *StreamHandler) handlePTYOutput(session *StreamSession) error {
 			if !ok {
 				return io.EOF
 			}
-			
+
 			// Send output to stream
 			if err := session.stream.Send(&games_pb.GameIOResponse{
 				Response: &games_pb.GameIOResponse_Output{
@@ -166,7 +166,7 @@ func (h *StreamHandler) handlePTYOutput(session *StreamSession) error {
 		case err := <-errorChan:
 			// Get exit code if available
 			exitCode, _ := session.ptySession.GetExitCode()
-			
+
 			// Send process exit event
 			if err := session.stream.Send(&games_pb.GameIOResponse{
 				Response: &games_pb.GameIOResponse_Event{

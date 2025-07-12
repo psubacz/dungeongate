@@ -34,7 +34,7 @@ func (r *StubGameRepository) Save(ctx context.Context, game *domain.Game) error 
 func (r *StubGameRepository) FindByID(ctx context.Context, id domain.GameID) (*domain.Game, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	
+
 	game, exists := r.games[id.String()]
 	if !exists {
 		return nil, fmt.Errorf("game not found")
@@ -46,7 +46,7 @@ func (r *StubGameRepository) FindByID(ctx context.Context, id domain.GameID) (*d
 func (r *StubGameRepository) FindByName(ctx context.Context, name string) (*domain.Game, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	
+
 	for _, game := range r.games {
 		if game.Metadata().Name == name {
 			return game, nil
@@ -59,7 +59,7 @@ func (r *StubGameRepository) FindByName(ctx context.Context, name string) (*doma
 func (r *StubGameRepository) FindAll(ctx context.Context) ([]*domain.Game, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	
+
 	games := make([]*domain.Game, 0, len(r.games))
 	for _, game := range r.games {
 		games = append(games, game)
@@ -71,7 +71,7 @@ func (r *StubGameRepository) FindAll(ctx context.Context) ([]*domain.Game, error
 func (r *StubGameRepository) FindEnabled(ctx context.Context) ([]*domain.Game, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	
+
 	var games []*domain.Game
 	for _, game := range r.games {
 		if game.CanStart() {
@@ -93,7 +93,7 @@ func (r *StubGameRepository) Delete(ctx context.Context, id domain.GameID) error
 func (r *StubGameRepository) FindByCategory(ctx context.Context, category string) ([]*domain.Game, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	
+
 	var games []*domain.Game
 	for _, game := range r.games {
 		if game.Metadata().Category == category {
@@ -107,7 +107,7 @@ func (r *StubGameRepository) FindByCategory(ctx context.Context, category string
 func (r *StubGameRepository) FindByTag(ctx context.Context, tag string) ([]*domain.Game, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	
+
 	var games []*domain.Game
 	for _, game := range r.games {
 		for _, gameTag := range game.Metadata().Tags {
@@ -124,7 +124,7 @@ func (r *StubGameRepository) FindByTag(ctx context.Context, tag string) ([]*doma
 func (r *StubGameRepository) SearchByName(ctx context.Context, query string) ([]*domain.Game, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	
+
 	var games []*domain.Game
 	for _, game := range r.games {
 		if contains(game.Metadata().Name, query) {
@@ -138,7 +138,7 @@ func (r *StubGameRepository) SearchByName(ctx context.Context, query string) ([]
 func (r *StubGameRepository) CountByStatus(ctx context.Context, status domain.GameStatus) (int, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	
+
 	count := 0
 	for _, game := range r.games {
 		if game.Status() == status {
@@ -158,12 +158,12 @@ func (r *StubGameRepository) UpdateStatistics(ctx context.Context, id domain.Gam
 func (r *StubGameRepository) GetMostPopular(ctx context.Context, limit int) ([]*domain.Game, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	
+
 	games := make([]*domain.Game, 0, len(r.games))
 	for _, game := range r.games {
 		games = append(games, game)
 	}
-	
+
 	// Simple implementation - just return first 'limit' games
 	if len(games) > limit {
 		games = games[:limit]
@@ -196,7 +196,7 @@ func (r *StubSessionRepository) Save(ctx context.Context, session *domain.GameSe
 func (r *StubSessionRepository) FindByID(ctx context.Context, id domain.SessionID) (*domain.GameSession, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	
+
 	session, exists := r.sessions[id.String()]
 	if !exists {
 		return nil, fmt.Errorf("session not found")
@@ -208,7 +208,7 @@ func (r *StubSessionRepository) FindByID(ctx context.Context, id domain.SessionI
 func (r *StubSessionRepository) FindByUserID(ctx context.Context, userID domain.UserID) ([]*domain.GameSession, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	
+
 	var sessions []*domain.GameSession
 	for _, session := range r.sessions {
 		if session.UserID() == userID {
@@ -222,7 +222,7 @@ func (r *StubSessionRepository) FindByUserID(ctx context.Context, userID domain.
 func (r *StubSessionRepository) FindByGameID(ctx context.Context, gameID domain.GameID) ([]*domain.GameSession, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	
+
 	var sessions []*domain.GameSession
 	for _, session := range r.sessions {
 		if session.GameID() == gameID {
@@ -244,7 +244,7 @@ func (r *StubSessionRepository) Delete(ctx context.Context, id domain.SessionID)
 func (r *StubSessionRepository) FindActive(ctx context.Context) ([]*domain.GameSession, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	
+
 	var sessions []*domain.GameSession
 	for _, session := range r.sessions {
 		if session.IsActive() {
@@ -258,7 +258,7 @@ func (r *StubSessionRepository) FindActive(ctx context.Context) ([]*domain.GameS
 func (r *StubSessionRepository) FindActiveByUser(ctx context.Context, userID domain.UserID) ([]*domain.GameSession, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	
+
 	var sessions []*domain.GameSession
 	for _, session := range r.sessions {
 		if session.UserID() == userID && session.IsActive() {
@@ -272,7 +272,7 @@ func (r *StubSessionRepository) FindActiveByUser(ctx context.Context, userID dom
 func (r *StubSessionRepository) FindActiveByGame(ctx context.Context, gameID domain.GameID) ([]*domain.GameSession, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	
+
 	var sessions []*domain.GameSession
 	for _, session := range r.sessions {
 		if session.GameID() == gameID && session.IsActive() {
@@ -286,7 +286,7 @@ func (r *StubSessionRepository) FindActiveByGame(ctx context.Context, gameID dom
 func (r *StubSessionRepository) FindByStatus(ctx context.Context, status domain.SessionStatus) ([]*domain.GameSession, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	
+
 	var sessions []*domain.GameSession
 	for _, session := range r.sessions {
 		if session.Status() == status {
@@ -300,7 +300,7 @@ func (r *StubSessionRepository) FindByStatus(ctx context.Context, status domain.
 func (r *StubSessionRepository) FindByDateRange(ctx context.Context, start, end time.Time) ([]*domain.GameSession, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	
+
 	var sessions []*domain.GameSession
 	for _, session := range r.sessions {
 		if session.StartTime().After(start) && session.StartTime().Before(end) {
@@ -314,7 +314,7 @@ func (r *StubSessionRepository) FindByDateRange(ctx context.Context, start, end 
 func (r *StubSessionRepository) CountActiveByGame(ctx context.Context, gameID domain.GameID) (int, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	
+
 	count := 0
 	for _, session := range r.sessions {
 		if session.GameID() == gameID && session.IsActive() {
@@ -328,7 +328,7 @@ func (r *StubSessionRepository) CountActiveByGame(ctx context.Context, gameID do
 func (r *StubSessionRepository) CountTotalByUser(ctx context.Context, userID domain.UserID) (int, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	
+
 	count := 0
 	for _, session := range r.sessions {
 		if session.UserID() == userID {
@@ -342,21 +342,21 @@ func (r *StubSessionRepository) CountTotalByUser(ctx context.Context, userID dom
 func (r *StubSessionRepository) GetAverageSessionDuration(ctx context.Context, gameID domain.GameID) (time.Duration, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	
+
 	var totalDuration time.Duration
 	count := 0
-	
+
 	for _, session := range r.sessions {
 		if session.GameID() == gameID && !session.IsActive() {
 			totalDuration += session.Duration()
 			count++
 		}
 	}
-	
+
 	if count == 0 {
 		return 0, nil
 	}
-	
+
 	return totalDuration / time.Duration(count), nil
 }
 
@@ -364,17 +364,17 @@ func (r *StubSessionRepository) GetAverageSessionDuration(ctx context.Context, g
 func (r *StubSessionRepository) DeleteExpiredSessions(ctx context.Context, maxAge time.Duration) (int, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	
+
 	cutoff := time.Now().Add(-maxAge)
 	count := 0
-	
+
 	for id, session := range r.sessions {
 		if session.StartTime().Before(cutoff) {
 			delete(r.sessions, id)
 			count++
 		}
 	}
-	
+
 	return count, nil
 }
 
@@ -403,7 +403,7 @@ func (r *StubSaveRepository) Save(ctx context.Context, save *domain.GameSave) er
 func (r *StubSaveRepository) FindByID(ctx context.Context, id domain.SaveID) (*domain.GameSave, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	
+
 	save, exists := r.saves[id.String()]
 	if !exists {
 		return nil, fmt.Errorf("save not found")
@@ -415,7 +415,7 @@ func (r *StubSaveRepository) FindByID(ctx context.Context, id domain.SaveID) (*d
 func (r *StubSaveRepository) FindByUserAndGame(ctx context.Context, userID domain.UserID, gameID domain.GameID) (*domain.GameSave, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	
+
 	for _, save := range r.saves {
 		if save.UserID() == userID && save.GameID() == gameID {
 			return save, nil
@@ -428,7 +428,7 @@ func (r *StubSaveRepository) FindByUserAndGame(ctx context.Context, userID domai
 func (r *StubSaveRepository) FindByUser(ctx context.Context, userID domain.UserID) ([]*domain.GameSave, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	
+
 	var saves []*domain.GameSave
 	for _, save := range r.saves {
 		if save.UserID() == userID {
@@ -442,7 +442,7 @@ func (r *StubSaveRepository) FindByUser(ctx context.Context, userID domain.UserI
 func (r *StubSaveRepository) FindByGame(ctx context.Context, gameID domain.GameID) ([]*domain.GameSave, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	
+
 	var saves []*domain.GameSave
 	for _, save := range r.saves {
 		if save.GameID() == gameID {
@@ -464,7 +464,7 @@ func (r *StubSaveRepository) Delete(ctx context.Context, id domain.SaveID) error
 func (r *StubSaveRepository) FindByStatus(ctx context.Context, status domain.SaveStatus) ([]*domain.GameSave, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	
+
 	var saves []*domain.GameSave
 	for _, save := range r.saves {
 		if save.Status() == status {
@@ -478,7 +478,7 @@ func (r *StubSaveRepository) FindByStatus(ctx context.Context, status domain.Sav
 func (r *StubSaveRepository) FindLargerThan(ctx context.Context, size int64) ([]*domain.GameSave, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	
+
 	var saves []*domain.GameSave
 	for _, save := range r.saves {
 		if save.FileSize() > size {
@@ -492,7 +492,7 @@ func (r *StubSaveRepository) FindLargerThan(ctx context.Context, size int64) ([]
 func (r *StubSaveRepository) FindOlderThan(ctx context.Context, age time.Duration) ([]*domain.GameSave, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	
+
 	cutoff := time.Now().Add(-age)
 	var saves []*domain.GameSave
 	for _, save := range r.saves {
@@ -525,7 +525,7 @@ func (r *StubSaveRepository) DeleteBackup(ctx context.Context, saveID domain.Sav
 func (r *StubSaveRepository) GetTotalStorageUsed(ctx context.Context) (int64, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	
+
 	var total int64
 	for _, save := range r.saves {
 		total += save.FileSize()
@@ -537,7 +537,7 @@ func (r *StubSaveRepository) GetTotalStorageUsed(ctx context.Context) (int64, er
 func (r *StubSaveRepository) GetStorageUsedByUser(ctx context.Context, userID domain.UserID) (int64, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	
+
 	var total int64
 	for _, save := range r.saves {
 		if save.UserID() == userID {
@@ -551,7 +551,7 @@ func (r *StubSaveRepository) GetStorageUsedByUser(ctx context.Context, userID do
 func (r *StubSaveRepository) GetStorageUsedByGame(ctx context.Context, gameID domain.GameID) (int64, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	
+
 	var total int64
 	for _, save := range r.saves {
 		if save.GameID() == gameID {
@@ -598,7 +598,7 @@ func (r *StubEventRepository) SaveEvent(ctx context.Context, event *domain.GameE
 func (r *StubEventRepository) FindEvents(ctx context.Context, filters domain.EventFilters) ([]*domain.GameEvent, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	
+
 	// Simple implementation - return all events
 	return r.events, nil
 }
@@ -607,7 +607,7 @@ func (r *StubEventRepository) FindEvents(ctx context.Context, filters domain.Eve
 func (r *StubEventRepository) FindEventsBySession(ctx context.Context, sessionID domain.SessionID) ([]*domain.GameEvent, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	
+
 	var events []*domain.GameEvent
 	for _, event := range r.events {
 		if event.SessionID == sessionID.String() {
@@ -621,7 +621,7 @@ func (r *StubEventRepository) FindEventsBySession(ctx context.Context, sessionID
 func (r *StubEventRepository) FindEventsByGame(ctx context.Context, gameID domain.GameID) ([]*domain.GameEvent, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	
+
 	var events []*domain.GameEvent
 	for _, event := range r.events {
 		if event.GameID == gameID.String() {
@@ -635,7 +635,7 @@ func (r *StubEventRepository) FindEventsByGame(ctx context.Context, gameID domai
 func (r *StubEventRepository) FindEventsByUser(ctx context.Context, userID domain.UserID) ([]*domain.GameEvent, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	
+
 	var events []*domain.GameEvent
 	for _, event := range r.events {
 		if event.UserID == userID.Int() {
@@ -649,11 +649,11 @@ func (r *StubEventRepository) FindEventsByUser(ctx context.Context, userID domai
 func (r *StubEventRepository) DeleteOldEvents(ctx context.Context, maxAge time.Duration) (int, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	
+
 	cutoff := time.Now().Add(-maxAge)
 	var newEvents []*domain.GameEvent
 	count := 0
-	
+
 	for _, event := range r.events {
 		if event.Timestamp.After(cutoff) {
 			newEvents = append(newEvents, event)
@@ -661,7 +661,7 @@ func (r *StubEventRepository) DeleteOldEvents(ctx context.Context, maxAge time.D
 			count++
 		}
 	}
-	
+
 	r.events = newEvents
 	return count, nil
 }
@@ -731,8 +731,8 @@ func (u *StubUnitOfWork) Events() domain.EventRepository {
 
 // contains checks if a string contains a substring (case-insensitive)
 func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || 
-		len(substr) == 0 || 
+	return len(s) >= len(substr) && (s == substr ||
+		len(substr) == 0 ||
 		s[0:len(substr)] == substr ||
 		(len(s) > len(substr) && contains(s[1:], substr)))
 }

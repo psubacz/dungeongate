@@ -31,7 +31,7 @@ func (m *MockSSHChannel) Read(data []byte) (int, error) {
 		m.readIndex += n
 		return n, nil
 	}
-	
+
 	args := m.Called(data)
 	return args.Int(0), args.Error(1)
 }
@@ -95,7 +95,7 @@ func TestNewMenuHandler(t *testing.T) {
 	// Create a real banner manager for testing
 	bannerConfig := &banner.BannerConfig{}
 	bannerManager := banner.NewBannerManager(bannerConfig)
-	
+
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
 
 	// Test with nil clients to verify constructor
@@ -111,7 +111,7 @@ func TestShowAnonymousMenu_Success(t *testing.T) {
 	tempFile, err := os.CreateTemp("", "test_banner_*.txt")
 	require.NoError(t, err)
 	defer os.Remove(tempFile.Name())
-	
+
 	bannerContent := `Welcome to DungeonGate
 =====================
 
@@ -182,7 +182,7 @@ func TestShowAnonymousMenu_AllChoices(t *testing.T) {
 			tempFile, err := os.CreateTemp("", "test_banner_*.txt")
 			require.NoError(t, err)
 			defer os.Remove(tempFile.Name())
-			
+
 			bannerContent := `Welcome to DungeonGate
 =====================
 
@@ -227,7 +227,7 @@ func TestShowAnonymousMenu_InvalidChoice(t *testing.T) {
 	tempFile, err := os.CreateTemp("", "test_banner_*.txt")
 	require.NoError(t, err)
 	defer os.Remove(tempFile.Name())
-	
+
 	bannerContent := `Welcome to DungeonGate
 =====================
 
@@ -355,21 +355,21 @@ func TestParseGameChoice(t *testing.T) {
 		expected  int
 		shouldErr bool
 	}{
-		{"1", 3, 0, false},    // Valid first choice
-		{"2", 3, 1, false},    // Valid second choice  
-		{"3", 3, 2, false},    // Valid third choice
-		{"0", 3, -1, true},    // Invalid - too low
-		{"4", 3, -1, true},    // Invalid - too high
-		{"abc", 3, -1, true},  // Invalid - not a number
-		{"", 3, -1, true},     // Invalid - empty
-		{"1.5", 3, -1, true},  // Invalid - decimal
-		{"-1", 3, -1, true},   // Invalid - negative
+		{"1", 3, 0, false},   // Valid first choice
+		{"2", 3, 1, false},   // Valid second choice
+		{"3", 3, 2, false},   // Valid third choice
+		{"0", 3, -1, true},   // Invalid - too low
+		{"4", 3, -1, true},   // Invalid - too high
+		{"abc", 3, -1, true}, // Invalid - not a number
+		{"", 3, -1, true},    // Invalid - empty
+		{"1.5", 3, -1, true}, // Invalid - decimal
+		{"-1", 3, -1, true},  // Invalid - negative
 	}
 
 	for _, tc := range testCases {
 		t.Run("input_"+tc.input, func(t *testing.T) {
 			result, err := parseGameChoice(tc.input, tc.maxGames)
-			
+
 			if tc.shouldErr {
 				assert.Error(t, err)
 				assert.Equal(t, -1, result)
@@ -401,8 +401,8 @@ func TestBuildGameSelectionBanner(t *testing.T) {
 		{
 			Id:          "dcss",
 			Name:        "Dungeon Crawl Stone Soup",
-			Description: "",  // Test empty description
-			Version:     "",  // Test empty version
+			Description: "", // Test empty description
+			Version:     "", // Test empty version
 			Status:      gamev2.GameStatus_GAME_STATUS_UNSPECIFIED,
 		},
 	}
@@ -418,7 +418,7 @@ func TestBuildGameSelectionBanner(t *testing.T) {
 	assert.Contains(t, banner, "Version: 3.7.0")
 	assert.Contains(t, banner, "[q] Return to main menu")
 	assert.Contains(t, banner, "Enter your choice:")
-	
+
 	// Make sure empty fields don't break the banner
 	assert.NotContains(t, banner, "Description: \r\n")
 	assert.NotContains(t, banner, "Version: \r\n")
@@ -430,7 +430,7 @@ func BenchmarkShowAnonymousMenu(b *testing.B) {
 	bannerManager := banner.NewBannerManager(bannerConfig)
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
 	handler := NewMenuHandler(bannerManager, nil, nil, logger)
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		channel := &MockSSHChannel{}

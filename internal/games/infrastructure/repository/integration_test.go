@@ -49,10 +49,10 @@ func convertQueryParams(query string, dbType string) string {
 // Integration test setup
 func setupTestDB(t *testing.T) (*database.Connection, string, func()) {
 	dbType := getTestDBType()
-	
+
 	t.Logf("=== INTEGRATION TEST DATABASE CONFIGURATION ===")
 	t.Logf("Database Type: %s", dbType)
-	
+
 	switch dbType {
 	case DBTypeSQLite:
 		t.Logf("Using SQLite for testing (local/CI mode)")
@@ -136,7 +136,7 @@ func createTestTablesSQLite(db *database.Connection) error {
 	if err != nil {
 		return fmt.Errorf("failed to enable foreign keys: %w", err)
 	}
-	
+
 	schema := `
 	-- Users table (required for foreign keys)
 	CREATE TABLE IF NOT EXISTS users (
@@ -394,12 +394,12 @@ func TestSessionRepository_Integration_DeleteExpiredSessions(t *testing.T) {
 
 	// Insert old session directly into database
 	oldEndTime := time.Now().Add(-48 * time.Hour)
-	
+
 	sessionQuery := convertQueryParams(`
 		INSERT INTO game_sessions (id, game_id, user_id, status, ended_at)
 		VALUES ($1, '1', 1, 'stopped', $2)
 	`, dbType)
-	
+
 	_, err := db.DB(database.QueryTypeWrite).ExecContext(ctx, sessionQuery, oldSessionID.String(), oldEndTime)
 	require.NoError(t, err)
 

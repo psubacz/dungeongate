@@ -60,14 +60,14 @@ func New(cfg *Config, logger *slog.Logger) (*Service, error) {
 
 	// Initialize servers
 	sshConfig := &server.SSHConfig{
-		Address:       cfg.SSH.Address,
-		Port:          cfg.SSH.Port,
-		MaxConns:      cfg.MaxConnections,
-		IdleTimeout:   cfg.SSH.IdleTimeout,
-		HostKey:       cfg.SSH.HostKey,
-		PasswordAuth:  cfg.SSH.PasswordAuth,
-		PublicKeyAuth: cfg.SSH.PublicKeyAuth,
-		AllowAnonymous: cfg.SSH.AllowAnonymous,
+		Address:         cfg.SSH.Address,
+		Port:            cfg.SSH.Port,
+		MaxConns:        cfg.MaxConnections,
+		IdleTimeout:     cfg.SSH.IdleTimeout,
+		HostKey:         cfg.SSH.HostKey,
+		PasswordAuth:    cfg.SSH.PasswordAuth,
+		PublicKeyAuth:   cfg.SSH.PublicKeyAuth,
+		AllowAnonymous:  cfg.SSH.AllowAnonymous,
 		BannerMainAnon:  cfg.Menu.Banners.MainAnon,
 		BannerMainUser:  cfg.Menu.Banners.MainUser,
 		BannerWatchMenu: cfg.Menu.Banners.WatchMenu,
@@ -113,7 +113,6 @@ func (s *Service) Start() error {
 	if err := s.connectionManager.Start(s.ctx); err != nil {
 		return fmt.Errorf("failed to start connection manager: %w", err)
 	}
-
 
 	// Start streaming manager
 	if err := s.streamingManager.Start(s.ctx); err != nil {

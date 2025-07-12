@@ -31,14 +31,14 @@ type SSHServer struct {
 
 // SSHConfig holds SSH server configuration
 type SSHConfig struct {
-	Address       string
-	Port          int
-	HostKey       string
-	MaxConns      int
-	IdleTimeout   string
-	PasswordAuth  bool
-	PublicKeyAuth bool
-	AllowAnonymous bool
+	Address         string
+	Port            int
+	HostKey         string
+	MaxConns        int
+	IdleTimeout     string
+	PasswordAuth    bool
+	PublicKeyAuth   bool
+	AllowAnonymous  bool
 	BannerMainAnon  string
 	BannerMainUser  string
 	BannerWatchMenu string

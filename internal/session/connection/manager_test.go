@@ -104,7 +104,7 @@ func TestRegisterConnectionRateLimit(t *testing.T) {
 	require.NoError(t, err)
 
 	sameIP := net.ParseIP("192.168.1.1")
-	
+
 	// Register connections from same IP up to rate limit
 	var connIDs []string
 	for i := 0; i < 10; i++ {
@@ -246,7 +246,7 @@ func TestGetStats(t *testing.T) {
 	stats := manager.GetStats()
 	assert.Equal(t, 3, stats.Active)
 	assert.Equal(t, 3, stats.Total)
-	
+
 	// Detailed stats not available in stateless mode
 	// These would be queried from Game Service in a real implementation
 	assert.Equal(t, 0, len(stats.ByState))
@@ -279,7 +279,7 @@ func TestConcurrentOperations(t *testing.T) {
 			defer wg.Done()
 			connIDs[goroutineID] = make([]string, 0, connectionsPerGoroutine)
 			connections[goroutineID] = make([]*mockConn, 0, connectionsPerGoroutine)
-			
+
 			for j := 0; j < connectionsPerGoroutine; j++ {
 				conn := &mockConn{
 					remoteAddr: &net.TCPAddr{
@@ -404,7 +404,7 @@ func TestRateLimitingWithTime(t *testing.T) {
 	require.NoError(t, err)
 
 	sameIP := net.ParseIP("192.168.1.1")
-	
+
 	// Register 6 connections quickly (within time limit)
 	var connIDs []string
 	for i := 0; i < 6; i++ {
