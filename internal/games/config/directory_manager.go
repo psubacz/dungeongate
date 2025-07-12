@@ -10,12 +10,12 @@ import (
 
 // GameDirectoryManager manages game directories and configuration
 type GameDirectoryManager struct {
-	BaseDir      string                      // Base directory for all game data
-	UserDirs     map[string]*UserGameDirs    // Per-user directory structure
-	TempDirs     map[string]string           // Temporary directories for active games
-	CleanupQueue []string                    // Directories pending cleanup
-	pathDetector *PathDetector               // Path detector for system paths
-	mutex        sync.RWMutex                // Protects concurrent access
+	BaseDir      string                   // Base directory for all game data
+	UserDirs     map[string]*UserGameDirs // Per-user directory structure
+	TempDirs     map[string]string        // Temporary directories for active games
+	CleanupQueue []string                 // Directories pending cleanup
+	pathDetector *PathDetector            // Path detector for system paths
+	mutex        sync.RWMutex             // Protects concurrent access
 	logger       *log.Logger
 }
 
@@ -210,7 +210,7 @@ func (gm *GameDirectoryManager) createSaveSymlinks(paths *NetHackPaths, userDirs
 func (gm *GameDirectoryManager) copyDefaultConfig(userDirs *UserGameDirs) error {
 	// Create a basic .nethackrc file
 	nethackrcPath := filepath.Join(userDirs.ConfigDir, ".nethackrc")
-	
+
 	// Check if file already exists
 	if _, err := os.Stat(nethackrcPath); err == nil {
 		gm.logger.Printf("Config file already exists: %s", nethackrcPath)

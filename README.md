@@ -1,6 +1,12 @@
 # DungeonGate
-
-> This repo barely works and various states of working, borked, and not working. Be advised.
+```bash
+ ____                                      ___        _
+|  _ \ _   _ _ __   __ _  ___  ___  _ __  / __|  __ _| |_ ___
+| | | | | | | ._ \ / _. |/ _ \/ _ \| ._ \| |___ / _. | __/ _ \
+| |_| | |_| | | | | (_| |  __/ (_) | | | | |__ | (_| |  ||  _/
+|____/ \__,_|_| |_|\__, |\___|\____|_| |_|____/ \__,_|\__\___|
+                   |___/
+```
 
 **A SSH-based gateway to terminal gaming adventures written in Go**
 
@@ -8,6 +14,8 @@ DungeonGate is a over-engineered microserviced application inspired by [dgamelau
 
 Supported games
 - NetHack
+
+
 
 ## 🚀 Quick Start
 
@@ -134,6 +142,12 @@ ssh -p 2222 localhost  # Connect to test the SSH service
 ```
 
 ### Troubleshooting
+
+**Services already running:**
+Kill all previous runs before starting new ones:
+```bash
+make stop
+```
 
 **Port 2222 in use:**
 ```bash
@@ -532,24 +546,31 @@ The session service provides comprehensive metrics:
 
 DungeonGate is released under the [GNU GENERAL PUBLIC LICENSE](LICENSE).
 
+## 🤖 Development with Claude AI
+
+This repository was **coded and maintained with significant assistance from Claude AI**. The majority of the codebase, architecture design, and documentation was collaboratively developed through extensive pair programming sessions with Claude.
+
+### Claude's Contributions Include:
+- **Architecture Design**: Microservices design, gRPC communication patterns, and stateless session management
+- **Code Implementation**: Core business logic, SSH server implementation, authentication system, and game integration
+- **Testing Strategy**: Comprehensive test suites, integration testing, and performance benchmarks
+- **Documentation**: README, roadmaps, API documentation, and inline code comments
+- **Refactoring**: Session service stateless refactor, service consolidation, and performance optimizations
+
+### Human-AI Collaboration
+While Peter Subacz initiated the project and provided domain knowledge, requirements, and direction, Claude AI contributed the detailed implementation, best practices, and extensive documentation that makes this codebase production-ready.
+
+This project demonstrates the potential of human-AI collaboration in software development, combining human creativity and domain expertise with AI's ability to write comprehensive, well-structured, and documented code.
+
 ## 🙏 Acknowledgments
 
 - **Original dgamelaunch** by M. Drew Streib and contributors
 - **Modern Go ecosystem** for excellent tooling and libraries
-- **Claude AI** for development assistance and architectural guidance
 - **SSH and terminal gaming community** for inspiration and requirements
 
 ## About the Author
 
-DungeonGate is developed and maintained by Peter Subacz. Feel free to reach out to me with any questions or feedback you may have.
+DungeonGate is developed and maintained by Peter Subacz in collaboration with Claude AI. Feel free to reach out with any questions or feedback.
 
-I developed this as a learning project after getting rained out of a few to many summer days with claude. I liked to play nethack in college, despite being bad at it. I just kept going as I learned more about golang and various tips and tricks of software development (like ring buffers, grpc with protobuf, object pools, worker pools, encryption, containers, etc...). Now we have an entirely over-engineered piece of software to play terminal games. Please Enjoy!
+This project started as a learning exercise after getting rained out of too many summer days. What began as a simple attempt to recreate dgamelaunch in Go evolved into an over-engineered microservices platform through extensive collaboration with Claude AI. The result is a production-ready system that demonstrates modern Go development practices, microservices architecture, and comprehensive testing - far beyond what was originally envisioned!
 
-```bash
- ____                                      ___        _
-|  _ \ _   _ _ __   __ _  ___  ___  _ __  / __|  __ _| |_ ___
-| | | | | | | ._ \ / _. |/ _ \/ _ \| ._ \| |___ / _. | __/ _ \
-| |_| | |_| | | | | (_| |  __/ (_) | | | | |__ | (_| |  ||  _/
-|____/ \__,_|_| |_|\__, |\___|\____|_| |_|____/ \__,_|\__\___|
-                   |___/
-```

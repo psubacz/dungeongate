@@ -3,11 +3,12 @@ package auth
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strconv"
 	"time"
 
-	proto "github.com/dungeongate/pkg/api/auth/v1"
 	"github.com/dungeongate/internal/user"
+	proto "github.com/dungeongate/pkg/api/auth/v1"
 	"github.com/dungeongate/pkg/database"
 	"github.com/dungeongate/pkg/encryption"
 	"github.com/golang-jwt/jwt/v5"
@@ -25,6 +26,7 @@ type Service struct {
 	encryptor encryption.Encryptor
 	jwtSecret []byte
 	jwtIssuer string
+	logger    *slog.Logger
 
 	// Token expiration times
 	accessTokenExpiration  time.Duration
@@ -46,7 +48,7 @@ type Config struct {
 }
 
 // NewService creates a new Auth service
-func NewService(db *database.Connection, userSvc *user.Service, encryptor encryption.Encryptor, config *Config) *Service {
+func NewService(db *database.Connection, userSvc *user.Service, encryptor encryption.Encryptor, config *Config, logger *slog.Logger) *Service {
 	// Set default values
 	if config.AccessTokenExpiration == 0 {
 		config.AccessTokenExpiration = 15 * time.Minute
@@ -70,6 +72,7 @@ func NewService(db *database.Connection, userSvc *user.Service, encryptor encryp
 		encryptor:              encryptor,
 		jwtSecret:              []byte(config.JWTSecret),
 		jwtIssuer:              config.JWTIssuer,
+		logger:                 logger,
 		accessTokenExpiration:  config.AccessTokenExpiration,
 		refreshTokenExpiration: config.RefreshTokenExpiration,
 		maxLoginAttempts:       config.MaxLoginAttempts,
@@ -371,6 +374,99 @@ func (s *Service) GetLoginAttempts(ctx context.Context, req *proto.GetLoginAttem
 		AccountLocked:     false,
 		LockedUntil:       0,
 		RemainingAttempts: int32(s.maxLoginAttempts),
+	}, nil
+}
+
+// Register creates a new user account
+func (s *Service) Register(ctx context.Context, req *proto.RegisterRequest) (*proto.RegisterResponse, error) {
+	if req.Username == "" || req.Password == "" {
+		return &proto.RegisterResponse{
+			Success:   false,
+			Error:     "Username and password are required",
+			ErrorCode: "invalid_request",
+		}, nil
+	}
+
+	// Email is optional - removed requirement check
+
+	// Create registration request
+	regReq := &user.RegistrationRequest{
+		Username:        req.Username,
+		Password:        req.Password,
+		PasswordConfirm: req.Password, // Set same as password
+		Email:           req.Email,
+		AcceptTerms:     true,
+		Source:          "api",
+		IPAddress:       req.ClientIp,
+		UserAgent:       req.UserAgent,
+	}
+
+	// Create user via user service
+	regResp, err := s.userSvc.RegisterUser(ctx, regReq)
+	if err != nil {
+		s.logger.Error("Failed to register user", "error", err, "username", req.Username)
+		return &proto.RegisterResponse{
+			Success:   false,
+			Error:     "Registration failed",
+			ErrorCode: "registration_failed",
+		}, nil
+	}
+
+	if !regResp.Success {
+		// Map validation errors to registration error codes
+		var errorCode string = "registration_failed"
+		var errorMessage string = regResp.Message
+		
+		if len(regResp.Errors) > 0 {
+			// Use the first error for the main response
+			firstError := regResp.Errors[0]
+			errorMessage = firstError.Message
+			
+			switch firstError.Code {
+			case "USERNAME_EXISTS":
+				errorCode = "username_taken"
+			case "USERNAME_INVALID_CHARS":
+				errorCode = "invalid_username"
+			case "EMAIL_INVALID":
+				errorCode = "invalid_email"
+			case "PASSWORD_TOO_SHORT":
+				errorCode = "invalid_password"
+			case "PASSWORD_REQUIRED":
+				errorCode = "invalid_password"
+			default:
+				errorCode = "registration_failed"
+			}
+		}
+
+		return &proto.RegisterResponse{
+			Success:   false,
+			Error:     errorMessage,
+			ErrorCode: errorCode,
+		}, nil
+	}
+
+	userObj := regResp.User
+
+	// Generate tokens for the new user
+	accessToken, refreshToken, err := s.generateTokens(userObj)
+	if err != nil {
+		s.logger.Error("Failed to generate tokens for new user", "error", err, "username", req.Username)
+		return &proto.RegisterResponse{
+			Success: false,
+			Error:   "Failed to generate authentication tokens",
+		}, status.Errorf(codes.Internal, "failed to generate tokens: %v", err)
+	}
+
+	// Convert user to proto
+	protoUser := s.convertUserToProto(userObj)
+
+	return &proto.RegisterResponse{
+		Success:               true,
+		AccessToken:           accessToken,
+		RefreshToken:          refreshToken,
+		AccessTokenExpiresAt:  time.Now().Add(s.accessTokenExpiration).Unix(),
+		RefreshTokenExpiresAt: time.Now().Add(s.refreshTokenExpiration).Unix(),
+		User:                  protoUser,
 	}, nil
 }
 

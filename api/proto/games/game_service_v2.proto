@@ -28,6 +28,10 @@ service GameService {
   rpc DeleteSave(DeleteSaveRequest) returns (DeleteSaveResponse);
   rpc ListSaves(ListSavesRequest) returns (ListSavesResponse);
 
+  // PTY streaming for terminal I/O
+  rpc StreamGameIO(stream GameIORequest) returns (stream GameIOResponse);
+  rpc ResizeTerminal(ResizeTerminalRequest) returns (ResizeTerminalResponse);
+
   // Health check
   rpc Health(google.protobuf.Empty) returns (HealthResponse);
 }
@@ -362,6 +366,80 @@ message ListSavesRequest {
 message ListSavesResponse {
   repeated GameSave saves = 1;
   int32 total_count = 2;
+}
+
+// PTY streaming messages
+message GameIORequest {
+  oneof request {
+    ConnectPTYRequest connect = 1;
+    PTYInput input = 2;
+    DisconnectPTYRequest disconnect = 3;
+  }
+}
+
+message GameIOResponse {
+  oneof response {
+    ConnectPTYResponse connected = 1;
+    PTYOutput output = 2;
+    PTYEvent event = 3;
+    DisconnectPTYResponse disconnected = 4;
+  }
+}
+
+message ConnectPTYRequest {
+  string session_id = 1;
+  TerminalSize terminal_size = 2;
+  string term_type = 3;
+}
+
+message ConnectPTYResponse {
+  bool success = 1;
+  string error = 2;
+  string pty_id = 3;
+}
+
+message PTYInput {
+  string session_id = 1;
+  bytes data = 2;
+}
+
+message PTYOutput {
+  string session_id = 1;
+  bytes data = 2;
+}
+
+message PTYEvent {
+  string session_id = 1;
+  PTYEventType type = 2;
+  string message = 3;
+  map<string, string> metadata = 4;
+}
+
+enum PTYEventType {
+  PTY_EVENT_UNSPECIFIED = 0;
+  PTY_EVENT_PROCESS_EXIT = 1;
+  PTY_EVENT_PROCESS_ERROR = 2;
+  PTY_EVENT_SESSION_TIMEOUT = 3;
+  PTY_EVENT_SESSION_TERMINATED = 4;
+}
+
+message DisconnectPTYRequest {
+  string session_id = 1;
+  string reason = 2;
+}
+
+message DisconnectPTYResponse {
+  bool success = 1;
+}
+
+message ResizeTerminalRequest {
+  string session_id = 1;
+  TerminalSize new_size = 2;
+}
+
+message ResizeTerminalResponse {
+  bool success = 1;
+  string error = 2;
 }
 
 // Health response

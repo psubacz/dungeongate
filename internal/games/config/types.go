@@ -50,11 +50,11 @@ type GameCleanupOptions struct {
 // NetHackSystemPaths represents system paths detected from NetHack
 type NetHackSystemPaths struct {
 	// Detected from `nethack --showpaths` command
-	ScoreDir    string `json:"scoredir"`    // "/opt/homebrew/share/nethack/"
-	SysConfFile string `json:"sysconf"`     // "/opt/homebrew/Cellar/nethack/3.6.7/libexec/sysconf"
-	SymbolsFile string `json:"symbols"`     // "/opt/homebrew/Cellar/nethack/3.6.7/libexec/symbols"
-	DataFile    string `json:"datafile"`    // "nhdat"
-	UserConfig  string `json:"userconfig"`  // "/Users/caboose/.nethackrc"
+	ScoreDir    string `json:"scoredir"`   // "/opt/homebrew/share/nethack/"
+	SysConfFile string `json:"sysconf"`    // "/opt/homebrew/Cellar/nethack/3.6.7/libexec/sysconf"
+	SymbolsFile string `json:"symbols"`    // "/opt/homebrew/Cellar/nethack/3.6.7/libexec/symbols"
+	DataFile    string `json:"datafile"`   // "nhdat"
+	UserConfig  string `json:"userconfig"` // "/Users/caboose/.nethackrc"
 
 	// Variable paths (customizable, typically "not set")
 	HackDir    string `json:"hackdir"`    // User-specific game directory
@@ -81,12 +81,12 @@ type UserGameDirs struct {
 
 // GameConfigError represents a configuration error
 type GameConfigError struct {
-	ErrorType   string                 `json:"error_type"`
-	Message     string                 `json:"message"`
-	Path        string                 `json:"path,omitempty"`
+	ErrorType   string         `json:"error_type"`
+	Message     string         `json:"message"`
+	Path        string         `json:"path,omitempty"`
 	Details     map[string]any `json:"details,omitempty"`
-	Recoverable bool                   `json:"recoverable"`
-	Suggestions []string               `json:"suggestions,omitempty"`
+	Recoverable bool           `json:"recoverable"`
+	Suggestions []string       `json:"suggestions,omitempty"`
 }
 
 func (e *GameConfigError) Error() string {

@@ -10,9 +10,8 @@ DungeonGate is a microservices-based platform for hosting terminal games like Ne
 
 ### Microservices Design
 - **Session Service** (port 8083/9093): SSH server, PTY management, terminal sessions
-- **Auth Service** (port 8081/8082): Centralized authentication and authorization via gRPC
+- **Auth Service** (port 8081/8082): Centralized authentication, authorization, and user management via gRPC
 - **Game Service** (port 8085/50051): Game management, configuration, and session orchestration
-- **User Service** (port 8084/9084): User registration and profile management
 
 ### API Structure
 Protocol Buffers with versioned APIs:
@@ -21,7 +20,7 @@ Protocol Buffers with versioned APIs:
 - **Games API v2**: `api/proto/games/game_service_v2.proto` → `pkg/api/games/v2/`
 
 ### Key Directories
-- `cmd/` - Service entry points (session-service, auth-service, game-service, user-service)
+- `cmd/` - Service entry points (session-service, auth-service, game-service)
 - `internal/` - Business logic organized by domain
 - `pkg/` - Shared packages (config, database, encryption, ttyrec)
 - `api/proto/` - Protocol Buffer definitions with versioned APIs
@@ -38,14 +37,12 @@ Protocol Buffers with versioned APIs:
 - `make build-session` - Build session service binary
 - `make build-auth` - Build auth service binary
 - `make build-game` - Build game service binary
-- `make build-user` - Build user service binary
 - `make build-all` - Build all service binaries
 
 ### Running Services
 - `make run-session` - Run session service (SSH on port 2222, HTTP on 8083)
 - `make run-auth` - Run auth service (gRPC on 8082, HTTP on 8081)
 - `make run-game` - Run game service (gRPC on 50051, HTTP on 8085)
-- `make run-user` - Run user service (gRPC on 9084, HTTP on 8084)
 - `make run-all` - Run all services with proper startup sequence
 
 ### Protocol Buffers
@@ -79,6 +76,7 @@ Protocol Buffers with versioned APIs:
 ## Current Implementation Status
 
 ### ✅ Completed Features
+- **Stateless Session Service**: Complete refactor to stateless architecture for horizontal scaling
 - SSH server with terminal session management
 - Centralized auth service with JWT tokens
 - User registration and authentication flows
@@ -90,6 +88,7 @@ Protocol Buffers with versioned APIs:
 - Versioned Protocol Buffer APIs
 
 ### 🚧 In Progress
+- Comprehensive test suite for Session Service
 - Game service domain implementation
 - Save file management
 - Game configuration and path management
@@ -131,6 +130,63 @@ The project supports dual-mode database operation:
   - `configs/testing/` - Database testing configurations
 
 ## Testing the Platform
+
+### Test Structure and Organization
+
+The project follows Go standard layout with tests organized as follows:
+
+- **Unit Tests**: Co-located with source files (`*_test.go`)
+- **Integration Tests**: In `/test` directory for larger test suites
+- **Test Data**: Uses `/test/data` or `/test/testdata` for fixtures
+- **Mock Objects**: Extensive use of `testify/mock` for dependency isolation
+
+### Core Test Commands
+
+```bash
+# Run all tests
+make test
+
+# Run with coverage report
+make test-coverage
+
+# Run specific test suites
+make test-ssh          # SSH server functionality
+make test-auth         # Authentication system
+make test-spectating   # Spectating system
+make test-race         # Race condition detection
+make test-short        # Quick tests only
+```
+
+### Session Service Testing
+
+The stateless Session Service includes comprehensive test coverage:
+
+- **Connection Management**: Connection lifecycle, rate limiting, cleanup
+- **SSH Server**: Authentication, channel handling, PTY management
+- **Game Client**: gRPC communication with Game Service
+- **Auth Client**: gRPC communication with Auth Service
+- **Terminal Manager**: PTY creation, resizing, process management
+- **Streaming Manager**: Spectator streaming, stream lifecycle
+- **Service Integration**: End-to-end service functionality
+
+### Test Categories
+
+#### Unit Tests
+- **Components**: Individual service components and managers
+- **Business Logic**: Core functionality and edge cases
+- **Error Handling**: Proper error propagation and recovery
+- **Concurrency**: Thread safety and race condition prevention
+
+#### Integration Tests
+- **Service Communication**: gRPC client-server interactions
+- **Database Operations**: Repository patterns and data persistence
+- **File System**: PTY management and session cleanup
+- **Network**: SSH connections and protocol handling
+
+#### Performance Tests
+- **Benchmarks**: Critical path performance measurement
+- **Load Testing**: Connection limits and resource management
+- **Memory Usage**: Memory leak detection and optimization
 
 ### Quick Start Testing
 ```bash

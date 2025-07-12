@@ -8,4 +8,7 @@ Menu Options:
   [r] Register
   [w] Watch games
   [g] List games
+  [c] Credit
   [q] Quit
+
+Choice: 

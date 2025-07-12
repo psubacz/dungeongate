@@ -9,6 +9,9 @@ import "google/protobuf/timestamp.proto";
 
 // AuthService provides authentication and authorization operations
 service AuthService {
+  // Register creates a new user account
+  rpc Register(RegisterRequest) returns (RegisterResponse);
+  
   // Login authenticates a user and returns tokens
   rpc Login(LoginRequest) returns (LoginResponse);
   
@@ -38,6 +41,33 @@ service AuthService {
   
   // Health check
   rpc Health(google.protobuf.Empty) returns (HealthResponse);
+}
+
+// RegisterRequest represents a user registration request
+message RegisterRequest {
+  string username = 1;
+  string password = 2;
+  string email = 3;
+  string client_id = 4;
+  string client_ip = 5;
+  string user_agent = 6;
+  map<string, string> metadata = 7;
+}
+
+// RegisterResponse represents a user registration response
+message RegisterResponse {
+  bool success = 1;
+  string error = 2;
+  string error_code = 3; // "username_taken", "email_taken", "invalid_password", etc.
+  
+  // Tokens (present on successful registration)
+  string access_token = 4;
+  string refresh_token = 5;
+  int64 access_token_expires_at = 6;
+  int64 refresh_token_expires_at = 7;
+  
+  // User info (present on successful registration)
+  User user = 8;
 }
 
 // LoginRequest represents a login request

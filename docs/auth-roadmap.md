@@ -27,164 +27,126 @@ The DungeonGate authentication service provides centralized authentication and a
 
 ## Development Priorities
 
-### Phase 1: Security Enhancements (Q1 2025)
+### Phase 1: Core Security and Stability (Q1 2025)
 **Priority: High**
 
-#### 1.1 Multi-Factor Authentication (MFA)
-- [ ] **TOTP Support**: Time-based One-Time Password implementation
-- [ ] **Backup Codes**: Emergency access codes for MFA recovery
-- [ ] **MFA Enrollment**: User-friendly MFA setup flow
-- [ ] **MFA Validation**: Integration with login flow
+#### 1.1 Session Management
+- [ ] **Session Tracking**: Track active sessions per user
+- [ ] **Session Revocation**: Allow users to log out other sessions
+- [ ] **Session Expiration**: Configurable session timeout policies
 
-#### 1.2 Advanced Security Features
-- [ ] **Session Management**: Advanced session tracking and revocation
-- [ ] **Device Registration**: Trusted device management
-- [ ] **Suspicious Activity Detection**: Behavioral analysis and alerting
-- [ ] **Password Policy Enforcement**: Configurable password complexity rules
+#### 1.2 Security Hardening
+- [ ] **Password Policy**: Basic password strength requirements
+- [ ] **Failed Login Tracking**: Improve rate limiting and lockout mechanisms
+- [ ] **Audit Logging**: Authentication event logging for security monitoring
 
-#### 1.3 Audit and Compliance
-- [ ] **Audit Logging**: Comprehensive authentication event logging
-- [ ] **Compliance Reports**: Security audit trail generation
-- [ ] **Data Retention**: Configurable log retention policies
-
-### Phase 2: User Experience Improvements (Q2 2025)
+### Phase 2: User Experience (Q2 2025)
 **Priority: Medium**
 
-#### 2.1 Password Recovery Enhancements
+#### 2.1 Password Recovery
 - [ ] **Email Integration**: SMTP service for password reset emails
-- [ ] **Security Questions**: Alternative recovery methods
-- [ ] **Recovery Link Expiration**: Configurable reset token lifetimes
+- [ ] **Recovery Link Management**: Secure token generation and expiration
+- [ ] **Email Verification**: Validate user email addresses
 
 #### 2.2 Account Management
-- [ ] **Email Verification**: User email validation flow
-- [ ] **Profile Management**: User profile updates through auth service
-- [ ] **Account Deletion**: Secure account removal with data cleanup
+- [ ] **Profile Updates**: Allow users to update their information
+- [ ] **Account Deletion**: User-initiated account removal
+- [ ] **Password History**: Prevent password reuse
 
-#### 2.3 Social Authentication
-- [ ] **OAuth2 Integration**: Third-party authentication providers
-- [ ] **GitHub Authentication**: Developer-friendly login option
-- [ ] **Account Linking**: Link social accounts to existing users
-
-### Phase 3: Advanced Features (Q3 2025)
-**Priority: Low**
-
-#### 3.1 Role-Based Access Control (RBAC)
-- [ ] **Role Management**: Dynamic role creation and assignment
-- [ ] **Permission System**: Granular permission management
-- [ ] **Resource-Based Permissions**: Fine-grained access control
-
-#### 3.2 API Security
-- [ ] **API Key Management**: Service-to-service authentication
-- [ ] **OAuth2 Server**: Full OAuth2 provider implementation
-- [ ] **Scope-Based Access**: API endpoint access control
-
-#### 3.3 Enterprise Features
-- [ ] **LDAP Integration**: Enterprise directory service support
-- [ ] **SAML SSO**: Single Sign-On for enterprise environments
-- [ ] **Group Management**: User group organization and permissions
-
-### Phase 4: Scalability and Performance (Q4 2025)
+### Phase 3: Game Integration Features (Q3 2025)
 **Priority: Medium**
 
-#### 4.1 Caching and Performance
-- [ ] **Redis Integration**: Session caching and rate limiting
-- [ ] **Token Caching**: JWT validation performance optimization
-- [ ] **Database Optimization**: Query performance improvements
+#### 3.1 Game-Specific Authentication
+- [ ] **Game Session Tokens**: Secure tokens for game sessions
+- [ ] **Spectator Authentication**: Read-only access for game spectating
+- [ ] **Game Access Control**: Per-game access permissions
 
-#### 4.2 High Availability
-- [ ] **Service Clustering**: Multi-instance deployment support
-- [ ] **Database Replication**: Read/write splitting for performance
-- [ ] **Load Balancing**: Service discovery and load distribution
+#### 3.2 Basic Role Management
+- [ ] **User Roles**: Basic roles (admin, player, spectator)
+- [ ] **Permission Checks**: Role-based access to features
+- [ ] **Admin Functions**: User management capabilities
 
-#### 4.3 Monitoring and Metrics
-- [ ] **Prometheus Metrics**: Authentication service metrics
-- [ ] **Health Dashboards**: Service health monitoring
-- [ ] **Performance Monitoring**: Response time and throughput tracking
+### Phase 4: Performance and Monitoring (Q4 2025)
+**Priority: Low**
+
+#### 4.1 Performance Optimization
+- [ ] **Token Caching**: In-memory token validation cache
+- [ ] **Database Query Optimization**: Improve authentication query performance
+- [ ] **Connection Pooling**: Optimize database connections
+
+#### 4.2 Monitoring
+- [ ] **Health Metrics**: Basic service health monitoring
+- [ ] **Performance Metrics**: Authentication timing and success rates
+- [ ] **Alert System**: Basic alerts for authentication failures
 
 ## Technical Debt and Maintenance
 
 ### Code Quality
-- [ ] **Test Coverage**: Expand unit and integration test coverage
-- [ ] **Documentation**: API documentation and developer guides
-- [ ] **Code Review**: Establish code review processes
+- [ ] **Test Coverage**: Achieve 80% test coverage
+- [ ] **API Documentation**: Complete API documentation
+- [ ] **Error Handling**: Consistent error responses
 
 ### Configuration Management
-- [ ] **Environment Variables**: Migrate to environment-based configuration
-- [ ] **Secret Management**: Secure credential storage and rotation
-- [ ] **Feature Flags**: Runtime feature toggling
+- [ ] **Environment Variables**: Support for environment-based config
+- [ ] **Secret Rotation**: Basic secret management practices
+- [ ] **Configuration Validation**: Startup configuration checks
 
 ### Database Management
-- [ ] **Migration System**: Database schema versioning
-- [ ] **Backup Strategy**: Automated backup and recovery procedures
-- [ ] **Data Archiving**: Historical data management
+- [ ] **Migration System**: Proper database migration tooling
+- [ ] **Backup Strategy**: Basic backup procedures
+- [ ] **Index Optimization**: Database performance tuning
 
 ## Integration Points
 
 ### Game Service Integration
-- [ ] **Game Session Authentication**: Secure game session validation
-- [ ] **Player Statistics**: User game data association
-- [ ] **Achievement System**: User achievement tracking
+- [ ] **Session Validation**: Verify user sessions for game access
+- [ ] **Player Identity**: Associate players with game sessions
+- [ ] **Access Control**: Game-specific permissions
 
 ### Notification Service Integration
-- [ ] **Security Alerts**: Suspicious activity notifications
-- [ ] **Password Expiration**: Proactive password renewal reminders
-- [ ] **Account Changes**: User notification for profile updates
-
-### Admin Service Integration
-- [ ] **User Management**: Administrative user operations
-- [ ] **System Monitoring**: Service health and performance metrics
-- [ ] **Security Dashboard**: Real-time security monitoring
+- [ ] **Login Alerts**: Optional login notifications
+- [ ] **Password Changes**: Notify users of password updates
+- [ ] **Security Events**: Alert users to suspicious activity
 
 ## Success Metrics
 
 ### Security Metrics
-- Authentication success rate: >99.5%
+- Authentication success rate: >99%
 - Failed login attempts blocked: >95%
-- Password reset completion rate: >80%
-- Zero security incidents related to authentication
+- Zero security incidents
 
 ### Performance Metrics
-- Authentication response time: <100ms (95th percentile)
-- Token validation time: <10ms (95th percentile)
-- Service uptime: >99.9%
-- Concurrent user capacity: 10,000+ users
+- Authentication response time: <200ms (95th percentile)
+- Service uptime: >99.5%
+- Support 1000+ concurrent users
 
 ### User Experience Metrics
 - Password reset success rate: >90%
-- User onboarding completion: >85%
-- Support tickets related to authentication: <5% of total
+- Login success rate: >95%
+- Minimal authentication-related support tickets
 
 ## Dependencies
 
 ### External Services
 - SMTP service for email notifications
-- Redis for caching and session management
-- Certificate authority for TLS/SSL certificates
+- Database service (SQLite/PostgreSQL)
 
 ### Internal Services
-- Database service for user data persistence
-- Logging service for audit trails
-- Monitoring service for health checks
+- User service for profile management
+- Game service for session management
+- Session service for SSH authentication
 
 ## Risk Assessment
 
-### High Risk
-- **Security Vulnerabilities**: Regular security audits and penetration testing
-- **Data Breaches**: Encryption and secure data handling practices
-- **Service Downtime**: High availability and disaster recovery planning
+### High Priority Risks
+- **Security Vulnerabilities**: Regular security updates and best practices
+- **Service Downtime**: Basic redundancy and error recovery
+- **Data Loss**: Regular backups and data integrity checks
 
-### Medium Risk
-- **Performance Degradation**: Load testing and capacity planning
-- **Integration Failures**: Comprehensive testing of service interactions
-- **Configuration Errors**: Automated configuration validation
-
-### Low Risk
-- **Feature Delays**: Agile development and iterative delivery
-- **Technical Debt**: Regular refactoring and code quality reviews
-- **Documentation Gaps**: Continuous documentation updates
+### Medium Priority Risks
+- **Performance Issues**: Load testing and capacity planning
+- **Integration Failures**: Comprehensive integration testing
 
 ## Conclusion
 
-The authentication service roadmap focuses on building a secure, scalable, and user-friendly authentication system for the DungeonGate platform. The phased approach ensures critical security features are implemented first, followed by user experience improvements and advanced features.
-
-Regular review and updates to this roadmap will ensure alignment with platform requirements and security best practices.
+This streamlined roadmap focuses on delivering a secure, reliable authentication service appropriate for a terminal game hosting platform. The priorities emphasize core security features, basic user management, and game-specific integrations while avoiding enterprise complexity that would be overkill for this use case.

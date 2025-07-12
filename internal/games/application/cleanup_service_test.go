@@ -105,7 +105,7 @@ func TestCleanupService_CleanupGameData(t *testing.T) {
 	// Set up mock expectations
 	sessionRepo.On("FindByID", ctx, domain.NewSessionID(sessionID.String())).Return(session, nil)
 	saveRepo.On("FindByUser", ctx, session.UserID()).Return(saves, nil)
-	saveRepo.On("Save", ctx, mock.AnythingOfType("*domain.GameSave")).Return(nil)
+	// Note: Save is only called if verification fails. Since our mock save passes verification, no Save call expected.
 	eventRepo.On("SaveEvent", ctx, mock.AnythingOfType("*domain.GameEvent")).Return(nil)
 
 	// Test cleanup
@@ -200,13 +200,13 @@ func TestCleanupService_PeriodicCleanup(t *testing.T) {
 
 func createMockSessionWithProcess(userID int, gameID string, pid int) *domain.GameSession {
 	session := createMockSession(userID, gameID)
-	
+
 	// Start session with process info
 	session.Start(domain.ProcessInfo{
 		PID:     pid,
 		PodName: "test-pod",
 	})
-	
+
 	return session
 }
 
@@ -214,7 +214,7 @@ func createMockSaveWithFile(tempDir string, userID int, gameID, filename string,
 	// Create actual file for testing
 	filePath := filepath.Join(tempDir, filename)
 	os.WriteFile(filePath, data, 0644)
-	
+
 	return createMockSave(userID, gameID, filePath, data)
 }
 
@@ -248,7 +248,7 @@ func BenchmarkCleanupService_CleanupExpiredSessions(b *testing.B) {
 	sessionRepo := &MockSessionRepository{}
 	saveRepo := &MockSaveRepository{}
 	eventRepo := &MockEventRepository{}
-	logger := &testLogger{t: &testing.T{}}
+	logger := log.New(os.Stdout, "TEST: ", log.LstdFlags)
 
 	cleanupService := NewCleanupService(sessionRepo, saveRepo, eventRepo, logger)
 	ctx := context.Background()
@@ -294,7 +294,7 @@ func TestSessionManager_Integration_SaveLifecycle(t *testing.T) {
 	sessionDir1 := filepath.Join(tempDir, "sessions", session1.ID().String())
 	saveDir1 := filepath.Join(sessionDir1, "save")
 	os.MkdirAll(saveDir1, 0755)
-	
+
 	saveData1 := []byte("game progress data v1")
 	saveFile1 := filepath.Join(saveDir1, "save.dat")
 	os.WriteFile(saveFile1, saveData1, 0644)

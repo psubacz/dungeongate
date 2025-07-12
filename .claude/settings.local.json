@@ -5,7 +5,19 @@
       "Bash(rg:*)",
       "Bash(find:*)",
       "Bash(ls:*)",
-      "Bash(make:*)"
+      "Bash(make:*)",
+      "Bash(go build:*)",
+      "Bash(mkdir:*)",
+      "Bash(go mod:*)",
+      "Bash(rm:*)",
+      "Bash(go test:*)",
+      "Bash(pkill:*)",
+      "Bash(true)",
+      "Bash(cp:*)",
+      "Bash(go run:*)",
+      "mcp__ide__getDiagnostics",
+      "Bash(timeout:*)",
+      "Bash(cat:*)"
     ],
     "deny": []
   }

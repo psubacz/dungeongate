@@ -61,7 +61,7 @@ ssh:
   # SSH Authentication Configuration
   auth:
     # Enable password-based authentication
-    password_auth: true
+    password_auth: false
     
     # Enable public key authentication (requires key management setup)
     public_key_auth: false

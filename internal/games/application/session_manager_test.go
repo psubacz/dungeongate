@@ -297,14 +297,14 @@ func createTestSessionManager(t *testing.T) (*SessionManager, *MockSessionReposi
 	saveRepo := &MockSaveRepository{}
 	gameRepo := &MockGameRepository{}
 	eventRepo := &MockEventRepository{}
-	
+
 	// Create temporary directory for testing
 	tempDir := t.TempDir()
-	
+
 	logger := createTestLogger(t)
-	
+
 	sm := NewSessionManager(sessionRepo, saveRepo, gameRepo, eventRepo, tempDir, logger)
-	
+
 	return sm, sessionRepo, saveRepo, gameRepo, eventRepo, tempDir
 }
 
@@ -324,7 +324,7 @@ func TestSessionManager_StartGameSession_NewUser(t *testing.T) {
 
 	// Create mock game
 	game := createMockGame(gameID)
-	
+
 	// Set up mock expectations
 	gameRepo.On("FindByID", ctx, domain.NewGameID(gameID)).Return(game, nil)
 	saveRepo.On("FindByUserAndGame", ctx, domain.NewUserID(userID), domain.NewGameID(gameID)).Return(nil, fmt.Errorf("not found"))
@@ -401,7 +401,7 @@ func TestSessionManager_StartGameSession_WithExistingSave(t *testing.T) {
 }
 
 func TestSessionManager_CreateSaveFromSession(t *testing.T) {
-	sm, sessionRepo, saveRepo, gameRepo, eventRepo, tempDir := createTestSessionManager(t)
+	sm, _, saveRepo, _, _, tempDir := createTestSessionManager(t)
 	ctx := context.Background()
 
 	// Create test session
@@ -446,7 +446,7 @@ func TestSessionManager_CreateSaveFromSession(t *testing.T) {
 }
 
 func TestSessionManager_EndGameSession(t *testing.T) {
-	sm, sessionRepo, saveRepo, gameRepo, eventRepo, tempDir := createTestSessionManager(t)
+	sm, sessionRepo, saveRepo, _, eventRepo, tempDir := createTestSessionManager(t)
 	ctx := context.Background()
 
 	// Create test session
@@ -488,17 +488,56 @@ func TestSessionManager_EndGameSession(t *testing.T) {
 // Helper functions for creating mock objects
 
 func createMockGame(gameID string) *domain.Game {
-	// This would need to match the actual Game domain model
-	// For now, return nil since we don't have the complete Game implementation
-	// In a real test, this would create a proper Game object
-	return nil
+	// Create a mock game that uses a simple test binary
+	config := domain.GameConfig{
+		Binary: domain.BinaryConfig{
+			Path:             "/bin/sleep",  // Use sleep as a safe test binary
+			Args:             []string{"1"}, // Sleep for 1 second
+			WorkingDirectory: "/tmp",
+		},
+		Environment: map[string]string{
+			"TERM": "xterm",
+		},
+		Resources: domain.ResourceConfig{
+			CPULimit:    "50m",   // 50 millicores
+			MemoryLimit: "512Mi", // 512MB
+			DiskLimit:   "1Gi",   // 1GB
+		},
+		Security: domain.SecurityConfig{
+			RunAsUser:                1000,
+			RunAsGroup:               1000,
+			ReadOnlyRootFilesystem:   true,
+			AllowPrivilegeEscalation: false,
+			Capabilities:             []string{},
+		},
+		Networking: domain.NetworkConfig{
+			Isolated:      true,
+			BlockInternet: true,
+		},
+	}
+
+	metadata := domain.GameMetadata{
+		Name:        "Test Game",
+		ShortName:   gameID,
+		Description: "Mock game for testing",
+		Category:    "test",
+		Tags:        []string{"test"},
+		Version:     "1.0.0",
+		Difficulty:  1,
+	}
+
+	return domain.NewGame(
+		domain.NewGameID(gameID),
+		metadata,
+		config,
+	)
 }
 
 func createMockSave(userID int, gameID, filePath string, data []byte) *domain.GameSave {
 	saveID := domain.NewSaveID(uuid.New().String())
 	userIDDomain := domain.NewUserID(userID)
 	gameIDDomain := domain.NewGameID(gameID)
-	
+
 	metadata := domain.SaveMetadata{
 		GameVersion: "1.0",
 		Character:   "TestCharacter",
@@ -507,7 +546,7 @@ func createMockSave(userID int, gameID, filePath string, data []byte) *domain.Ga
 		PlayTime:    time.Hour,
 		Location:    "Test Dungeon",
 	}
-	
+
 	return domain.NewGameSave(saveID, userIDDomain, gameIDDomain, data, filePath, metadata)
 }
 
@@ -516,11 +555,11 @@ func createMockSession(userID int, gameID string) *domain.GameSession {
 	userIDDomain := domain.NewUserID(userID)
 	gameIDDomain := domain.NewGameID(gameID)
 	terminalSize := domain.TerminalSize{Width: 80, Height: 24}
-	
+
 	session := domain.NewGameSession(sessionID, userIDDomain, "testuser", gameIDDomain, domain.GameConfig{}, terminalSize)
-	
+
 	// Start the session to make it active
 	session.Start(domain.ProcessInfo{PID: 12345, PodName: "test-pod"})
-	
+
 	return session
 }

@@ -14,12 +14,10 @@ GOFMT=gofmt
 SESSION_BINARY_NAME=dungeongate-session-service
 AUTH_BINARY_NAME=dungeongate-auth-service
 GAME_BINARY_NAME=dungeongate-game-service
-USER_BINARY_NAME=dungeongate-user-service
 BUILD_DIR=build
 SESSION_MAIN_PATH=./cmd/session-service
 AUTH_MAIN_PATH=./cmd/auth-service
 GAME_MAIN_PATH=./cmd/game-service
-USER_MAIN_PATH=./cmd/user-service
 TEST_DATA_DIR=test-data
 CONFIG_DIR=configs
 
@@ -35,7 +33,6 @@ LDFLAGS=-ldflags "-s -w -X main.version=$(VERSION) -X main.buildTime=$(BUILD_TIM
 SESSION_CONFIG=configs/development/session-service.yaml
 AUTH_CONFIG=configs/development/auth-service.yaml
 GAME_CONFIG=configs/development/game-service.yaml
-USER_CONFIG=configs/development/user-service.yaml
 # Legacy config (deprecated - use service-specific configs)
 TEST_TIMEOUT=30s
 TEST_COVERAGE_DIR=coverage
@@ -93,15 +90,8 @@ build-game: deps ## Build the game service binary
 	$(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(GAME_BINARY_NAME) $(GAME_MAIN_PATH)
 	@echo "$(GREEN)Build completed: $(BUILD_DIR)/$(GAME_BINARY_NAME)$(NC)"
 
-.PHONY: build-user
-build-user: deps ## Build the user service binary
-	@echo "$(GREEN)Building $(USER_BINARY_NAME)...$(NC)"
-	@mkdir -p $(BUILD_DIR)
-	$(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(USER_BINARY_NAME) $(USER_MAIN_PATH)
-	@echo "$(GREEN)Build completed: $(BUILD_DIR)/$(USER_BINARY_NAME)$(NC)"
-
 .PHONY: build-all
-build-all: build-session build-auth build-game build-user ## Build all service binaries
+build-all: build-session build-auth build-game ## Build all service binaries
 
 # Legacy alias for backward compatibility
 .PHONY: build
@@ -271,6 +261,14 @@ clean-test-env: ## Clean test environment
 
 ##@ Running Individual Services
 
+.PHONY: stop
+stop: ## Stop all running DungeonGate services
+	@echo "$(GREEN)Stopping all DungeonGate services...$(NC)"
+	@pkill -f "dungeongate-session-service" 2>/dev/null || true
+	@pkill -f "dungeongate-auth-service" 2>/dev/null || true
+	@pkill -f "dungeongate-game-service" 2>/dev/null || true
+	@echo "$(GREEN)All DungeonGate services stopped$(NC)"
+
 .PHONY: run-session
 run-session: build-session setup-test-env ## Build and run the session service
 	@echo "$(GREEN)Starting DungeonGate Session Service...$(NC)"
@@ -286,24 +284,16 @@ run-game: build-game ## Build and run the game service
 	@echo "$(GREEN)Starting DungeonGate Game Service...$(NC)"
 	./$(BUILD_DIR)/$(GAME_BINARY_NAME) -config=$(GAME_CONFIG)
 
-.PHONY: run-user
-run-user: build-user ## Build and run the user service
-	@echo "$(GREEN)Starting DungeonGate User Service...$(NC)"
-	./$(BUILD_DIR)/$(USER_BINARY_NAME) -config=$(USER_CONFIG)
-
 .PHONY: run-all
 run-all: build-all setup-test-env ## Build and run all services
 	@echo "$(GREEN)Starting all DungeonGate services...$(NC)"
 	@echo "$(YELLOW)Auth service will run on port 8081/8082$(NC)"
 	@echo "$(YELLOW)Game service will run on port 8085/50051$(NC)"
-	@echo "$(YELLOW)User service will run on port 8084/9084$(NC)"
 	@echo "$(YELLOW)Session service will run on port 8083/2222$(NC)"
 	@echo "$(YELLOW)Use Ctrl+C to stop all services$(NC)"
 	@(./$(BUILD_DIR)/$(AUTH_BINARY_NAME) -config=$(AUTH_CONFIG) &) && \
 	 sleep 2 && \
 	 (./$(BUILD_DIR)/$(GAME_BINARY_NAME) -config=$(GAME_CONFIG) &) && \
-	 sleep 2 && \
-	 (./$(BUILD_DIR)/$(USER_BINARY_NAME) -config=$(USER_CONFIG) &) && \
 	 sleep 2 && \
 	 ./$(BUILD_DIR)/$(SESSION_BINARY_NAME) -config=$(SESSION_CONFIG)
 
@@ -437,7 +427,6 @@ info: version ## Show project information
 	@echo "Session Binary: $(SESSION_BINARY_NAME)"
 	@echo "Auth Binary: $(AUTH_BINARY_NAME)"
 	@echo "Game Binary: $(GAME_BINARY_NAME)"
-	@echo "User Binary: $(USER_BINARY_NAME)"
 	@echo "Build Directory: $(BUILD_DIR)"
 	@echo "Test Config: $(TEST_CONFIG)"
 	@echo "Go Version: $$(go version)"
@@ -517,7 +506,7 @@ GO_OUT_DIR=pkg/api
 .PHONY: proto-gen
 proto-gen: ## Generate Go code from Protocol Buffers
 	@echo "$(GREEN)Generating Go code from protobuf definitions...$(NC)"
-	@mkdir -p $(GO_OUT_DIR)
+	@mkdir -p $(GO_OUT_DIR)/auth/v1 $(GO_OUT_DIR)/games/v1 $(GO_OUT_DIR)/games/v2
 	$(PROTOC) --go_out=$(GO_OUT_DIR) --go_opt=paths=source_relative \
 		--go-grpc_out=$(GO_OUT_DIR) --go-grpc_opt=paths=source_relative \
 		-I $(PROTO_DIR) $(PROTO_DIR)/auth/auth_service.proto
@@ -527,11 +516,17 @@ proto-gen: ## Generate Go code from Protocol Buffers
 	$(PROTOC) --go_out=$(GO_OUT_DIR) --go_opt=paths=source_relative \
 		--go-grpc_out=$(GO_OUT_DIR) --go-grpc_opt=paths=source_relative \
 		-I $(PROTO_DIR) $(PROTO_DIR)/games/game_service_v2.proto
+	@mv $(GO_OUT_DIR)/auth/auth_service.pb.go $(GO_OUT_DIR)/auth/v1/
+	@mv $(GO_OUT_DIR)/auth/auth_service_grpc.pb.go $(GO_OUT_DIR)/auth/v1/
+	@mv $(GO_OUT_DIR)/games/game_service_v1.pb.go $(GO_OUT_DIR)/games/v1/
+	@mv $(GO_OUT_DIR)/games/game_service_v1_grpc.pb.go $(GO_OUT_DIR)/games/v1/
+	@mv $(GO_OUT_DIR)/games/game_service_v2.pb.go $(GO_OUT_DIR)/games/v2/
+	@mv $(GO_OUT_DIR)/games/game_service_v2_grpc.pb.go $(GO_OUT_DIR)/games/v2/
 
 .PHONY: proto-clean
 proto-clean: ## Clean generated protobuf files
 	@echo "$(GREEN)Cleaning generated protobuf files...$(NC)"
-	@rm -rf $(GO_OUT_DIR)/auth $(GO_OUT_DIR)/games
+	@rm -rf $(GO_OUT_DIR)/auth $(GO_OUT_DIR)/games $(GO_OUT_DIR)/github.com
 
 
 .PHONY: test-game-service
