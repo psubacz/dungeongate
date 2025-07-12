@@ -92,6 +92,13 @@ func main() {
 		MaxPTYs:        500,
 	}
 
+	// Set banner configuration if available
+	if cfg.Menu != nil && cfg.Menu.Banners != nil {
+		sessionConfig.Menu.Banners.MainAnon = cfg.Menu.Banners.MainAnon
+		sessionConfig.Menu.Banners.MainUser = cfg.Menu.Banners.MainUser
+		sessionConfig.Menu.Banners.WatchMenu = cfg.Menu.Banners.WatchMenu
+	}
+
 	// Create stateless session service
 	sessionService, err := session.New(sessionConfig, logger)
 	if err != nil {

@@ -29,6 +29,11 @@ func NewBannerManager(config *BannerConfig) *BannerManager {
 
 // RenderMainAnon renders the main anonymous user banner
 func (bm *BannerManager) RenderMainAnon() (string, error) {
+	// Debug: log the banner path being used
+	if bm.config.MainAnon == "" {
+		return "", fmt.Errorf("main anonymous banner path is not configured")
+	}
+	
 	return bm.renderBanner(bm.config.MainAnon, map[string]string{
 		"$SERVERID": "DungeonGate",
 		"$DATE":     time.Now().Format("2006-01-02"),
@@ -57,6 +62,11 @@ func (bm *BannerManager) RenderWatchMenu() (string, error) {
 
 // renderBanner loads a banner file and substitutes template variables
 func (bm *BannerManager) renderBanner(filePath string, variables map[string]string) (string, error) {
+	// Check if filePath is empty
+	if filePath == "" {
+		return "", fmt.Errorf("banner file path is empty")
+	}
+
 	// Check if file exists
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
 		return "", fmt.Errorf("banner file not found: %s", filePath)

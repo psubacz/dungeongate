@@ -6,6 +6,7 @@ import (
 	"io"
 	"log/slog"
 	"net"
+	"strconv"
 	"strings"
 	"time"
 
@@ -47,7 +48,7 @@ func (h *Handler) HandleConnection(ctx context.Context, conn net.Conn, config *s
 		h.logger.Warn("Failed to register connection", "remote_addr", conn.RemoteAddr())
 		return
 	}
-	defer h.manager.UnregisterConnection(connID)
+	defer h.manager.UnregisterConnection(connID, conn.RemoteAddr())
 
 	// Perform SSH handshake
 	sshConn, chans, reqs, err := ssh.NewServerConn(conn, config)
@@ -64,7 +65,7 @@ func (h *Handler) HandleConnection(ctx context.Context, conn net.Conn, config *s
 
 	// Handle SSH channels and requests
 	go h.handleRequests(ctx, reqs, connID)
-	h.handleChannels(ctx, chans, connID, sshConn.User())
+	h.handleChannels(ctx, chans, connID, sshConn)
 }
 
 // handleRequests handles SSH requests
@@ -88,13 +89,13 @@ func (h *Handler) handleRequests(ctx context.Context, reqs <-chan *ssh.Request, 
 }
 
 // handleChannels handles SSH channels
-func (h *Handler) handleChannels(ctx context.Context, chans <-chan ssh.NewChannel, connID, username string) {
+func (h *Handler) handleChannels(ctx context.Context, chans <-chan ssh.NewChannel, connID string, sshConn *ssh.ServerConn) {
 	for newChannel := range chans {
 		h.logger.Debug("Received SSH channel", "type", newChannel.ChannelType(), "connection_id", connID)
 
 		switch newChannel.ChannelType() {
 		case "session":
-			go h.handleSessionChannel(ctx, newChannel, connID, username)
+			go h.handleSessionChannel(ctx, newChannel, connID, sshConn)
 		default:
 			newChannel.Reject(ssh.UnknownChannelType, "unknown channel type")
 		}
@@ -102,7 +103,7 @@ func (h *Handler) handleChannels(ctx context.Context, chans <-chan ssh.NewChanne
 }
 
 // handleSessionChannel handles SSH session channels
-func (h *Handler) handleSessionChannel(ctx context.Context, newChannel ssh.NewChannel, connID, username string) {
+func (h *Handler) handleSessionChannel(ctx context.Context, newChannel ssh.NewChannel, connID string, sshConn *ssh.ServerConn) {
 	channel, requests, err := newChannel.Accept()
 	if err != nil {
 		h.logger.Error("Failed to accept channel", "error", err, "connection_id", connID)
@@ -128,19 +129,20 @@ func (h *Handler) handleSessionChannel(ctx context.Context, newChannel ssh.NewCh
 			req.Reply(true, nil)
 
 			// Get user info from auth service
-			userInfo, err := h.getUserInfo(ctx, username)
+			// For anonymous connections (no password auth), userInfo will be nil
+			// This allows both anonymous and authenticated workflows
+			userInfo, err := h.getUserInfo(ctx, sshConn)
 			if err != nil {
-				h.logger.Error("Failed to get user info", "error", err, "username", username)
-				channel.Write([]byte("Authentication failed\r\n"))
-				return
+				h.logger.Debug("No authenticated user info available, treating as anonymous", "error", err, "username", sshConn.User())
+				userInfo = nil // Treat as anonymous user
 			}
 
 			// Main menu loop
 			for {
 				// Check if game service is available
 				if !h.gameClient.IsHealthy(ctx) {
-					h.logger.Info("Game service unavailable, entering idle mode", "username", username)
-					h.handleIdleMode(ctx, channel, connID, username)
+					h.logger.Info("Game service unavailable, entering idle mode", "username", sshConn.User())
+					h.handleIdleMode(ctx, channel, connID, sshConn.User())
 					// If idle mode returns, user either pressed 'r' to retry or 'q' to quit
 					// If context is done, user quit, so we return
 					if ctx.Err() != nil {
@@ -154,14 +156,14 @@ func (h *Handler) handleSessionChannel(ctx context.Context, newChannel ssh.NewCh
 				var menuChoice *menu.MenuChoice
 				if userInfo == nil || userInfo.Id == "" {
 					// Show anonymous menu
-					menuChoice, err = h.menuHandler.ShowAnonymousMenu(ctx, channel, username)
+					menuChoice, err = h.menuHandler.ShowAnonymousMenu(ctx, channel, sshConn.User())
 				} else {
 					// Show authenticated user menu
-					menuChoice, err = h.menuHandler.ShowUserMenu(ctx, channel, username)
+					menuChoice, err = h.menuHandler.ShowUserMenu(ctx, channel, sshConn.User())
 				}
 
 				if err != nil {
-					h.logger.Error("Error in menu handler", "error", err, "username", username)
+					h.logger.Error("Error in menu handler", "error", err, "username", sshConn.User())
 					if ctx.Err() != nil {
 						return // Context cancelled
 					}
@@ -169,8 +171,8 @@ func (h *Handler) handleSessionChannel(ctx context.Context, newChannel ssh.NewCh
 				}
 
 				// Handle menu choice
-				if err := h.handleMenuChoice(ctx, channel, menuChoice, userInfo, connID, username, terminalCols, terminalRows); err != nil {
-					h.logger.Error("Error handling menu choice", "error", err, "choice", menuChoice.Action, "username", username)
+				if err := h.handleMenuChoice(ctx, channel, menuChoice, userInfo, connID, sshConn.User(), terminalCols, terminalRows); err != nil {
+					h.logger.Error("Error handling menu choice", "error", err, "choice", menuChoice.Action, "username", sshConn.User())
 					if ctx.Err() != nil {
 						return // Context cancelled
 					}
@@ -212,10 +214,20 @@ func (h *Handler) handleSessionChannel(ctx context.Context, newChannel ssh.NewCh
 }
 
 // getUserInfo retrieves user information from the auth service
-func (h *Handler) getUserInfo(ctx context.Context, username string) (*authv1.User, error) {
-	// In a real implementation, we'd have a token from the SSH authentication
-	// For now, we'll mock this by calling GetUserInfo with a placeholder
-	resp, err := h.authClient.GetUserInfo(ctx, "mock_token")
+func (h *Handler) getUserInfo(ctx context.Context, sshConn *ssh.ServerConn) (*authv1.User, error) {
+	// Get the access token from SSH permissions (set during authentication)
+	permissions := sshConn.Permissions
+	if permissions == nil || permissions.Extensions == nil {
+		return nil, fmt.Errorf("no authentication token available")
+	}
+	
+	accessToken, ok := permissions.Extensions["access_token"]
+	if !ok || accessToken == "" {
+		return nil, fmt.Errorf("no access token in session")
+	}
+	
+	// Validate token with auth service
+	resp, err := h.authClient.GetUserInfo(ctx, accessToken)
 	if err != nil {
 		return nil, err
 	}
@@ -457,7 +469,11 @@ func (a *AuthHandler) PasswordCallback(conn ssh.ConnMetadata, password []byte) (
 func (a *AuthHandler) PublicKeyCallback(conn ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
 	// For now, reject public key authentication
 	// In a real implementation, we'd validate the key against stored public keys
-	a.logger.Debug("Public key authentication attempted", "username", conn.User())
+	var username string
+	if conn != nil {
+		username = conn.User()
+	}
+	a.logger.Debug("Public key authentication attempted", "username", username)
 	return nil, fmt.Errorf("public key authentication not supported")
 }
 
@@ -559,22 +575,34 @@ func (h *Handler) handleMenuChoice(ctx context.Context, channel ssh.Channel, cho
 		return fmt.Errorf("user quit") // This will exit the session
 
 	case "play":
-		// Start a game session
-		return h.startGameSession(ctx, channel, userInfo, connID, username, terminalCols, terminalRows)
+		// Show game selection menu for authenticated users
+		if userInfo != nil {
+			return h.handleGameSelection(ctx, channel, userInfo, connID, username, terminalCols, terminalRows)
+		} else {
+			channel.Write([]byte("Please login first to play games.\r\n"))
+			channel.Write([]byte("Press any key to continue...\r\n"))
+			buffer := make([]byte, 1)
+			channel.Read(buffer)
+			return nil
+		}
 
 	case "login":
-		channel.Write([]byte("Login functionality not yet implemented.\r\n"))
-		channel.Write([]byte("Press any key to continue...\r\n"))
-		buffer := make([]byte, 1)
-		channel.Read(buffer)
-		return nil
+		return h.handleLogin(ctx, channel, connID, username)
 
 	case "register":
-		channel.Write([]byte("Registration functionality not yet implemented.\r\n"))
-		channel.Write([]byte("Press any key to continue...\r\n"))
-		buffer := make([]byte, 1)
-		channel.Read(buffer)
-		return nil
+		return h.handleRegister(ctx, channel, connID, username)
+
+	case "start_game":
+		// Start a specific game session with the selected game ID
+		if userInfo != nil {
+			return h.startSpecificGameSession(ctx, channel, userInfo, connID, username, choice.Value, terminalCols, terminalRows)
+		} else {
+			channel.Write([]byte("Please login first to play games.\r\n"))
+			channel.Write([]byte("Press any key to continue...\r\n"))
+			buffer := make([]byte, 1)
+			channel.Read(buffer)
+			return nil
+		}
 
 	case "watch":
 		channel.Write([]byte("Spectating functionality not yet implemented.\r\n"))
@@ -627,10 +655,13 @@ func (h *Handler) startGameSession(ctx context.Context, channel ssh.Channel, use
 
 	// Start game session via Game Service
 	// Convert string ID to int32 for the API
-	// TODO: Properly parse userInfo.Id string to int32
-	userID := int32(1)
-	_ = userInfo // TODO: Use userInfo.Id for actual user ID
-	sessionInfo, err := h.gameClient.StartGameSession(ctx, userID, username, gameID, terminalCols, terminalRows)
+	userID, err := strconv.ParseInt(userInfo.Id, 10, 32)
+	if err != nil {
+		h.logger.Error("Invalid user ID format", "user_id", userInfo.Id, "error", err)
+		channel.Write([]byte("Invalid user ID. Please contact administrator.\r\n"))
+		return nil
+	}
+	sessionInfo, err := h.gameClient.StartGameSession(ctx, int32(userID), username, gameID, terminalCols, terminalRows)
 	if err != nil {
 		h.logger.Error("Failed to start game session", "error", err, "username", username)
 		// Check if the error is due to game service unavailability
@@ -655,4 +686,208 @@ func (h *Handler) startGameSession(ctx context.Context, channel ssh.Channel, use
 	h.handleGameIO(ctx, channel, sessionID, connID)
 
 	return nil
+}
+
+// handleLogin handles the login process
+func (h *Handler) handleLogin(ctx context.Context, channel ssh.Channel, connID, currentUsername string) error {
+	channel.Write([]byte("\r\n=== Login ===\r\n"))
+	
+	// Flush any pending input from menu selection
+	h.flushInput(channel)
+	
+	// Get username
+	channel.Write([]byte("Username: "))
+	username, err := h.readLine(channel)
+	if err != nil {
+		return err
+	}
+	
+	// Get password (hidden input)
+	channel.Write([]byte("Password: "))
+	password, err := h.readLine(channel)
+	if err != nil {
+		return err
+	}
+	
+	// Attempt login with auth service
+	resp, err := h.authClient.Login(ctx, username, password)
+	if err != nil {
+		h.logger.Warn("Login failed", "username", username, "error", err)
+		channel.Write([]byte("\r\nLogin failed. Please check your credentials.\r\n"))
+		channel.Write([]byte("Press any key to continue...\r\n"))
+		buffer := make([]byte, 1)
+		channel.Read(buffer)
+		return nil
+	}
+	
+	// Login successful
+	h.logger.Info("User logged in successfully", "username", username, "user_id", resp.User.Id)
+	channel.Write([]byte("\r\nLogin successful! Welcome back, " + resp.User.Username + "!\r\n"))
+	
+	// Update connection state
+	h.manager.UpdateConnectionState(connID, types.ConnectionStateAuthenticated, resp.User.Id)
+	
+	channel.Write([]byte("Press any key to continue...\r\n"))
+	buffer := make([]byte, 1)
+	channel.Read(buffer)
+	
+	return nil
+}
+
+// handleRegister handles the registration process
+func (h *Handler) handleRegister(ctx context.Context, channel ssh.Channel, connID, currentUsername string) error {
+	channel.Write([]byte("\r\n=== Registration ===\r\n"))
+	
+	// Flush any pending input from menu selection
+	h.flushInput(channel)
+	
+	// Get username
+	channel.Write([]byte("Choose a username: "))
+	username, err := h.readLine(channel)
+	if err != nil {
+		return err
+	}
+	// Get password
+	channel.Write([]byte("Choose a password: "))
+	password, err := h.readLine(channel)
+	if err != nil {
+		return err
+	}
+	
+	// Get email (optional)
+	channel.Write([]byte("Email (optional): "))
+	email, err := h.readLine(channel)
+	if err != nil {
+		return err
+	}
+	
+	// Attempt registration with auth service
+	resp, err := h.authClient.Register(ctx, username, password, email)
+	if err != nil {
+		h.logger.Warn("Registration failed", "username", username, "error", err)
+		channel.Write([]byte("\r\nRegistration failed. Please try again later.\r\n"))
+		channel.Write([]byte("Press any key to continue...\r\n"))
+		buffer := make([]byte, 1)
+		channel.Read(buffer)
+		return nil
+	}
+	
+	if !resp.Success {
+		h.logger.Warn("Registration rejected", "username", username, "error", resp.Error, "error_code", resp.ErrorCode)
+		channel.Write([]byte("\r\nRegistration failed: " + resp.Error + "\r\n"))
+		channel.Write([]byte("Press any key to continue...\r\n"))
+		buffer := make([]byte, 1)
+		channel.Read(buffer)
+		return nil
+	}
+	
+	// Registration successful
+	h.logger.Info("User registered successfully", "username", username, "user_id", resp.User.Id)
+	channel.Write([]byte("\r\nRegistration successful! Welcome, " + resp.User.Username + "!\r\n"))
+	channel.Write([]byte("You are now logged in.\r\n"))
+	
+	// Update connection state
+	h.manager.UpdateConnectionState(connID, types.ConnectionStateAuthenticated, resp.User.Id)
+	
+	channel.Write([]byte("Press any key to continue...\r\n"))
+	buffer := make([]byte, 1)
+	channel.Read(buffer)
+	
+	return nil
+}
+
+// handleGameSelection shows the game selection menu and handles the choice
+func (h *Handler) handleGameSelection(ctx context.Context, channel ssh.Channel, userInfo *authv1.User, connID, username string, terminalCols, terminalRows int) error {
+	choice, err := h.menuHandler.ShowGameSelectionMenu(ctx, channel, username)
+	if err != nil {
+		h.logger.Error("Game selection menu failed", "error", err, "username", username)
+		channel.Write([]byte("Failed to display game selection menu.\r\n"))
+		return nil
+	}
+
+	// If choice is nil, user chose to go back to main menu
+	if choice == nil {
+		return nil
+	}
+
+	// Handle the game selection choice
+	return h.handleMenuChoice(ctx, channel, choice, userInfo, connID, username, terminalCols, terminalRows)
+}
+
+// startSpecificGameSession starts a game session with a specific game ID
+func (h *Handler) startSpecificGameSession(ctx context.Context, channel ssh.Channel, userInfo *authv1.User, connID, username, gameID string, terminalCols, terminalRows int) error {
+	// Convert string ID to int32 for the API
+	userID, err := strconv.ParseInt(userInfo.Id, 10, 32)
+	if err != nil {
+		h.logger.Error("Invalid user ID format", "user_id", userInfo.Id, "error", err)
+		channel.Write([]byte("Invalid user ID. Please contact administrator.\r\n"))
+		return nil
+	}
+
+	sessionInfo, err := h.gameClient.StartGameSession(ctx, int32(userID), username, gameID, terminalCols, terminalRows)
+	if err != nil {
+		h.logger.Error("Failed to start game session", "error", err, "username", username, "game_id", gameID)
+		// Check if the error is due to game service unavailability
+		if !h.gameClient.IsHealthy(ctx) {
+			h.logger.Info("Game service became unavailable, entering idle mode", "username", username)
+			h.handleIdleMode(ctx, channel, connID, username)
+			return nil // Return to menu
+		}
+		channel.Write([]byte("Failed to start game session\r\n"))
+		return nil // Return to menu
+	}
+
+	// Successfully started game session
+	sessionID := sessionInfo.ID
+	h.logger.Info("Started game session", "session_id", sessionID, "user", username, "game", gameID)
+
+	// Update connection state
+	h.manager.UpdateConnectionState(connID, types.ConnectionStateActive, username)
+
+	// Handle I/O - since Game Service doesn't have direct I/O methods,
+	// we'll need to implement this differently in a real implementation
+	h.handleGameIO(ctx, channel, sessionID, connID)
+
+	return nil
+}
+
+// flushInput drains any pending input from the channel
+func (h *Handler) flushInput(channel ssh.Channel) {
+	// Simple approach: try to read one character and discard it if it's a newline
+	buffer := make([]byte, 1)
+	n, err := channel.Read(buffer)
+	if err == nil && n > 0 && (buffer[0] == '\r' || buffer[0] == '\n') {
+		// Consumed a pending newline, which is what we wanted
+		return
+	}
+	// If we read something else, we can't put it back, but this should be rare
+}
+
+// readLine reads a line of input from the SSH channel, skipping empty lines
+func (h *Handler) readLine(channel ssh.Channel) (string, error) {
+	for {
+		var line []byte
+		buffer := make([]byte, 1)
+		
+		for {
+			n, err := channel.Read(buffer)
+			if err != nil {
+				return "", err
+			}
+			
+			if n > 0 {
+				char := buffer[0]
+				if char == '\r' || char == '\n' {
+					break
+				}
+				line = append(line, char)
+			}
+		}
+		
+		// If we got a non-empty line, return it
+		if len(line) > 0 {
+			return string(line), nil
+		}
+		// Otherwise, continue reading the next line
+	}
 }

@@ -9,3 +9,5 @@ Menu Options:
   [w] Watch games
   [g] List games
   [q] Quit
+
+Choice: 

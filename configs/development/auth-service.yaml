@@ -168,6 +168,17 @@ database:
 auth:
   # Enable authentication service (should always be true for auth service)
   enabled: true
+
+  # At database initialization, enable root user to promote accounts to admins. Alternativelty, see admins
+  root_admin_user:
+    enabled: true
+    one_time_password: password
+
+  # At database initialization, add admin user. Alternativelty, see admins
+  admin_users:
+    - name: user1
+      one_time_password: password
+      recovery_email: person@email.com
   
   # JWT secret for signing tokens (CRITICAL: change in production)
   # Should be a long, random string. Same across all services for token validation.
@@ -223,6 +234,20 @@ logging:
   # Log output: stdout, stderr, or file path
   # Consider centralized logging for production auth service
   output: "stdout"
+
+
+# ============================================================================
+# SMTP Integrations and Configuration
+# ============================================================================
+# Allows for automatic user account password resets with email
+email:
+  enabled: true
+  server: 
+    domain: email@host.com
+    credentials:
+      username: user
+      password: password
+
 
 # ============================================================================
 # Health Check Configuration

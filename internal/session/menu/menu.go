@@ -4,10 +4,12 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/dungeongate/internal/session/banner"
 	"github.com/dungeongate/internal/session/client"
+	gamev2 "github.com/dungeongate/pkg/api/games/v2"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -188,4 +190,122 @@ func (mh *MenuHandler) getFallbackUserBanner(username string) string {
 		username,
 		time.Now().Format("2006-01-02"),
 		time.Now().Format("15:04:05"))
+}
+
+// ShowGameSelectionMenu displays the game selection menu and handles input
+func (mh *MenuHandler) ShowGameSelectionMenu(ctx context.Context, channel ssh.Channel, username string) (*MenuChoice, error) {
+	// Get list of available games from Game Service
+	games, err := mh.gameClient.ListGames(ctx)
+	if err != nil {
+		mh.logger.Error("Failed to get available games", "error", err, "username", username)
+		channel.Write([]byte("\r\nFailed to load available games. Please try again later.\r\n"))
+		channel.Write([]byte("Press any key to return to main menu...\r\n"))
+		buffer := make([]byte, 1)
+		channel.Read(buffer)
+		return nil, nil
+	}
+
+	if len(games) == 0 {
+		channel.Write([]byte("\r\nNo games are currently available.\r\n"))
+		channel.Write([]byte("Press any key to return to main menu...\r\n"))
+		buffer := make([]byte, 1)
+		channel.Read(buffer)
+		return nil, nil
+	}
+
+	// Display game selection menu
+	banner := mh.buildGameSelectionBanner(games, username)
+	_, err = channel.Write([]byte(banner))
+	if err != nil {
+		return nil, fmt.Errorf("failed to write game selection banner: %w", err)
+	}
+
+	// Wait for user input
+	buffer := make([]byte, 10) // Allow for multi-digit selection
+	for {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+			n, err := channel.Read(buffer)
+			if err != nil {
+				return nil, fmt.Errorf("failed to read user input: %w", err)
+			}
+
+			if n > 0 {
+				choice := strings.TrimSpace(string(buffer[:n]))
+				
+				// Handle quit/back option
+				if choice == "q" || choice == "Q" || choice == "b" || choice == "B" {
+					return nil, nil // Return to main menu
+				}
+
+				// Try to parse game selection number
+				if gameIndex, parseErr := parseGameChoice(choice, len(games)); parseErr == nil {
+					selectedGame := games[gameIndex]
+					return &MenuChoice{
+						Action: "start_game",
+						Value:  selectedGame.Id,
+					}, nil
+				} else {
+					// Invalid choice, show error and redisplay menu
+					errorMsg := fmt.Sprintf("\r\nInvalid choice '%s'. Please enter a number from 1-%d, or 'q' to return.\r\n\r\n", choice, len(games))
+					channel.Write([]byte(errorMsg))
+					// Redisplay the banner
+					channel.Write([]byte(banner))
+				}
+			}
+		}
+	}
+}
+
+// buildGameSelectionBanner creates the game selection menu display
+func (mh *MenuHandler) buildGameSelectionBanner(games []*gamev2.Game, username string) string {
+	banner := fmt.Sprintf("\r\n=== DungeonGate - Game Selection ===\r\n\r\n")
+	banner += fmt.Sprintf("Welcome, %s! Choose a game to play:\r\n\r\n", username)
+	
+	for i, game := range games {
+		status := "Available"
+		if game.Status != gamev2.GameStatus_GAME_STATUS_UNSPECIFIED {
+			// Add status information if available
+			status = fmt.Sprintf("Available (%s)", game.Status.String())
+		}
+		
+		banner += fmt.Sprintf("  [%d] %s\r\n", i+1, game.Name)
+		if game.Description != "" {
+			banner += fmt.Sprintf("      %s\r\n", game.Description)
+		}
+		banner += fmt.Sprintf("      Status: %s\r\n", status)
+		if game.Version != "" {
+			banner += fmt.Sprintf("      Version: %s\r\n", game.Version)
+		}
+		banner += "\r\n"
+	}
+	
+	banner += "  [q] Return to main menu\r\n\r\n"
+	banner += "Enter your choice: "
+	
+	return banner
+}
+
+// parseGameChoice parses the user's game selection input
+func parseGameChoice(input string, maxGames int) (int, error) {
+	// Check for decimal points or other invalid characters
+	if strings.Contains(input, ".") || strings.Contains(input, ",") {
+		return -1, fmt.Errorf("invalid input format: decimal numbers not allowed")
+	}
+	
+	choice, err := fmt.Sscanf(input, "%d", new(int))
+	if err != nil || choice != 1 {
+		return -1, fmt.Errorf("invalid input format")
+	}
+	
+	var gameIndex int
+	fmt.Sscanf(input, "%d", &gameIndex)
+	
+	if gameIndex < 1 || gameIndex > maxGames {
+		return -1, fmt.Errorf("choice out of range")
+	}
+	
+	return gameIndex - 1, nil // Convert to 0-based index
 }

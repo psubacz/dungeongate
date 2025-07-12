@@ -142,6 +142,22 @@ func (c *GameClient) ListGameSessions(ctx context.Context, userID int32) ([]*typ
 	return sessions, nil
 }
 
+// ListGames retrieves the list of available games
+func (c *GameClient) ListGames(ctx context.Context) ([]*gamev2.Game, error) {
+	req := &gamev2.ListGamesRequest{
+		EnabledOnly: true, // Only show enabled games
+		Limit:       100,  // Get up to 100 games
+		Offset:      0,
+	}
+
+	resp, err := c.client.ListGames(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list games: %w", err)
+	}
+
+	return resp.Games, nil
+}
+
 // Health checks the health of the game service
 func (c *GameClient) Health(ctx context.Context) (*gamev2.HealthResponse, error) {
 	resp, err := c.client.Health(ctx, &emptypb.Empty{})

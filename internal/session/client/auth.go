@@ -84,3 +84,19 @@ func (c *AuthClient) GetUserInfo(ctx context.Context, token string) (*authv1.Get
 
 	return resp, nil
 }
+
+// Register creates a new user account
+func (c *AuthClient) Register(ctx context.Context, username, password, email string) (*authv1.RegisterResponse, error) {
+	req := &authv1.RegisterRequest{
+		Username: username,
+		Password: password,
+		Email:    email,
+	}
+
+	resp, err := c.client.Register(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to register user: %w", err)
+	}
+
+	return resp, nil
+}

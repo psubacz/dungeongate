@@ -235,7 +235,7 @@ func (s *PTYSession) Close() {
 		close(s.closeChan)
 		
 		// Kill the process if it's still running
-		if s.Cmd.Process != nil {
+		if s.Cmd != nil && s.Cmd.Process != nil {
 			s.Cmd.Process.Signal(syscall.SIGTERM)
 		}
 		

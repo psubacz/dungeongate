@@ -18,15 +18,15 @@ type Manager struct {
 	maxConnections int
 	logger         *slog.Logger
 
-	// Atomic counters for stats
+	// Atomic counters for stats only
 	activeConnections int64
 	totalConnections  int64
 
-	// Rate limiting
+	// Rate limiting only (no connection state storage)
 	connectionsByIP sync.Map // map[string]*ipConnectionTracker
 
-	// Connection tracking for cleanup only
-	connections sync.Map // map[string]*types.Connection
+	// NOTE: No connection storage - truly stateless
+	// All connection state is managed by Game Service
 }
 
 // ipConnectionTracker tracks connections per IP for rate limiting
@@ -58,17 +58,15 @@ func (m *Manager) Start(ctx context.Context) error {
 func (m *Manager) Stop(ctx context.Context) error {
 	m.logger.Info("Connection manager stopping")
 
-	// Close all connections
-	m.connections.Range(func(key, value interface{}) bool {
-		connID := key.(string)
-		m.UnregisterConnection(connID)
-		return true
-	})
+	// In stateless mode, no local connections to close
+	// Connection cleanup is handled by SSH server shutdown
+	m.logger.Info("Connection manager stopped (stateless mode)")
 
 	return nil
 }
 
-// RegisterConnection registers a new connection and returns its ID
+// RegisterConnection validates and registers a new connection, returns ID
+// Connection state is NOT stored locally - only rate limiting and counters
 func (m *Manager) RegisterConnection(conn net.Conn) string {
 	connID := uuid.New().String()
 
@@ -88,39 +86,28 @@ func (m *Manager) RegisterConnection(conn net.Conn) string {
 		return ""
 	}
 
-	// Create connection record
-	connection := &types.Connection{
-		ID:           connID,
-		RemoteAddr:   conn.RemoteAddr(),
-		State:        types.ConnectionStateConnected,
-		CreatedAt:    time.Now(),
-		LastActivity: time.Now(),
-	}
-
-	// Store connection
-	m.connections.Store(connID, connection)
-
-	// Update counters
+	// Update counters only - no connection state storage
 	atomic.AddInt64(&m.activeConnections, 1)
 	atomic.AddInt64(&m.totalConnections, 1)
 
-	m.logger.Info("Connection registered", "connection_id", connID, "remote_addr", conn.RemoteAddr())
+	m.logger.Info("Connection registered (stateless)", 
+		"connection_id", connID, 
+		"remote_addr", conn.RemoteAddr(),
+		"active_count", atomic.LoadInt64(&m.activeConnections))
 
 	return connID
 }
 
-// UnregisterConnection removes a connection
-func (m *Manager) UnregisterConnection(connID string) {
+// UnregisterConnection decrements counters (stateless)
+// Takes remoteAddr since we don't store connection state
+func (m *Manager) UnregisterConnection(connID string, remoteAddr net.Addr) {
 	if connID == "" {
 		return
 	}
 
-	// Remove from storage
-	if connInterface, exists := m.connections.LoadAndDelete(connID); exists {
-		connection := connInterface.(*types.Connection)
-
-		// Update IP tracker
-		remoteIP := getIPFromAddr(connection.RemoteAddr)
+	// Update IP tracker if we have the address
+	if remoteAddr != nil {
+		remoteIP := getIPFromAddr(remoteAddr)
 		if tracker, exists := m.connectionsByIP.Load(remoteIP); exists {
 			ipTracker := tracker.(*ipConnectionTracker)
 			ipTracker.mu.Lock()
@@ -129,36 +116,38 @@ func (m *Manager) UnregisterConnection(connID string) {
 			}
 			ipTracker.mu.Unlock()
 		}
-
-		// Update counter
-		atomic.AddInt64(&m.activeConnections, -1)
-
-		m.logger.Info("Connection unregistered", "connection_id", connID)
 	}
+
+	// Update counter
+	atomic.AddInt64(&m.activeConnections, -1)
+
+	m.logger.Info("Connection unregistered (stateless)", 
+		"connection_id", connID,
+		"active_count", atomic.LoadInt64(&m.activeConnections))
 }
 
-// UpdateConnectionState updates the state of a connection
+// UpdateConnectionState is no longer needed in stateless architecture
+// Connection state is managed by Game Service
+// This method is kept for compatibility but does nothing
 func (m *Manager) UpdateConnectionState(connID string, state types.ConnectionState, userID string) {
-	if connInterface, exists := m.connections.Load(connID); exists {
-		connection := connInterface.(*types.Connection)
-		connection.State = state
-		connection.UserID = userID
-		connection.LastActivity = time.Now()
-
-		m.connections.Store(connID, connection)
-	}
+	// No-op in stateless architecture
+	// Connection state is managed by Game Service
+	m.logger.Debug("Connection state update delegated to Game Service", 
+		"connection_id", connID, 
+		"state", state, 
+		"user_id", userID)
 }
 
-// GetConnection retrieves connection information
+// GetConnection is no longer available in stateless architecture
+// Connection state should be queried from Game Service instead
 func (m *Manager) GetConnection(connID string) (*types.Connection, bool) {
-	if connInterface, exists := m.connections.Load(connID); exists {
-		connection := connInterface.(*types.Connection)
-		return connection, true
-	}
+	// No longer available - connection state is in Game Service
+	m.logger.Debug("Connection state query should use Game Service", "connection_id", connID)
 	return nil, false
 }
 
-// GetStats returns connection statistics
+// GetStats returns basic connection statistics (counters only)
+// Detailed stats should be queried from Game Service
 func (m *Manager) GetStats() *types.ConnectionStats {
 	stats := &types.ConnectionStats{
 		Active:     int(atomic.LoadInt64(&m.activeConnections)),
@@ -168,21 +157,9 @@ func (m *Manager) GetStats() *types.ConnectionStats {
 		ByRemoteIP: make(map[string]int),
 	}
 
-	// Count by state, user, and IP
-	m.connections.Range(func(key, value interface{}) bool {
-		connection := value.(*types.Connection)
-
-		stats.ByState[connection.State]++
-
-		if connection.UserID != "" {
-			stats.ByUserID[connection.UserID]++
-		}
-
-		ip := getIPFromAddr(connection.RemoteAddr)
-		stats.ByRemoteIP[ip]++
-
-		return true
-	})
+	// Only basic counters available in stateless mode
+	// Detailed stats should be queried from Game Service
+	m.logger.Debug("Returning basic stats only - detailed stats available from Game Service")
 
 	return stats
 }
@@ -218,9 +195,9 @@ func (m *Manager) checkRateLimit(remoteIP string) bool {
 	return true
 }
 
-// cleanupLoop periodically cleans up expired connections
+// cleanupLoop periodically cleans up rate limiting data only
 func (m *Manager) cleanupLoop(ctx context.Context) {
-	ticker := time.NewTicker(30 * time.Second)
+	ticker := time.NewTicker(5 * time.Minute) // Less frequent in stateless mode
 	defer ticker.Stop()
 
 	for {
@@ -233,22 +210,12 @@ func (m *Manager) cleanupLoop(ctx context.Context) {
 	}
 }
 
-// cleanup removes expired connections and IP trackers
+// cleanup removes expired IP trackers only (stateless mode)
 func (m *Manager) cleanup() {
 	now := time.Now()
-	expired := now.Add(-1 * time.Hour) // 1 hour timeout
 
-	// Clean up expired connections
-	m.connections.Range(func(key, value interface{}) bool {
-		connection := value.(*types.Connection)
-		if connection.LastActivity.Before(expired) {
-			m.logger.Info("Cleaning up expired connection", "connection_id", connection.ID)
-			m.UnregisterConnection(connection.ID)
-		}
-		return true
-	})
-
-	// Clean up IP trackers
+	// Only clean up IP trackers in stateless mode
+	// Connection cleanup is handled by Game Service
 	m.connectionsByIP.Range(func(key, value interface{}) bool {
 		tracker := value.(*ipConnectionTracker)
 		tracker.mu.RLock()
@@ -257,6 +224,7 @@ func (m *Manager) cleanup() {
 
 		if shouldDelete {
 			m.connectionsByIP.Delete(key)
+			m.logger.Debug("Cleaned up IP tracker", "ip", key)
 		}
 		return true
 	})

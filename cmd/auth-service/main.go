@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -86,6 +87,11 @@ func main() {
 		jwtSecret = hex.EncodeToString(secretBytes)
 	}
 
+	// Setup logger
+	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+		Level: slog.LevelInfo,
+	}))
+
 	// Setup auth service
 	authConfig := &auth.Config{
 		JWTSecret:              jwtSecret,
@@ -96,7 +102,7 @@ func main() {
 		LockoutDuration:        15 * time.Minute,
 	}
 
-	authService := auth.NewService(db, userService, *encryptor, authConfig)
+	authService := auth.NewService(db, userService, *encryptor, authConfig, logger)
 
 	// Setup context for graceful shutdown
 	_, cancel := context.WithCancel(context.Background())

@@ -9,5 +9,6 @@ Menu Options:
   [u] Unlock User Account
   [d] Delete User Account
   [r] Reset User Account Password
-  [s] Statistics
+  [p] Promote User account to Admin
+  [s] Server Statistics
   [q] Quit

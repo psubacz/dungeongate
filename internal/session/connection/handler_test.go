@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/dungeongate/internal/session/client"
+	"github.com/dungeongate/internal/session/menu"
+	"github.com/dungeongate/internal/session/banner"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/ssh"
@@ -33,7 +35,12 @@ func TestNewHandler(t *testing.T) {
 	}
 	defer authClient.Close()
 
-	handler := NewHandler(manager, gameClient, authClient, logger)
+	// Create a mock menu handler for testing
+	bannerConfig := &banner.BannerConfig{}
+	bannerManager := banner.NewBannerManager(bannerConfig)
+	menuHandler := menu.NewMenuHandler(bannerManager, gameClient, authClient, logger)
+	
+	handler := NewHandler(manager, gameClient, authClient, menuHandler, logger)
 
 	assert.NotNil(t, handler)
 	assert.Equal(t, manager, handler.manager)
@@ -66,7 +73,12 @@ func TestHandlerHandleConnectionRegistration(t *testing.T) {
 		defer authClient.Close()
 	}
 
-	handler := NewHandler(manager, gameClient, authClient, logger)
+	// Create a mock menu handler for testing
+	bannerConfig := &banner.BannerConfig{}
+	bannerManager := banner.NewBannerManager(bannerConfig)
+	menuHandler := menu.NewMenuHandler(bannerManager, gameClient, authClient, logger)
+	
+	handler := NewHandler(manager, gameClient, authClient, menuHandler, logger)
 
 	// Create mock connection
 	conn := &mockNetConn{
@@ -114,7 +126,12 @@ func TestHandlerHandleConnectionMaxConnections(t *testing.T) {
 		defer authClient.Close()
 	}
 
-	handler := NewHandler(manager, gameClient, authClient, logger)
+	// Create a mock menu handler for testing
+	bannerConfig := &banner.BannerConfig{}
+	bannerManager := banner.NewBannerManager(bannerConfig)
+	menuHandler := menu.NewMenuHandler(bannerManager, gameClient, authClient, logger)
+	
+	handler := NewHandler(manager, gameClient, authClient, menuHandler, logger)
 
 	// Register first connection
 	conn1 := &mockNetConn{
@@ -148,7 +165,7 @@ func TestHandlerHandleConnectionMaxConnections(t *testing.T) {
 	assert.True(t, conn2.closed)
 	
 	// Clean up first connection
-	manager.UnregisterConnection(connID1)
+	manager.UnregisterConnection(connID1, conn1.RemoteAddr())
 }
 
 func TestAuthHandlerPasswordCallback(t *testing.T) {
@@ -219,7 +236,12 @@ func TestParsePTYRequest(t *testing.T) {
 		defer authClient.Close()
 	}
 	
-	handler := NewHandler(manager, gameClient, authClient, logger)
+	// Create a mock menu handler for testing
+	bannerConfig := &banner.BannerConfig{}
+	bannerManager := banner.NewBannerManager(bannerConfig)
+	menuHandler := menu.NewMenuHandler(bannerManager, gameClient, authClient, logger)
+	
+	handler := NewHandler(manager, gameClient, authClient, menuHandler, logger)
 	
 	tests := []struct {
 		name     string
@@ -269,7 +291,12 @@ func TestParseWindowChange(t *testing.T) {
 		defer authClient.Close()
 	}
 	
-	handler := NewHandler(manager, gameClient, authClient, logger)
+	// Create a mock menu handler for testing
+	bannerConfig := &banner.BannerConfig{}
+	bannerManager := banner.NewBannerManager(bannerConfig)
+	menuHandler := menu.NewMenuHandler(bannerManager, gameClient, authClient, logger)
+	
+	handler := NewHandler(manager, gameClient, authClient, menuHandler, logger)
 	
 	tests := []struct {
 		name     string

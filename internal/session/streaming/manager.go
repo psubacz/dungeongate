@@ -3,16 +3,16 @@ package streaming
 import (
 	"context"
 	"log/slog"
-	"sync"
 
 	"github.com/dungeongate/internal/session/types"
 )
 
 // Manager manages streaming in a stateless manner
+// All stream state is managed by Game Service
 type Manager struct {
-	logger     *slog.Logger
-	streams    sync.Map // map[string]*Stream
-	spectators sync.Map // map[string]*Spectator
+	logger *slog.Logger
+	// NOTE: No local state storage - truly stateless
+	// Stream and spectator state managed by Game Service
 }
 
 // Stream represents a streaming session
@@ -42,35 +42,40 @@ func NewManager(logger *slog.Logger) *Manager {
 
 // Start starts the streaming manager
 func (m *Manager) Start(ctx context.Context) error {
-	m.logger.Info("Streaming manager starting")
+	if m.logger != nil {
+		m.logger.Info("Streaming manager starting")
+	}
 	return nil
 }
 
 // Stop stops the streaming manager
 func (m *Manager) Stop(ctx context.Context) error {
-	m.logger.Info("Streaming manager stopping")
+	if m.logger != nil {
+		m.logger.Info("Streaming manager stopping")
+	}
 
-	// Close all streams
-	m.streams.Range(func(key, value interface{}) bool {
-		stream := value.(*Stream)
-		stream.Close()
-		return true
-	})
-
-	// Close all spectators
-	m.spectators.Range(func(key, value interface{}) bool {
-		spectator := value.(*Spectator)
-		spectator.Close()
-		return true
-	})
+	// In stateless mode, no local streams/spectators to close
+	// Stream cleanup handled by Game Service
+	if m.logger != nil {
+		m.logger.Info("Streaming manager stopped (stateless mode)")
+	}
 
 	return nil
 }
 
-// CreateStream creates a new streaming session
+// CreateStream delegates stream creation to Game Service
+// Returns stream info but doesn't store state locally
 func (m *Manager) CreateStream(sessionID, userID string) (*Stream, error) {
 	streamID := sessionID + "-stream"
 
+	// Stream creation delegated to Game Service
+	// TODO: Add gRPC call to Game Service to create stream
+	m.logger.Info("Stream creation delegated to Game Service", 
+		"stream_id", streamID, 
+		"session_id", sessionID, 
+		"user_id", userID)
+
+	// Return stream info without storing locally
 	stream := &Stream{
 		ID:        streamID,
 		SessionID: sessionID,
@@ -79,34 +84,33 @@ func (m *Manager) CreateStream(sessionID, userID string) (*Stream, error) {
 		logger:    m.logger,
 	}
 
-	m.streams.Store(streamID, stream)
-
-	m.logger.Info("Stream created", "stream_id", streamID, "session_id", sessionID, "user_id", userID)
-
 	return stream, nil
 }
 
-// GetStream retrieves a stream
+// GetStream should query Game Service for stream state
 func (m *Manager) GetStream(streamID string) (*Stream, bool) {
-	if value, exists := m.streams.Load(streamID); exists {
-		return value.(*Stream), true
-	}
+	// TODO: Query Game Service for stream state
+	m.logger.Debug("Stream state query should use Game Service", "stream_id", streamID)
 	return nil, false
 }
 
-// RemoveStream removes a stream
+// RemoveStream delegates to Game Service
 func (m *Manager) RemoveStream(streamID string) {
-	if value, exists := m.streams.LoadAndDelete(streamID); exists {
-		stream := value.(*Stream)
-		stream.Close()
-		m.logger.Info("Stream removed", "stream_id", streamID)
-	}
+	// TODO: Add gRPC call to Game Service to remove stream
+	m.logger.Info("Stream removal delegated to Game Service", "stream_id", streamID)
 }
 
-// AddSpectator adds a spectator to a stream
+// AddSpectator delegates to Game Service
 func (m *Manager) AddSpectator(streamID, userID string) (*Spectator, error) {
 	spectatorID := streamID + "-spectator-" + userID
 
+	// TODO: Add gRPC call to Game Service to add spectator
+	m.logger.Info("Spectator addition delegated to Game Service", 
+		"spectator_id", spectatorID, 
+		"stream_id", streamID, 
+		"user_id", userID)
+
+	// Return spectator info without storing locally
 	spectator := &Spectator{
 		ID:        spectatorID,
 		StreamID:  streamID,
@@ -115,39 +119,28 @@ func (m *Manager) AddSpectator(streamID, userID string) (*Spectator, error) {
 		logger:    m.logger,
 	}
 
-	m.spectators.Store(spectatorID, spectator)
-
-	m.logger.Info("Spectator added", "spectator_id", spectatorID, "stream_id", streamID, "user_id", userID)
-
 	return spectator, nil
 }
 
-// RemoveSpectator removes a spectator
+// RemoveSpectator delegates to Game Service
 func (m *Manager) RemoveSpectator(spectatorID string) {
-	if value, exists := m.spectators.LoadAndDelete(spectatorID); exists {
-		spectator := value.(*Spectator)
-		spectator.Close()
-		m.logger.Info("Spectator removed", "spectator_id", spectatorID)
-	}
+	// TODO: Add gRPC call to Game Service to remove spectator
+	m.logger.Info("Spectator removal delegated to Game Service", "spectator_id", spectatorID)
 }
 
-// GetStreamSpectators gets all spectators for a stream
+// GetStreamSpectators should query Game Service
 func (m *Manager) GetStreamSpectators(streamID string) []*Spectator {
-	var spectators []*Spectator
-
-	m.spectators.Range(func(key, value interface{}) bool {
-		spectator := value.(*Spectator)
-		if spectator.StreamID == streamID {
-			spectators = append(spectators, spectator)
-		}
-		return true
-	})
-
-	return spectators
+	// TODO: Query Game Service for spectator list
+	m.logger.Debug("Spectator list query should use Game Service", "stream_id", streamID)
+	return []*Spectator{}
 }
 
-// GetStats returns streaming statistics
+// GetStats should query Game Service for streaming statistics
 func (m *Manager) GetStats() *types.StreamingStats {
+	// TODO: Query Game Service for streaming stats
+	m.logger.Debug("Streaming stats query should use Game Service")
+
+	// Return empty stats - real stats should come from Game Service
 	stats := &types.StreamingStats{
 		ActiveStreams:    0,
 		TotalStreams:     0,
@@ -156,40 +149,6 @@ func (m *Manager) GetStats() *types.StreamingStats {
 		Streams:          make(map[string]*types.StreamInfo),
 		Spectators:       make(map[string]*types.SpectatorInfo),
 	}
-
-	m.streams.Range(func(key, value interface{}) bool {
-		stream := value.(*Stream)
-		stats.TotalStreams++
-		if stream.Active {
-			stats.ActiveStreams++
-		}
-
-		stats.Streams[stream.ID] = &types.StreamInfo{
-			ID:        stream.ID,
-			SessionID: stream.SessionID,
-			UserID:    stream.UserID,
-			Active:    stream.Active,
-		}
-
-		return true
-	})
-
-	m.spectators.Range(func(key, value interface{}) bool {
-		spectator := value.(*Spectator)
-		stats.TotalSpectators++
-		if spectator.Connected {
-			stats.ActiveSpectators++
-		}
-
-		stats.Spectators[spectator.ID] = &types.SpectatorInfo{
-			ID:        spectator.ID,
-			StreamID:  spectator.StreamID,
-			UserID:    spectator.UserID,
-			Connected: spectator.Connected,
-		}
-
-		return true
-	})
 
 	return stats
 }

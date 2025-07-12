@@ -10,9 +10,8 @@ DungeonGate is a microservices-based platform for hosting terminal games like Ne
 
 ### Microservices Design
 - **Session Service** (port 8083/9093): SSH server, PTY management, terminal sessions
-- **Auth Service** (port 8081/8082): Centralized authentication and authorization via gRPC
+- **Auth Service** (port 8081/8082): Centralized authentication, authorization, and user management via gRPC
 - **Game Service** (port 8085/50051): Game management, configuration, and session orchestration
-- **User Service** (port 8084/9084): User registration and profile management
 
 ### API Structure
 Protocol Buffers with versioned APIs:
@@ -21,7 +20,7 @@ Protocol Buffers with versioned APIs:
 - **Games API v2**: `api/proto/games/game_service_v2.proto` → `pkg/api/games/v2/`
 
 ### Key Directories
-- `cmd/` - Service entry points (session-service, auth-service, game-service, user-service)
+- `cmd/` - Service entry points (session-service, auth-service, game-service)
 - `internal/` - Business logic organized by domain
 - `pkg/` - Shared packages (config, database, encryption, ttyrec)
 - `api/proto/` - Protocol Buffer definitions with versioned APIs
@@ -38,14 +37,12 @@ Protocol Buffers with versioned APIs:
 - `make build-session` - Build session service binary
 - `make build-auth` - Build auth service binary
 - `make build-game` - Build game service binary
-- `make build-user` - Build user service binary
 - `make build-all` - Build all service binaries
 
 ### Running Services
 - `make run-session` - Run session service (SSH on port 2222, HTTP on 8083)
 - `make run-auth` - Run auth service (gRPC on 8082, HTTP on 8081)
 - `make run-game` - Run game service (gRPC on 50051, HTTP on 8085)
-- `make run-user` - Run user service (gRPC on 9084, HTTP on 8084)
 - `make run-all` - Run all services with proper startup sequence
 
 ### Protocol Buffers
