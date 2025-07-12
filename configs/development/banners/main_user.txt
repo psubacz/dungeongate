@@ -9,6 +9,6 @@ Menu Options:
   [e] Edit profile
   [l] List games
   [r] View recordings
-  [g] Game Statistics
-  [a] Server Administration
+  [s] Game Statistics
+  [c] Credit
   [q] Quit

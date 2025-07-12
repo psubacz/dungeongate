@@ -387,13 +387,7 @@ func (s *Service) Register(ctx context.Context, req *proto.RegisterRequest) (*pr
 		}, nil
 	}
 
-	if req.Email == "" {
-		return &proto.RegisterResponse{
-			Success:   false,
-			Error:     "Email is required",
-			ErrorCode: "invalid_request",
-		}, nil
-	}
+	// Email is optional - removed requirement check
 
 	// Create registration request
 	regReq := &user.RegistrationRequest{
@@ -421,13 +415,23 @@ func (s *Service) Register(ctx context.Context, req *proto.RegisterRequest) (*pr
 	if !regResp.Success {
 		// Map validation errors to registration error codes
 		var errorCode string = "registration_failed"
+		var errorMessage string = regResp.Message
+		
 		if len(regResp.Errors) > 0 {
-			switch regResp.Errors[0].Code {
+			// Use the first error for the main response
+			firstError := regResp.Errors[0]
+			errorMessage = firstError.Message
+			
+			switch firstError.Code {
 			case "USERNAME_EXISTS":
 				errorCode = "username_taken"
+			case "USERNAME_INVALID_CHARS":
+				errorCode = "invalid_username"
 			case "EMAIL_INVALID":
 				errorCode = "invalid_email"
 			case "PASSWORD_TOO_SHORT":
+				errorCode = "invalid_password"
+			case "PASSWORD_REQUIRED":
 				errorCode = "invalid_password"
 			default:
 				errorCode = "registration_failed"
@@ -436,7 +440,7 @@ func (s *Service) Register(ctx context.Context, req *proto.RegisterRequest) (*pr
 
 		return &proto.RegisterResponse{
 			Success:   false,
-			Error:     regResp.Message,
+			Error:     errorMessage,
 			ErrorCode: errorCode,
 		}, nil
 	}

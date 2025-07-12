@@ -9,6 +9,7 @@ import (
 
 	"github.com/dungeongate/internal/session/banner"
 	"github.com/dungeongate/internal/session/client"
+	"github.com/dungeongate/internal/session/terminal"
 	gamev2 "github.com/dungeongate/pkg/api/games/v2"
 	"golang.org/x/crypto/ssh"
 )
@@ -39,6 +40,9 @@ type MenuChoice struct {
 
 // ShowAnonymousMenu displays the main menu for anonymous users and handles input
 func (mh *MenuHandler) ShowAnonymousMenu(ctx context.Context, channel ssh.Channel, username string) (*MenuChoice, error) {
+	// Clear screen and position cursor at top
+	channel.Write([]byte("\033[2J\033[H"))
+	
 	// Render the anonymous banner
 	banner, err := mh.bannerManager.RenderMainAnon()
 	if err != nil {
@@ -53,43 +57,47 @@ func (mh *MenuHandler) ShowAnonymousMenu(ctx context.Context, channel ssh.Channe
 		return nil, fmt.Errorf("failed to write banner: %w", err)
 	}
 
+	// Create terminal input handler for proper keyboard support
+	inputHandler := terminal.NewInputHandler(channel)
+	
 	// Wait for user input
-	buffer := make([]byte, 1)
 	for {
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		default:
-			// Note: SSH channels don't support SetReadDeadline,
-			// so we'll use context timeout instead for cancellation
-
-			n, err := channel.Read(buffer)
-			if err != nil {
-				return nil, fmt.Errorf("failed to read user input: %w", err)
+		event, err := inputHandler.ReadInput(ctx)
+		if err != nil {
+			if err.Error() == "user cancelled" {
+				return &MenuChoice{Action: "quit", Value: ""}, nil
 			}
+			return nil, fmt.Errorf("failed to read user input: %w", err)
+		}
 
-			if n > 0 {
-				choice := string(buffer[:n])
-				choice = string(choice[0]) // Take first character only
+		// Only handle character input for menu choices
+		if event.Type == terminal.EventCharacter {
+			choice := string(event.Character)
 
-				switch choice {
-				case "l", "L":
-					return &MenuChoice{Action: "login", Value: ""}, nil
-				case "r", "R":
-					return &MenuChoice{Action: "register", Value: ""}, nil
-				case "w", "W":
-					return &MenuChoice{Action: "watch", Value: ""}, nil
-				case "g", "G":
-					return &MenuChoice{Action: "list_games", Value: ""}, nil
-				case "q", "Q":
-					return &MenuChoice{Action: "quit", Value: ""}, nil
-				default:
-					// Invalid choice, show error and redisplay menu
-					errorMsg := fmt.Sprintf("\r\nInvalid choice '%s'. Please try again.\r\n\r\n", choice)
-					channel.Write([]byte(errorMsg))
-					// Redisplay the banner
-					channel.Write([]byte(banner))
-				}
+			switch strings.ToLower(choice) {
+			case "l":
+				return &MenuChoice{Action: "login", Value: ""}, nil
+			case "r":
+				return &MenuChoice{Action: "register", Value: ""}, nil
+			case "w":
+				return &MenuChoice{Action: "watch", Value: ""}, nil
+			case "g":
+				return &MenuChoice{Action: "list_games", Value: ""}, nil
+			case "c":
+				return &MenuChoice{Action: "credit", Value: ""}, nil
+			case "q":
+				return &MenuChoice{Action: "quit", Value: ""}, nil
+			default:
+				// Invalid choice, show error and redisplay menu
+				errorMsg := fmt.Sprintf("\r\nInvalid choice '%s'. Please try again.\r\n\r\n", choice)
+				channel.Write([]byte(errorMsg))
+				// Redisplay the banner
+				channel.Write([]byte(banner))
+			}
+		} else if event.Type == terminal.EventKey {
+			switch event.KeyCode {
+			case terminal.KeyCtrlC, terminal.KeyCtrlD:
+				return &MenuChoice{Action: "quit", Value: ""}, nil
 			}
 		}
 	}
@@ -97,6 +105,9 @@ func (mh *MenuHandler) ShowAnonymousMenu(ctx context.Context, channel ssh.Channe
 
 // ShowUserMenu displays the main menu for authenticated users and handles input
 func (mh *MenuHandler) ShowUserMenu(ctx context.Context, channel ssh.Channel, username string) (*MenuChoice, error) {
+	// Clear screen and position cursor at top
+	channel.Write([]byte("\033[2J\033[H"))
+	
 	// Render the user banner
 	banner, err := mh.bannerManager.RenderMainUser(username)
 	if err != nil {
@@ -111,47 +122,51 @@ func (mh *MenuHandler) ShowUserMenu(ctx context.Context, channel ssh.Channel, us
 		return nil, fmt.Errorf("failed to write banner: %w", err)
 	}
 
+	// Create terminal input handler for proper keyboard support
+	inputHandler := terminal.NewInputHandler(channel)
+	
 	// Wait for user input
-	buffer := make([]byte, 1)
 	for {
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		default:
-			// Note: SSH channels don't support SetReadDeadline,
-			// so we'll use context timeout instead for cancellation
-
-			n, err := channel.Read(buffer)
-			if err != nil {
-				return nil, fmt.Errorf("failed to read user input: %w", err)
+		event, err := inputHandler.ReadInput(ctx)
+		if err != nil {
+			if err.Error() == "user cancelled" {
+				return &MenuChoice{Action: "quit", Value: ""}, nil
 			}
+			return nil, fmt.Errorf("failed to read user input: %w", err)
+		}
 
-			if n > 0 {
-				choice := string(buffer[:n])
-				choice = string(choice[0]) // Take first character only
+		// Only handle character input for menu choices
+		if event.Type == terminal.EventCharacter {
+			choice := string(event.Character)
 
-				switch choice {
-				case "p", "P":
-					return &MenuChoice{Action: "play", Value: ""}, nil
-				case "w", "W":
-					return &MenuChoice{Action: "watch", Value: ""}, nil
-				case "e", "E":
-					return &MenuChoice{Action: "edit_profile", Value: ""}, nil
-				case "l", "L":
-					return &MenuChoice{Action: "list_games", Value: ""}, nil
-				case "r", "R":
-					return &MenuChoice{Action: "view_recordings", Value: ""}, nil
-				case "s", "S":
-					return &MenuChoice{Action: "statistics", Value: ""}, nil
-				case "q", "Q":
-					return &MenuChoice{Action: "quit", Value: ""}, nil
-				default:
-					// Invalid choice, show error and redisplay menu
-					errorMsg := fmt.Sprintf("\r\nInvalid choice '%s'. Please try again.\r\n\r\n", choice)
-					channel.Write([]byte(errorMsg))
-					// Redisplay the banner
-					channel.Write([]byte(banner))
-				}
+			switch strings.ToLower(choice) {
+			case "p":
+				return &MenuChoice{Action: "play", Value: ""}, nil
+			case "w":
+				return &MenuChoice{Action: "watch", Value: ""}, nil
+			case "e":
+				return &MenuChoice{Action: "edit_profile", Value: ""}, nil
+			case "l":
+				return &MenuChoice{Action: "list_games", Value: ""}, nil
+			case "r":
+				return &MenuChoice{Action: "view_recordings", Value: ""}, nil
+			case "s":
+				return &MenuChoice{Action: "statistics", Value: ""}, nil
+			case "c":
+				return &MenuChoice{Action: "credit", Value: ""}, nil
+			case "q":
+				return &MenuChoice{Action: "quit", Value: ""}, nil
+			default:
+				// Invalid choice, show error and redisplay menu
+				errorMsg := fmt.Sprintf("\r\nInvalid choice '%s'. Please try again.\r\n\r\n", choice)
+				channel.Write([]byte(errorMsg))
+				// Redisplay the banner
+				channel.Write([]byte(banner))
+			}
+		} else if event.Type == terminal.EventKey {
+			switch event.KeyCode {
+			case terminal.KeyCtrlC, terminal.KeyCtrlD:
+				return &MenuChoice{Action: "quit", Value: ""}, nil
 			}
 		}
 	}
@@ -199,17 +214,15 @@ func (mh *MenuHandler) ShowGameSelectionMenu(ctx context.Context, channel ssh.Ch
 	if err != nil {
 		mh.logger.Error("Failed to get available games", "error", err, "username", username)
 		channel.Write([]byte("\r\nFailed to load available games. Please try again later.\r\n"))
-		channel.Write([]byte("Press any key to return to main menu...\r\n"))
-		buffer := make([]byte, 1)
-		channel.Read(buffer)
+		// Brief pause to let user read the message
+		time.Sleep(2 * time.Second)
 		return nil, nil
 	}
 
 	if len(games) == 0 {
 		channel.Write([]byte("\r\nNo games are currently available.\r\n"))
-		channel.Write([]byte("Press any key to return to main menu...\r\n"))
-		buffer := make([]byte, 1)
-		channel.Read(buffer)
+		// Brief pause to let user read the message
+		time.Sleep(2 * time.Second)
 		return nil, nil
 	}
 
