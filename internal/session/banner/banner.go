@@ -18,6 +18,7 @@ type BannerConfig struct {
 	MainAnon  string
 	MainUser  string
 	WatchMenu string
+	IdleMode  string
 }
 
 // NewBannerManager creates a new banner manager
@@ -55,6 +56,16 @@ func (bm *BannerManager) RenderMainUser(username string) (string, error) {
 func (bm *BannerManager) RenderWatchMenu() (string, error) {
 	return bm.renderBanner(bm.config.WatchMenu, map[string]string{
 		"$SERVERID": "DungeonGate",
+		"$DATE":     time.Now().Format("2006-01-02"),
+		"$TIME":     time.Now().Format("15:04:05"),
+	})
+}
+
+// RenderIdleMode renders the idle mode banner
+func (bm *BannerManager) RenderIdleMode(username string) (string, error) {
+	return bm.renderBanner(bm.config.IdleMode, map[string]string{
+		"$SERVERID": "DungeonGate",
+		"$USERNAME": username,
 		"$DATE":     time.Now().Format("2006-01-02"),
 		"$TIME":     time.Now().Format("15:04:05"),
 	})
@@ -104,6 +115,7 @@ func (bm *BannerManager) ValidateBannerFiles() error {
 		{"main_anon", bm.config.MainAnon},
 		{"main_user", bm.config.MainUser},
 		{"watch_menu", bm.config.WatchMenu},
+		{"idle_mode", bm.config.IdleMode},
 	}
 
 	for _, file := range files {
@@ -126,6 +138,7 @@ func (bm *BannerManager) GetBannerInfo() map[string]fs.FileInfo {
 		"main_anon":  bm.config.MainAnon,
 		"main_user":  bm.config.MainUser,
 		"watch_menu": bm.config.WatchMenu,
+		"idle_mode":  bm.config.IdleMode,
 	}
 
 	for name, path := range files {
