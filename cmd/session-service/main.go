@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -10,6 +11,8 @@ import (
 
 	"github.com/dungeongate/internal/session"
 	"github.com/dungeongate/pkg/config"
+	"github.com/dungeongate/pkg/log"
+	"github.com/op/go-logging"
 )
 
 var (
@@ -17,6 +20,49 @@ var (
 	buildTime string = "unknown"
 	gitCommit string = "unknown"
 )
+
+// setupLogger creates a configured logger using the standard logging package
+func setupLogger(cfg *config.SessionServiceConfig) *logging.Logger {
+	// Create the go-logging logger (matches other services)
+	var logConfig log.Config
+	if cfg.Logging != nil {
+		// Set defaults if values are empty
+		level := cfg.Logging.Level
+		if level == "" {
+			level = "info"
+		}
+		format := cfg.Logging.Format
+		if format == "" {
+			format = "text"
+		}
+		output := cfg.Logging.Output
+		if output == "" {
+			output = "stdout"
+		}
+		
+		logConfig = log.Config{
+			Level:  level,
+			Format: format,
+			Output: output,
+			File: &log.FileConfig{
+				Directory: "./logs",
+				Filename:  "session-service.log",
+				MaxSize:   "100MB",
+				MaxFiles:  10,
+				MaxAge:    "30d",
+				Compress:  true,
+			},
+		}
+	} else {
+		logConfig = log.Config{
+			Level:  "info",
+			Format: "text",
+			Output: "stdout",
+		}
+	}
+	
+	return log.SetupLogger("session-service", logConfig)
+}
 
 func main() {
 	var (
@@ -33,17 +79,23 @@ func main() {
 		return
 	}
 
-	// Setup structured logging
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
-		Level: slog.LevelInfo,
-	}))
-
-	// Load configuration
+	// Load configuration first to setup logging properly
 	cfg, err := config.LoadSessionServiceConfig(*configFile)
 	if err != nil {
-		logger.Error("Failed to load configuration", "error", err)
+		// Use basic logger for config load errors
+		basicLogger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
+		basicLogger.Error("Failed to load configuration", "error", err)
 		os.Exit(1)
 	}
+
+	// Setup structured logging based on configuration  
+	goLogger := setupLogger(cfg)
+	
+	// Create silent slog logger for internal components (we'll use go-logging for main messages)
+	// Set to a high level to suppress most internal logging
+	slogLogger := slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{
+		Level: slog.LevelError, // Only show errors from internal components
+	}))
 
 	// Convert to session config format
 	sessionConfig := &session.Config{
@@ -100,23 +152,23 @@ func main() {
 	}
 
 	// Create stateless session service
-	sessionService, err := session.New(sessionConfig, logger)
+	sessionService, err := session.New(sessionConfig, slogLogger)
 	if err != nil {
-		logger.Error("Failed to create session service", "error", err)
+		goLogger.Errorf("Failed to create session service: %v", err)
 		os.Exit(1)
 	}
 
 	// Start the service
 	if err := sessionService.Start(); err != nil {
-		logger.Error("Failed to start session service", "error", err)
+		goLogger.Errorf("Failed to start session service: %v", err)
 		os.Exit(1)
 	}
 
-	logger.Info("Session Service started",
-		"ssh_port", sessionConfig.SSH.Port,
-		"http_port", sessionConfig.HTTP.Port,
-		"grpc_port", sessionConfig.GRPC.Port,
-		"max_connections", sessionConfig.MaxConnections,
+	goLogger.Infof("Session Service started - SSH: %d, HTTP: %d, gRPC: %d, Max Connections: %d",
+		sessionConfig.SSH.Port,
+		sessionConfig.HTTP.Port,
+		sessionConfig.GRPC.Port,
+		sessionConfig.MaxConnections,
 	)
 
 	// Wait for interrupt signal
@@ -124,12 +176,12 @@ func main() {
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
 	<-sigChan
-	logger.Info("Shutting down gracefully...")
+	goLogger.Info("Shutting down gracefully...")
 
 	// Shutdown the service
 	if err := sessionService.Stop(); err != nil {
-		logger.Error("Error during shutdown", "error", err)
+		goLogger.Errorf("Error during shutdown: %v", err)
 	}
 
-	logger.Info("Session Service stopped")
+	goLogger.Info("Session Service stopped")
 }

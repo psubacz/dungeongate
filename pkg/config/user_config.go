@@ -120,12 +120,15 @@ type CacheConfig struct {
 
 // UserServiceConfig represents user service configuration
 type UserServiceConfig struct {
+	InheritFrom    string              `yaml:"inherit_from"`
 	Server         *ServerConfig       `yaml:"server"`
 	Database       *DatabaseConfig     `yaml:"database"`
 	Registration   *RegistrationConfig `yaml:"registration"`
 	Authentication *AuthConfig         `yaml:"authentication"`
 	Validation     *ValidationConfig   `yaml:"validation"`
 	Security       *SecurityConfig     `yaml:"security"`
+	Logging        *LoggingConfig      `yaml:"logging"`
+	Health         *HealthConfig       `yaml:"health"`
 }
 
 // RegistrationConfig represents registration configuration
@@ -714,6 +717,19 @@ func LoadUserServiceConfig(configPath string) (*UserServiceConfig, error) {
 	var config UserServiceConfig
 	if err := yaml.Unmarshal([]byte(expanded), &config); err != nil {
 		return nil, fmt.Errorf("failed to parse config: %w", err)
+	}
+
+	// Load and merge common configuration if specified
+	if config.InheritFrom != "" {
+		commonConfigPath := FindCommonConfig(configPath)
+		if config.InheritFrom == "common.yaml" {
+			// Use the common.yaml in the same directory
+			commonConfig, err := LoadCommonConfig(commonConfigPath)
+			if err != nil {
+				return nil, fmt.Errorf("failed to load common config: %w", err)
+			}
+			MergeWithCommonUser(&config, commonConfig)
+		}
 	}
 
 	// Apply defaults for missing fields

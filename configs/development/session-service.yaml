@@ -326,45 +326,17 @@ storage:
   temp_path: "/Users/caboose/Desktop/dungeongate/tmp"
 
 # ============================================================================
-# Logging Configuration
+# Logging Configuration Overrides
 # ============================================================================
-# Session service logging configuration (will inherit from common.yaml when implemented)
+# Session service logging overrides (inherits base config from common.yaml)
 logging:
-  # Log level: debug, info, warn, error
-  level: "debug"
-  
-  # Log format: text (human readable), json (machine readable)
-  format: "text"
-  
-  # Log output: stdout, stderr, file, journald
-  output: "stdout"
-  
-  # File logging configuration (when output is "file")
+  # Service-specific log file name
   file:
-    # Directory for log files
-    directory: "./logs"
-    
-    # Log file name pattern
     filename: "session-service.log"
-    
-    # Maximum size of each log file before rotation
-    max_size: "100MB"
-    
-    # Maximum number of old log files to retain
-    max_files: 10
-    
-    # Maximum age of log files before deletion
-    max_age: "30d"
-    
-    # Compress rotated log files
-    compress: true
   
-  # Journald configuration (when output is "journald")
+  # Service-specific journald configuration
   journald:
-    # Service identifier for journald
     identifier: "dungeongate-session"
-    
-    # Additional fields to include in journald logs
     fields:
       service: "session-service"
       component: "dungeongate"

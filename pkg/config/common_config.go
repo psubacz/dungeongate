@@ -79,6 +79,38 @@ func LoadCommonConfig(configPath string) (*CommonConfig, error) {
 	return &config, nil
 }
 
+// MergeWithCommonUser merges user service config with common config
+// Service-specific values take precedence over common values
+func MergeWithCommonUser(serviceConfig *UserServiceConfig, commonConfig *CommonConfig) {
+	// Merge database configuration
+	if serviceConfig.Database == nil && commonConfig.Database != nil {
+		serviceConfig.Database = commonConfig.Database
+	}
+
+	// Merge logging configuration
+	if serviceConfig.Logging == nil && commonConfig.Logging != nil {
+		// Convert log.Config to LoggingConfig for compatibility
+		serviceConfig.Logging = &LoggingConfig{
+			Level:  commonConfig.Logging.Level,
+			Format: commonConfig.Logging.Format,
+			Output: commonConfig.Logging.Output,
+		}
+	} else if serviceConfig.Logging != nil && commonConfig.Logging != nil {
+		// Merge logging fields, keeping service-specific overrides
+		mergeLoggingConfigWithCommon(serviceConfig.Logging, commonConfig.Logging)
+	}
+
+	// Merge health configuration
+	if serviceConfig.Health == nil && commonConfig.HealthCheck != nil {
+		serviceConfig.Health = commonConfig.HealthCheck
+	}
+
+	// Merge server configuration
+	if serviceConfig.Server != nil && commonConfig.Server != nil {
+		mergeServerConfig(serviceConfig.Server, commonConfig.Server)
+	}
+}
+
 // MergeWithCommon merges service-specific config with common config
 // Service-specific values take precedence over common values
 func MergeWithCommon(serviceConfig *GameServiceConfig, commonConfig *CommonConfig) {
