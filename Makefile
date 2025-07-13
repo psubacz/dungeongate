@@ -20,9 +20,9 @@ AUTH_MAIN_PATH=./cmd/auth-service
 GAME_MAIN_PATH=./cmd/game-service
 
 # Configuration files
-SESSION_CONFIG=configs/development/session-service.yaml
-AUTH_CONFIG=configs/development/auth-service.yaml
-GAME_CONFIG=configs/development/game-service.yaml
+SESSION_CONFIG=configs/session-service.yaml
+AUTH_CONFIG=configs/auth-service.yaml
+GAME_CONFIG=configs/game-service.yaml
 
 # Test configuration
 TEST_TIMEOUT=30s

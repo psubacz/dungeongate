@@ -38,7 +38,7 @@ var serviceLogger *logging.Logger
 
 func main() {
 	var (
-		configFile  = flag.String("config", "configs/development/game-service.yaml", "Path to configuration file")
+		configFile  = flag.String("config", "configs/game-service.yaml", "Path to configuration file")
 		showVersion = flag.Bool("version", false, "Show version information")
 	)
 	flag.Parse()
@@ -108,7 +108,7 @@ func loadConfig(configFile string) (*config.GameServiceConfig, error) {
 
 	// Try other common locations
 	configPaths := []string{
-		"./configs/development/game-service.yaml",
+		"./configs/game-service.yaml",
 		"./configs/game-service.yaml",
 		"/etc/dungeongate/game-service.yaml",
 	}

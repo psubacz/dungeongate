@@ -36,7 +36,7 @@ var serviceLogger *logging.Logger
 
 func main() {
 	var (
-		configFile  = flag.String("config", "configs/development/auth-service.yaml", "Path to configuration file")
+		configFile  = flag.String("config", "configs/auth-service.yaml", "Path to configuration file")
 		showVersion = flag.Bool("version", false, "Show version information")
 	)
 	flag.Parse()
