@@ -1,702 +1,684 @@
-# DungeonGate Session Service
+# Session Service Architecture
 
-A modern, stateless SSH-based gateway for terminal gaming, providing secure access to roguelike games like NetHack and Dungeon Crawl Stone Soup with session persistence and reconnection capabilities.
+## Overview
 
-## 🚀 Quick Start
+The DungeonGate Session Service provides SSH-based terminal access to games through a modern, pool-based architecture designed for high scalability, resource efficiency, and reliability. The service has been completely refactored from a monolithic design to a microservices-ready, horizontally scalable architecture.
 
-### Prerequisites
+## Architecture Evolution
 
-- Go 1.24 or higher
-- SSH client (for testing)
-- Terminal with UTF-8 support
-- Auth Service and Game Service running
+### Previous Architecture (Legacy)
+- **Monolithic Handler**: Single large handler managing all connection logic
+- **Direct Goroutine Spawning**: Created new goroutines for each connection without limits
+- **No Resource Management**: Limited control over system resource usage
+- **Minimal Observability**: Basic logging without comprehensive metrics
 
-### Setup and Build
+### Current Architecture (Pool-Based)
+- **Pool-Based Design**: Connection, worker, and PTY resource pools
+- **Resource Management**: Comprehensive quotas, limits, and usage tracking
+- **Backpressure Management**: Circuit breaker and load shedding patterns
+- **Comprehensive Observability**: Structured logging and Prometheus metrics
+- **Horizontal Scalability**: Stateless design ready for load balancing
 
-1. **Clone and setup the project:**
-```bash
-git clone <repository-url>
-cd dungeongate
+## Core Components
+
+### 1. Connection Pool (`internal/session/pools/connection_pool.go`)
+
+The connection pool manages SSH connections with bounded resource limits and priority queuing.
+
+#### Key Features
+- **Bounded Connections**: Hard limit on concurrent connections (default: 1000)
+- **Priority Queuing**: Support for critical, high, normal, and low priority requests
+- **Graceful Shutdown**: Configurable drain timeout for clean shutdowns
+- **Resource Quotas**: Per-connection resource limits and tracking
+- **Idle Management**: Automatic cleanup of idle connections
+
+#### Configuration
+```yaml
+connection_pool:
+  max_connections: 1000
+  queue_size: 100
+  queue_timeout: "5s"
+  idle_timeout: "30m"
+  drain_timeout: "30s"
 ```
 
-2. **Install dependencies and tools:**
-```bash
-make deps          # Install Go dependencies
-make deps-tools    # Install development tools
+#### Usage Example
+```go
+// Request a new connection
+conn, err := pool.RequestConnection(ctx, channel, sshConn, PriorityNormal)
+if err != nil {
+    return fmt.Errorf("connection rejected: %w", err)
+}
+
+// Use the connection
+defer pool.ReleaseConnection(conn.ID)
 ```
 
-3. **Build the services:**
-```bash
-make build-all     # Build all services
-# Or build individually:
-make build-session # Session service
-make build-auth    # Auth service
-make build-game    # Game service
+#### Metrics
+- `session_pool_active_connections` - Active connections count
+- `session_pool_total_connections` - Total connections created
+- `session_pool_rejected_connections` - Rejected connection count
+- `session_pool_queue_time_seconds` - Time spent in queue
+
+### 2. Worker Pool (`internal/session/pools/worker_pool.go`)
+
+The worker pool manages a fixed number of goroutines to process work items, preventing goroutine explosion.
+
+#### Key Features
+- **Fixed Goroutine Pool**: Configurable number of workers (default: 50)
+- **Work Item Prioritization**: Priority-based work queue processing
+- **Work Type Specialization**: Different handlers for different work types
+- **Timeout Management**: Configurable timeouts for work execution
+- **Comprehensive Metrics**: Worker utilization and performance tracking
+
+#### Work Types
+- `WorkTypeNewConnection` - New SSH connection setup
+- `WorkTypeMenuAction` - Menu navigation and user interactions
+- `WorkTypeGameIO` - Game I/O streaming
+- `WorkTypeAuthentication` - User authentication flows
+- `WorkTypeCleanup` - Resource cleanup operations
+- `WorkTypeStreamManagement` - Spectator stream management
+
+#### Configuration
+```yaml
+worker_pool:
+  pool_size: 50
+  queue_size: 1000
+  worker_timeout: "30s"
+  shutdown_timeout: "10s"
 ```
 
-4. **Start all services:**
+#### Usage Example
+```go
+// Submit work to the pool
+work := &WorkItem{
+    Type:       WorkTypeMenuAction,
+    Connection: conn,
+    Handler:    handleMenuAction,
+    Context:    ctx,
+    Priority:   PriorityNormal,
+}
+
+err := workerPool.Submit(work)
+```
+
+#### Metrics
+- `session_worker_active_workers` - Number of busy workers
+- `session_worker_queue_size` - Work items in queue
+- `session_worker_processing_time` - Work processing duration
+- `session_worker_utilization` - Worker pool utilization percentage
+
+### 3. PTY Pool (`internal/session/pools/pty_pool.go`)
+
+The PTY pool manages pseudo-terminal resources with efficient reuse and cleanup.
+
+#### Key Features
+- **PTY Reuse**: Reuse PTYs across sessions to reduce overhead
+- **File Descriptor Management**: Track and limit FD usage
+- **Automatic Cleanup**: Remove old or invalid PTYs
+- **Health Monitoring**: Validate PTY health before reuse
+- **Resource Limits**: Configurable FD and PTY limits
+
+#### Configuration
+```yaml
+pty_pool:
+  max_ptys: 500
+  reuse_timeout: "5m"
+  cleanup_interval: "1m"
+  fd_limit: 1024
+```
+
+#### Usage Example
+```go
+// Acquire a PTY for a session
+ptyRes, err := ptyPool.AcquirePTY(sessionID)
+if err != nil {
+    return fmt.Errorf("PTY allocation failed: %w", err)
+}
+
+// Use the PTY
+defer ptyPool.ReleasePTY(ptyRes.ID)
+```
+
+#### Metrics
+- `session_pty_active_ptys` - PTYs currently in use
+- `session_pty_available_ptys` - PTYs available for reuse
+- `session_pty_fd_usage` - File descriptors in use
+- `session_pty_reuse_rate` - PTY reuse efficiency
+
+### 4. Backpressure Manager (`internal/session/pools/backpressure.go`)
+
+The backpressure manager implements circuit breaker and load shedding patterns to protect the system under load.
+
+#### Key Features
+- **Circuit Breaker**: Fail-fast when error rate is high
+- **Load Shedding**: Drop requests when system load is high
+- **Queue Management**: Bounded queues with drop policies
+- **System Monitoring**: Track CPU, memory, and queue utilization
+- **Adaptive Behavior**: Automatically adjust to system conditions
+
+#### Circuit Breaker States
+- **Closed**: Normal operation, all requests allowed
+- **Open**: High error rate, requests rejected immediately
+- **Half-Open**: Testing recovery, limited requests allowed
+
+#### Configuration
+```yaml
+backpressure:
+  enabled: true
+  circuit_breaker:
+    enabled: true
+    failure_threshold: 10
+    recovery_timeout: "60s"
+  load_shedding:
+    enabled: true
+    cpu_threshold: 0.8
+    memory_threshold: 0.9
+```
+
+#### Usage Example
+```go
+// Check if request can be accepted
+if !backpressure.CanAccept() {
+    return fmt.Errorf("server overloaded")
+}
+
+// Record operation result
+if err != nil {
+    backpressure.RecordFailure()
+} else {
+    backpressure.RecordSuccess()
+}
+```
+
+## Resource Management
+
+### 1. Resource Limiter (`internal/session/resources/limiter.go`)
+
+Manages resource limits and quotas at user and system levels.
+
+#### Resource Types
+- **Connections**: Number of concurrent SSH connections
+- **PTYs**: Number of pseudo-terminals
+- **Memory**: Memory usage in bytes
+- **Bandwidth**: Network bandwidth usage
+- **CPU**: CPU core allocation
+- **File Descriptors**: Open file descriptor count
+
+#### User Quotas
+```yaml
+default_user_quota:
+  max_connections: 10
+  max_ptys: 5
+  max_memory: "256MB"
+  max_bandwidth: "10MB/s"
+  max_cpu_cores: 0.5
+  expires_after: "24h"
+  priority: 1
+
+vip_user_quota:
+  max_connections: 25
+  max_ptys: 10
+  max_memory: "512MB"
+  max_bandwidth: "50MB/s"
+  max_cpu_cores: 1.0
+  expires_after: "168h"
+  priority: 5
+```
+
+### 2. Resource Tracker (`internal/session/resources/tracker.go`)
+
+Tracks resource usage across connections and sessions.
+
+#### Tracked Metrics
+- Connection lifecycle and state changes
+- Data transfer statistics (bytes sent/received)
+- Session duration and resource consumption
+- User activity patterns
+- Resource utilization trends
+
+#### Usage Monitoring
+```go
+// Track connection
+tracker.TrackConnection(connID, userID, remoteAddr)
+
+// Track data transfer
+tracker.TrackDataTransfer(connID, bytesSent, bytesReceived)
+
+// Track session
+tracker.TrackSession(sessionID, userID, connID, gameID)
+```
+
+### 3. Metrics Registry (`internal/session/resources/metrics.go`)
+
+Comprehensive metrics collection with Prometheus-style metrics.
+
+#### Metric Types
+- **Counters**: Monotonically increasing values (total connections)
+- **Gauges**: Current values that can go up/down (active connections)
+- **Histograms**: Distribution of values (response times)
+- **Custom Collectors**: Domain-specific metric collection
+
+#### Key Metrics
+```
+# Connection Pool Metrics
+session_pool_active_connections
+session_pool_total_connections
+session_pool_rejected_connections
+session_pool_queue_time_seconds
+
+# Worker Pool Metrics
+session_worker_active_workers
+session_worker_queue_size
+session_worker_processing_time_seconds
+session_worker_utilization
+
+# PTY Pool Metrics
+session_pty_active_ptys
+session_pty_available_ptys
+session_pty_fd_usage
+session_pty_reuse_rate
+
+# Resource Usage Metrics
+session_resource_memory_usage_bytes
+session_resource_bandwidth_usage_bytes
+session_resource_cpu_usage_cores
+session_resource_violations_total
+```
+
+## Configuration
+
+### Basic Configuration
+
+The session service configuration is found in `configs/session-service.yaml` and includes comprehensive pool settings:
+
+```yaml
+# Connection Pool Configuration
+connection_pool:
+  max_connections: 1000
+  queue_size: 100
+  queue_timeout: "5s"
+  idle_timeout: "30m"
+  drain_timeout: "30s"
+
+# Worker Pool Configuration
+worker_pool:
+  pool_size: 50
+  queue_size: 1000
+  worker_timeout: "30s"
+  shutdown_timeout: "10s"
+
+# PTY Pool Configuration
+pty_pool:
+  max_ptys: 500
+  reuse_timeout: "5m"
+  cleanup_interval: "1m"
+  fd_limit: 1024
+
+# Resource Management
+resource_management:
+  limits:
+    system:
+      max_connections: 1000
+      max_ptys: 500
+      max_memory: "8GB"
+      max_bandwidth: "1GB/s"
+      max_file_descriptors: 8192
+```
+
+### Advanced Configuration
+
+For production deployments, advanced configuration options are available:
+
+```yaml
+advanced_pool_config:
+  connection_pool:
+    enable_prioritization: true
+    connection_warming:
+      enabled: true
+      min_connections: 10
+
+  worker_pool:
+    dynamic_scaling:
+      enabled: true
+      min_workers: 10
+      max_workers: 100
+      scale_up_threshold: 0.8
+
+  pty_pool:
+    pre_allocation:
+      enabled: true
+      pre_allocate_count: 20
+```
+
+## Monitoring and Observability
+
+### Structured Logging
+
+All components use structured logging with contextual information:
+
+```go
+logger.Info("Connection accepted",
+    "connection_id", connID,
+    "user_id", userID,
+    "remote_addr", remoteAddr,
+    "active_connections", activeCount)
+```
+
+### Health Checks
+
+Pool components provide health check endpoints:
+
+- `/health/connection-pool` - Connection pool health
+- `/health/worker-pool` - Worker pool health
+- `/health/pty-pool` - PTY pool health
+- `/health/resource-limiter` - Resource limiter health
+
+### Metrics Endpoints
+
+Prometheus metrics are exposed at:
+- `:8085/metrics` - Session service metrics
+
+### Alert Thresholds
+
+Configurable alert thresholds for monitoring:
+
+```yaml
+alerts:
+  high_connection_count: 900
+  high_queue_time: "2s"
+  high_error_rate: 0.05
+  high_resource_usage: 0.9
+```
+
+## Architecture Diagrams
+
+### Pool-Based Architecture Overview
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    Session Service (Pool-Based)                │
+├─────────────────────────────────────────────────────────────────┤
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐  │
+│  │ Connection Pool │  │  Worker Pool    │  │    PTY Pool     │  │
+│  │                 │  │                 │  │                 │  │
+│  │ • Bounded Conns │  │ • Fixed Workers │  │ • PTY Reuse     │  │
+│  │ • Priority Queue│  │ • Work Queue    │  │ • FD Management │  │
+│  │ • Graceful      │  │ • Specialization│  │ • Health Checks │  │
+│  │   Shutdown      │  │ • Metrics       │  │ • Auto Cleanup  │  │
+│  └─────────────────┘  └─────────────────┘  └─────────────────┘  │
+├─────────────────────────────────────────────────────────────────┤
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐  │
+│  │ Backpressure    │  │ Resource        │  │ Metrics         │  │
+│  │ Manager         │  │ Management      │  │ Registry        │  │
+│  │                 │  │                 │  │                 │  │
+│  │ • Circuit Break │  │ • Quotas        │  │ • Prometheus    │  │
+│  │ • Load Shedding │  │ • Limits        │  │ • Custom        │  │
+│  │ • Queue Mgmt    │  │ • Tracking      │  │   Collectors    │  │
+│  │ • Monitoring    │  │ • Violations    │  │ • Health Checks │  │
+│  └─────────────────┘  └─────────────────┘  └─────────────────┘  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Request Flow Architecture
+
+```
+SSH Client ──┐
+             │
+SSH Client ──┼──► Connection Pool ──► Worker Pool ──► Handlers
+             │         │                   │              │
+SSH Client ──┘         │                   │              │
+                       │                   │              │
+             Backpressure ◄────────────────┼──────────────┘
+               Manager                     │
+                 │                         │
+                 ▼                         ▼
+           Circuit Breaker            PTY Pool ──► Game Service
+           Load Shedding                │              │
+                                        │              │
+                                        ▼              ▼
+                                 Resource Tracker   NetHack
+                                                       Process
+```
+
+### Resource Management Flow
+
+```
+┌─────────────┐    Resource     ┌─────────────┐    Usage      ┌─────────────┐
+│    User     │    Request      │  Resource   │   Tracking    │  Resource   │
+│ Connection  │ ──────────────► │   Limiter   │ ────────────► │   Tracker   │
+│             │                 │             │               │             │
+│ • UserID    │    ✓ Allow      │ • Quotas    │   • Monitor   │ • Metrics   │
+│ • Conn ID   │ ◄────────────── │ • Limits    │   • Stats     │ • History   │
+│ • Priority  │    ✗ Reject     │ • Violations│   • Alerts    │ • Cleanup   │
+└─────────────┘                 └─────────────┘               └─────────────┘
+```
+
+## Migration from Legacy Architecture
+
+### Migration Status
+
+- ✅ **Phase 1: Infrastructure** (Completed)
+  - Pool infrastructure implementation
+  - Resource management components
+  - Configuration integration
+
+- 🚧 **Phase 2: Handler Refactoring** (In Progress)
+  - Extract SessionHandler from monolithic handler
+  - Create specialized handlers (auth, game, stream)
+  - Integrate with existing MenuHandler
+
+- 📋 **Phase 3: Pool Integration** (Planned)
+  - Replace direct goroutine spawning with worker pools
+  - Implement connection pooling
+  - Enable backpressure management
+
+- 📋 **Phase 4: Testing and Optimization** (Planned)
+  - Comprehensive testing for pool architecture
+  - Performance tuning and resource limit calibration
+  - Load testing and optimization
+
+### Compatibility
+
+The new architecture maintains compatibility with:
+- Existing SSH client connections
+- Current menu system and user interface
+- Auth service and game service integration
+- Configuration file structure (with extensions)
+
+## Deployment Considerations
+
+### Horizontal Scaling
+
+The pool-based architecture supports horizontal scaling:
+
+1. **Stateless Design**: No session state stored in service
+2. **Load Balancer Ready**: Works with any TCP/HTTP load balancer
+3. **Resource Isolation**: Each instance manages its own resource pools
+4. **Health Check Support**: Built-in health checks for load balancer integration
+
+### Resource Planning
+
+For capacity planning, consider:
+
+- **Connection Pool Size**: Based on expected concurrent users
+- **Worker Pool Size**: Based on CPU cores and workload characteristics
+- **PTY Pool Size**: Based on game session patterns
+- **Memory Limits**: Account for connection overhead and game resources
+
+### Performance Tuning
+
+Key performance tuning parameters:
+
+```yaml
+# High-throughput configuration
+connection_pool:
+  max_connections: 5000
+  queue_size: 500
+
+worker_pool:
+  pool_size: 100
+  queue_size: 5000
+
+pty_pool:
+  max_ptys: 2000
+  fd_limit: 4096
+```
+
+## Development
+
+### Quick Start
+
 ```bash
-# Start all services with proper sequencing:
+# Install dependencies
+make deps && make deps-tools
+
+# Build services
+make build-all
+
+# Start all services
 make run-all
 
-# Or start individually:
-make run-session   # Session service only (limited functionality)
-make run-auth      # Auth service only
-make run-game      # Game service only
-```
-
-5. **Test SSH connection:**
-```bash
+# Test SSH connection
 ssh -p 2222 localhost
-# Or use the built-in test:
-make ssh-test-connection
 ```
-
-### Default Test Accounts
-
-- **yellow/password** - Test user account (see database migrations)
-- Anonymous access available in development mode
-
-## 🏗️ Architecture
-
-### Session Service Architecture (Stateless Design)
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                 Session Service (Stateless)                │
-├─────────────────────────────────────────────────────────────┤
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐  │
-│  │ SSH Server  │  │ Connection  │  │ Menu System         │  │
-│  │             │  │ Manager     │  │                     │  │
-│  │ • Auth      │  │ • Stateless │  │ • User Interface    │  │
-│  │ • Channels  │  │ • Tracking  │  │ • Game Selection    │  │
-│  │ • Terminal  │  │ • Cleanup   │  │ • Authentication    │  │
-│  └─────────────┘  └─────────────┘  └─────────────────────┘  │
-└─────────────────────────────────────────────────────────────┘
-│                                                             │
-├─────────────────────────────────────────────────────────────┤
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐  │
-│  │ Auth Client │  │ Game Client │  │ Streaming Manager   │  │
-│  │             │  │             │  │                     │  │
-│  │ • JWT Auth  │  │ • Game Mgmt │  │ • I/O Bridging      │  │
-│  │ • User Mgmt │  │ • PTY Proxy │  │ • Session Handling  │  │
-│  │ • Sessions  │  │ • Lifecycle │  │ • Reconnection      │  │
-│  └─────────────┘  └─────────────┘  └─────────────────────┘  │
-└─────────────────────────────────────────────────────────────┘
-```
-
-### Microservices Integration
-
-```
-SSH Client → Session Service → Game Service → NetHack Process
-     ↑              ↓              ↓              ↓
-  Terminal     Auth Service    PTY Manager    Game Output
-   I/O         JWT Tokens      Process        Terminal
-                              Management      Streams
-```
-
-### Key Features
-
-- **Stateless Design**: Horizontal scaling support with no session state in memory
-- **Session Persistence**: Games survive stream disconnections and reconnections
-- **Full SSH Protocol Support**: SSH-2.0 compliant server with proper terminal emulation
-- **Terminal Management**: PTY proxy to Game Service with automatic window resizing
-- **Session Recording**: TTY recording for playback (via Game Service)
-- **Real-time Spectating**: Watch other players' games with live streaming
-- **Microservices Authentication**: JWT-based authentication with Auth Service
-- **Connection Resilience**: Heartbeat mechanisms and reconnection support
-
-## 🔧 Configuration
-
-### Session Service Configuration
-
-The service uses a comprehensive YAML configuration file located at `configs/development/session-service.yaml`:
-
-```yaml
-# HTTP/gRPC Server Configuration
-server:
-  port: 8083          # HTTP API port
-  grpc_port: 9093     # gRPC port for service communication
-  host: "localhost"
-  timeout: "30s"
-  max_connections: 1000
-
-# SSH Server Configuration
-ssh:
-  enabled: true
-  port: 2222          # SSH port (2222 for development, 22 for production)
-  host: "localhost"
-  banner: "Welcome to DungeonGate Development Server!\r\n"
-  max_sessions: 10
-  session_timeout: "1h"
-  idle_timeout: "15m"
-  
-  # SSH Authentication
-  auth:
-    password_auth: false      # Disabled - using centralized auth
-    public_key_auth: false    # Public keys not implemented yet
-    allow_anonymous: true     # Allow anonymous connections in dev
-    
-  # SSH Keepalive Configuration (NEW)
-  keepalive:
-    enabled: true
-    interval: "30s"           # Prevent timeout during NetHack idle periods
-    count_max: 3
-    
-  # Terminal Configuration
-  terminal:
-    default_size: "80x24"
-    max_size: "120x40"
-    supported_terminals: ["xterm", "xterm-256color", "screen", "tmux"]
-
-# Session Management Configuration
-session_management:
-  terminal:
-    default_size: "80x24"
-    max_size: "120x40"
-    encoding: "utf-8"
-    
-  # Session Timeout Configuration
-  timeouts:
-    idle_timeout: "15m"
-    max_session_duration: "1h"
-    cleanup_interval: "1m"
-    
-  # Heartbeat Configuration (NEW)
-  heartbeat:
-    enabled: true
-    interval: "60s"                    # General heartbeat interval
-    idle_detection_threshold: "2m"     # Detect idle state after 2 minutes
-    
-    # gRPC Stream Heartbeat
-    grpc_stream:
-      enabled: true
-      ping_interval: "45s"             # gRPC stream ping
-      pong_timeout: "10s"              # Timeout for pong response
-    
-  # TTY Recording
-  ttyrec:
-    enabled: true
-    compression: "gzip"
-    directory: "/Users/caboose/Desktop/dungeongate/ttyrec"
-    max_file_size: "10MB"
-    retention_days: 7
-    
-  # Spectating System
-  spectating:
-    enabled: true
-    max_spectators_per_session: 3
-    spectator_timeout: "30m"
-
-# Service Integration
-services:
-  user_service: "localhost:8084"      # Future user service
-  game_service: "localhost:50051"     # Game Service gRPC
-  auth_service: "localhost:8082"      # Auth Service gRPC
-
-# Authentication Service Integration
-auth:
-  enabled: true
-  service_address: "localhost:8081"   # Auth Service HTTP
-  grpc_address: "localhost:8082"      # Auth Service gRPC
-  jwt_secret: "dev-secret-please-change-in-production"
-  jwt_issuer: "dungeongate-dev"
-  access_token_expiration: "15m"
-  refresh_token_expiration: "168h"    # 7 days
-  max_login_attempts: 3
-  lockout_duration: "15m"
-```
-
-### Production Configuration Differences
-
-For production deployment:
-
-```yaml
-ssh:
-  port: 22              # Standard SSH port
-  host: "0.0.0.0"       # Listen on all interfaces
-  max_sessions: 1000    # Higher limits
-  session_timeout: "4h"
-  
-  auth:
-    allow_anonymous: false # Require authentication
-    
-security:
-  rate_limiting:
-    enabled: true
-    max_connections_per_ip: 100
-    
-  brute_force_protection:
-    enabled: true
-    max_failed_attempts: 10
-    lockout_duration: "1m"
-```
-
-## 🎮 Game Integration
-
-### Stateless Game Session Management
-
-The Session Service now operates in a **stateless mode** that enables:
-
-- **Session Persistence**: NetHack games survive SSH disconnections
-- **Reconnection Support**: Users can reconnect to ongoing games
-- **Horizontal Scaling**: Multiple Session Service instances can handle the same user
-- **Process Independence**: Games run in Game Service, not Session Service
-
-### Game Service Integration
-
-```
-┌─────────────┐    gRPC     ┌─────────────┐    PTY      ┌─────────────┐
-│   Session   │ ◄─────────► │    Game     │ ◄─────────► │   NetHack   │
-│   Service   │             │   Service   │             │   Process   │
-│             │             │             │             │             │
-│ • SSH Menu  │             │ • PTY Mgmt  │             │ • Game Loop │
-│ • Auth      │             │ • Process   │             │ • Save/Load │
-│ • Streaming │             │ • Adapters  │             │ • Terminal  │
-└─────────────┘             └─────────────┘             └─────────────┘
-```
-
-### Supported Games
-
-- **NetHack 3.6.7**: Classic roguelike with full feature support
-- **Dungeon Crawl Stone Soup**: Modern tactical roguelike (planned)
-- **Custom Games**: Easy to add through Game Service adapters
-
-### Game Session Flow
-
-1. **User Connection**: SSH connection to Session Service
-2. **Authentication**: JWT-based auth through Auth Service
-3. **Game Selection**: Menu-driven game selection
-4. **Session Creation**: Game Service creates PTY and starts process
-5. **Stream Bridging**: Session Service bridges SSH ↔ Game Service I/O
-6. **Session Persistence**: Games survive disconnections
-7. **Reconnection**: Users can reconnect to ongoing sessions
-
-## 🔐 Security Features
-
-### Multi-Layer Authentication
-
-1. **SSH Layer**: SSH protocol authentication (currently allows all)
-2. **Application Layer**: JWT-based authentication with Auth Service
-3. **Service Layer**: gRPC service-to-service authentication
-
-### Security Controls
-
-- **Rate Limiting**: Configurable connection limits per IP
-- **Brute Force Protection**: Account lockout after failed attempts
-- **Session Security**: JWT tokens with configurable expiration
-- **Host Key Verification**: SSH server identity verification
-- **Connection Monitoring**: Comprehensive logging and tracking
-
-### Configuration Security
-
-```yaml
-security:
-  rate_limiting:
-    enabled: true
-    max_connections_per_ip: 100
-    connection_window: "1m"
-    
-  brute_force_protection:
-    enabled: true
-    max_failed_attempts: 10
-    lockout_duration: "1m"
-    
-  session_security:
-    require_encryption: false     # Development setting
-    session_token_length: 32
-    secure_random: true
-```
-
-## 🛠️ Development
 
 ### Project Structure
 
 ```
 internal/session/
-├── connection/
-│   └── handler.go                  # SSH connection and channel handling
-├── menu/
-│   └── menu.go                     # User interface and menu system
-├── terminal/
-│   └── input.go                    # Terminal input processing
-├── streaming/
-│   └── manager.go                  # I/O streaming and session management
-├── auth/
-│   └── service.go                  # Authentication service integration
-└── config.go                       # Session service configuration
+├── pools/                    # Pool infrastructure
+│   ├── connection_pool.go    # Connection management
+│   ├── worker_pool.go        # Worker goroutine pool
+│   ├── pty_pool.go          # PTY resource pool
+│   └── backpressure.go      # Backpressure management
+├── resources/               # Resource management
+│   ├── limiter.go           # Resource limits and quotas
+│   ├── tracker.go           # Resource usage tracking
+│   └── metrics.go           # Metrics collection
+├── handlers/                # Handler components (future)
+│   ├── session_handler.go   # Main session coordinator
+│   ├── auth_handler.go      # Authentication workflows
+│   ├── game_handler.go      # Game session management
+│   └── stream_handler.go    # I/O streaming
+└── middleware/              # Connection middleware (future)
+    ├── rate_limiter.go      # Rate limiting middleware
+    └── auth_middleware.go   # Authentication middleware
 
-cmd/session-service/
-└── main.go                         # Service entry point
-
-pkg/config/
-├── config.go                       # Base configuration
-└── session_config.go               # Session service configuration
+# Legacy components (being refactored)
+internal/session-old/
+├── connection/              # Legacy connection handling
+├── menu/                   # Menu system (being enhanced)
+├── streaming/              # Streaming management
+└── terminal/               # Terminal handling
 ```
 
-### Key Components
+## Testing
 
-#### Connection Handler (`connection/handler.go`)
-- SSH protocol implementation with stateless session management
-- Connection and channel lifecycle management
-- **Fixed**: No longer auto-terminates games on disconnection
-- Menu system integration and user interaction
-
-#### Streaming Manager (`streaming/manager.go`)
-- I/O bridging between SSH and Game Service
-- Session state tracking (stateless mode)
-- Connection cleanup without game termination
-- **New**: Heartbeat support for connection resilience
-
-#### Menu System (`menu/menu.go`)
-- Text-based user interface
-- Authentication flow integration
-- Game selection and management
-- Real-time status display
-
-#### Authentication Service (`auth/service.go`)
-- JWT token management
-- User authentication and authorization
-- Integration with centralized Auth Service
-- Session state management
-
-### API Endpoints
-
-#### HTTP Endpoints
-- `GET /health` - Health check
-- `GET /metrics` - Prometheus metrics (future)
-- `GET /connections` - List active connections (development)
-
-#### gRPC Services
-- Internal gRPC server on port 9093 for service communication
-
-### Recent Fixes and Improvements
-
-#### NetHack Session Persistence (FIXED)
-- **Issue**: NetHack processes were terminated immediately after startup
-- **Root Cause**: gRPC context binding and aggressive PTY cleanup
-- **Solution**: 
-  - Context-independent process creation (`exec.Command` vs `exec.CommandContext`)
-  - Session cleanup modifications to preserve running games
-  - Process lifecycle improvements for interactive games
-
-#### Heartbeat and Reconnection Support (NEW)
-- Configurable SSH keepalive to prevent timeouts
-- gRPC stream heartbeat for connection health monitoring
-- Idle detection and graceful handling
-- Support for NetHack session reconnection
-
-#### Stateless Architecture (IMPROVED)
-- Connection management without persistent state
-- Horizontal scaling support
-- Improved cleanup and resource management
-
-## 📊 Monitoring
-
-### Metrics (Future Implementation)
-
-The service will expose Prometheus metrics:
-
-- `ssh_total_connections` - Total SSH connections
-- `ssh_active_connections` - Active SSH connections
-- `ssh_failed_connections` - Failed SSH connections
-- `game_sessions_total` - Total game sessions started
-- `game_sessions_active` - Active game sessions
-- `session_duration_seconds` - Session duration histogram
-
-### Health Checks
-
-- **HTTP Health**: `GET /health`
-- **SSH Health**: Connection test on SSH port
-- **Service Dependencies**: Auth Service and Game Service health
-
-### Logging
-
-Structured logging with configurable levels:
-
-```json
-{
-  "timestamp": "2025-07-13T18:45:00Z",
-  "level": "info",
-  "message": "SSH connection established",
-  "connection_id": "conn_123",
-  "username": "yellow",
-  "remote_addr": "127.0.0.1:54321"
-}
-```
-
-## 🚀 Deployment
-
-### Development Deployment
+### Running Tests
 
 ```bash
-# Quick start - all services
-make run-all
+# Run all tests
+make test
 
-# Individual services (for debugging)
-make run-session      # Session service only
-make run-auth        # Auth service only  
-make run-game        # Game service only
+# Run pool-specific tests
+go test ./internal/session/pools/...
+go test ./internal/session/resources/...
 
-# Connect via SSH
-ssh -p 2222 localhost
+# Run with race detection
+make test-race
+
+# Generate coverage reports
+make test-coverage
 ```
 
-### Production Deployment
+### Test Categories
 
-1. **Build for production:**
-```bash
-make build-all
-```
+- **Unit Tests**: Individual component testing
+- **Integration Tests**: Service interaction testing
+- **Load Tests**: Pool capacity and performance testing
+- **Stress Tests**: Resource exhaustion scenarios
 
-2. **Configure for production:**
-```yaml
-# Update configs/production/session-service.yaml
-ssh:
-  port: 22
-  host: "0.0.0.0"
-  allow_anonymous: false
-  
-security:
-  rate_limiting:
-    enabled: true
-  brute_force_protection:
-    enabled: true
-```
+## Security Considerations
 
-3. **Deploy services:**
-```bash
-# Copy binaries
-sudo cp build/dungeongate-session-service /usr/local/bin/
-sudo cp build/dungeongate-auth-service /usr/local/bin/
-sudo cp build/dungeongate-game-service /usr/local/bin/
+### Resource Protection
+- User quotas prevent resource exhaustion attacks
+- Rate limiting protects against brute force attempts
+- Circuit breaker prevents cascade failures
 
-# Install systemd services (if available)
-sudo systemctl enable dungeongate-session
-sudo systemctl start dungeongate-session
-```
+### Connection Security
+- SSH authentication with auth service integration
+- JWT token validation for API access
+- Connection state tracking and validation
 
-### Docker Deployment
+### Data Protection
+- Secure handling of user credentials
+- Encrypted communication channels
+- Audit logging for security events
 
-```bash
-# Build Docker images
-make docker-build-all
-
-# Start development environment
-make docker-compose-dev
-
-# Start production environment
-make docker-compose-up
-```
-
-## 🎯 Usage Examples
-
-### Basic Connection and Game Play
-
-```bash
-# Connect to SSH service
-ssh -p 2222 localhost
-
-# Main menu appears:
-# Welcome to DungeonGate Development Server!
-# 
-# Menu Options:
-#   [l] Login
-#   [r] Register  
-#   [w] Watch games
-#   [g] List games
-#   [q] Quit
-
-# Login with test account
-# Enter: l
-# Username: yellow
-# Password: password
-
-# After authentication:
-# Welcome back to DungeonGate, yellow!
-# 
-# Menu Options:
-#   [p] Play a game
-#   [w] Watch games
-#   [e] Edit profile
-#   [l] List games
-#   [s] Game Statistics
-#   [q] Quit
-
-# Start NetHack
-# Enter: p
-# Choose game: 1 (NetHack)
-# NetHack starts and you can play normally!
-```
-
-### Session Persistence
-
-One of the key features is that NetHack sessions now persist:
-
-1. **Start NetHack**: Connect and start a game
-2. **Network Issue**: If connection drops, NetHack keeps running
-3. **Reconnect**: SSH back in and the game session continues
-4. **Resume**: Pick up exactly where you left off
-
-### Spectating Games
-
-```bash
-# From main menu, select Watch
-# Enter: w
-
-# View active sessions:
-# Active Game Sessions:
-# [1] yellow - NetHack - Started: 14:45:36
-# [q] Return to main menu
-
-# Select session to watch
-# Enter: 1
-# (Live NetHack gameplay streams to your terminal)
-```
-
-## 🔍 Troubleshooting
+## Troubleshooting
 
 ### Common Issues
 
-#### SSH Connection Refused
+1. **Connection Rejected**: Check connection pool limits and queue status
+2. **High Queue Times**: Increase worker pool size or connection pool capacity
+3. **PTY Allocation Failures**: Check FD limits and PTY pool configuration
+4. **Resource Exhaustion**: Review resource quotas and system limits
+
+### Debugging Tools
+
+1. **Metrics Dashboard**: Monitor pool utilization and performance
+2. **Health Checks**: Verify component health status
+3. **Structured Logs**: Search and filter by connection, user, or session ID
+4. **Resource Tracking**: Monitor user and system resource usage
+
+### Performance Analysis
+
+Use the built-in metrics to analyze performance:
+
 ```bash
-# Check if Session Service is running
-make ssh-check-server
+# Check connection pool utilization
+curl localhost:8085/metrics | grep session_pool_active_connections
 
-# Check port availability
-lsof -i :2222
+# Monitor worker pool performance
+curl localhost:8085/metrics | grep session_worker_utilization
 
-# Start services if not running
-make run-all
+# Track PTY efficiency
+curl localhost:8085/metrics | grep session_pty_reuse_rate
 ```
 
-#### Authentication Issues
-```bash
-# Check Auth Service status
-curl http://localhost:8081/health
+## Future Enhancements
 
-# Verify Auth Service is running
-make run-auth
+### Planned Features
+- Dynamic worker scaling based on load
+- Advanced queue prioritization algorithms
+- Intelligent PTY pre-allocation
+- Machine learning-based resource prediction
 
-# Check JWT configuration matches between services
-```
+### Kubernetes Integration
+- Horizontal Pod Autoscaler (HPA) support
+- Resource request/limit optimization
+- Service mesh integration
+- Advanced health checks
 
-#### Game Won't Start
-```bash
-# Check Game Service status
-curl http://localhost:8085/health
+### Enhanced Monitoring
+- Distributed tracing support
+- Advanced alerting rules
+- Performance profiling integration
+- Real-time dashboard updates
 
-# Verify Game Service is running
-make run-game
+## Conclusion
 
-# Check NetHack installation
-which nethack
-```
+The new pool-based session service architecture provides a solid foundation for scalable, reliable terminal game hosting. With comprehensive resource management, observability, and horizontal scaling support, the service is ready for production deployment and future growth.
 
-#### NetHack Process Termination (FIXED)
-- **Previous Issue**: NetHack was killed immediately after startup
-- **Status**: RESOLVED - NetHack now runs continuously and survives disconnections
-- **Verification**: Game logs should show "Process exited successfully" only when user quits
+The architecture emphasizes:
+- **Reliability**: Circuit breaker and backpressure management
+- **Scalability**: Horizontal scaling and resource pools
+- **Observability**: Comprehensive metrics and structured logging
+- **Maintainability**: Clear separation of concerns and modular design
+- **Security**: Resource protection and secure communication
 
-### Debug Mode
-
-Enable debug logging:
-
-```yaml
-logging:
-  level: "debug"
-  format: "text"
-  output: "stdout"
-```
-
-### Performance Tuning
-
-For high-load scenarios:
-
-```yaml
-server:
-  max_connections: 5000
-  timeout: "120s"
-
-ssh:
-  max_sessions: 1000
-  session_timeout: "8h"
-  idle_timeout: "2h"
-```
-
-## 📖 API Reference
-
-### Menu Commands
-
-| Key | Action | Description |
-|-----|--------|-------------|
-| `l` | Login | Authenticate with Auth Service |
-| `r` | Register | Create new account |
-| `p` | Play | Start a game session |
-| `w` | Watch | Spectate active games |
-| `e` | Edit | Edit user profile |
-| `g` | Games | List available games |
-| `s` | Stats | View game statistics |
-| `q` | Quit | Exit session |
-
-### Configuration Options
-
-Key configuration sections:
-
-- `server` - HTTP/gRPC server settings
-- `ssh` - SSH server and authentication
-- `ssh.keepalive` - SSH connection keepalive (NEW)
-- `session_management.heartbeat` - Heartbeat configuration (NEW)
-- `session_management.timeouts` - Session timeout settings
-- `services` - Microservice endpoints
-- `auth` - Authentication service integration
-- `security` - Security policies and limits
-
-## 🤝 Contributing
-
-### Development Setup
-
-1. **Fork and clone the repository**
-2. **Setup development environment**:
-   ```bash
-   make deps && make deps-tools
-   ```
-3. **Run all services**:
-   ```bash
-   make run-all
-   ```
-4. **Test changes**:
-   ```bash
-   make test
-   make verify
-   ```
-
-### Code Style
-
-- Follow Go conventions
-- Use structured logging
-- Add comprehensive tests
-- Document configuration options
-- Test with multiple terminal types
-
-### Testing Guidelines
-
-- Test SSH protocol compatibility
-- Verify authentication flows
-- Test game session management
-- Validate reconnection scenarios
-- Test spectating functionality
-
-## 📄 License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## 🙏 Acknowledgments
-
-- Original dgamelaunch project inspiration
-- Go SSH library developers
-- Terminal games community
-- NetHack development team
+This design positions DungeonGate for future growth while maintaining the performance and reliability required for real-time terminal gaming.
 
 ---
 
