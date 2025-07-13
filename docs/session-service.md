@@ -1,14 +1,15 @@
-# DungeonGate SSH Service
+# DungeonGate Session Service
 
-A modern SSH-based gateway for terminal gaming, providing secure access to roguelike games like NetHack and Dungeon Crawl Stone Soup.
+A modern, stateless SSH-based gateway for terminal gaming, providing secure access to roguelike games like NetHack and Dungeon Crawl Stone Soup with session persistence and reconnection capabilities.
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 
-- Go 1.21 or higher
+- Go 1.24 or higher
 - SSH client (for testing)
 - Terminal with UTF-8 support
+- Auth Service and Game Service running
 
 ### Setup and Build
 
@@ -28,18 +29,20 @@ make deps-tools    # Install development tools
 ```bash
 make build-all     # Build all services
 # Or build individually:
-make build         # Session service
+make build-session # Session service
 make build-auth    # Auth service
+make build-game    # Game service
 ```
 
-4. **Start the services:**
+4. **Start all services:**
 ```bash
-# Development with auto-reload:
-make dev
+# Start all services with proper sequencing:
+make run-all
 
-# Manual service management:
-make test-run-all  # Both auth and session services
-make test-run      # Session service only
+# Or start individually:
+make run-session   # Session service only (limited functionality)
+make run-auth      # Auth service only
+make run-game      # Game service only
 ```
 
 5. **Test SSH connection:**
@@ -51,201 +54,259 @@ make ssh-test-connection
 
 ### Default Test Accounts
 
-- **admin/admin** - Administrator account
-- **user/user** - Regular user account
+- **yellow/password** - Test user account (see database migrations)
+- Anonymous access available in development mode
 
 ## 🏗️ Architecture
 
-### SSH Service Components
+### Session Service Architecture (Stateless Design)
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    SSH Service                              │
+│                 Session Service (Stateless)                │
 ├─────────────────────────────────────────────────────────────┤
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐  │
-│  │ SSH Server  │  │ PTY Manager │  │ Session Manager     │  │
-│  │             │  │             │  │                     │  │
-│  │ • Auth      │  │ • Terminal  │  │ • Game Launching    │  │
-│  │ • Menu      │  │ • I/O       │  │ • Spectating        │  │
-│  │ • Sessions  │  │ • Resize    │  │ • Recording         │  │
+│  │ SSH Server  │  │ Connection  │  │ Menu System         │  │
+│  │             │  │ Manager     │  │                     │  │
+│  │ • Auth      │  │ • Stateless │  │ • User Interface    │  │
+│  │ • Channels  │  │ • Tracking  │  │ • Game Selection    │  │
+│  │ • Terminal  │  │ • Cleanup   │  │ • Authentication    │  │
 │  └─────────────┘  └─────────────┘  └─────────────────────┘  │
 └─────────────────────────────────────────────────────────────┘
 │                                                             │
 ├─────────────────────────────────────────────────────────────┤
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐  │
-│  │ Auth Client │  │ User Client │  │ Game Client         │  │
+│  │ Auth Client │  │ Game Client │  │ Streaming Manager   │  │
 │  │             │  │             │  │                     │  │
-│  │ • Login     │  │ • Profiles  │  │ • Game Configs      │  │
-│  │ • Register  │  │ • Stats     │  │ • Launch Commands   │  │
-│  │ • Sessions  │  │ • Prefs     │  │ • Status            │  │
+│  │ • JWT Auth  │  │ • Game Mgmt │  │ • I/O Bridging      │  │
+│  │ • User Mgmt │  │ • PTY Proxy │  │ • Session Handling  │  │
+│  │ • Sessions  │  │ • Lifecycle │  │ • Reconnection      │  │
 │  └─────────────┘  └─────────────┘  └─────────────────────┘  │
 └─────────────────────────────────────────────────────────────┘
 ```
 
+### Microservices Integration
+
+```
+SSH Client → Session Service → Game Service → NetHack Process
+     ↑              ↓              ↓              ↓
+  Terminal     Auth Service    PTY Manager    Game Output
+   I/O         JWT Tokens      Process        Terminal
+                              Management      Streams
+```
+
 ### Key Features
 
-- **Full SSH Protocol Support**: SSH-2.0 compliant server with proper terminal emulation and signal handling
-- **Terminal Management**: PTY allocation and terminal I/O handling with automatic window resizing and UTF-8 support
-- **Game Integration**: Launch and manage terminal games with configurable commands and environment variables
-- **Session Recording**: TTY recording for playback with gzip compression and configurable storage
-- **Real-time Spectating**: Watch other players' games with immutable data streaming, ring buffering for session history, and support for multiple simultaneous spectators
-- **Authentication**: Flexible authentication backends with JWT tokens and centralized auth service integration
-- **Microservices**: Clean separation of concerns with gRPC communication between auth and session services
+- **Stateless Design**: Horizontal scaling support with no session state in memory
+- **Session Persistence**: Games survive stream disconnections and reconnections
+- **Full SSH Protocol Support**: SSH-2.0 compliant server with proper terminal emulation
+- **Terminal Management**: PTY proxy to Game Service with automatic window resizing
+- **Session Recording**: TTY recording for playback (via Game Service)
+- **Real-time Spectating**: Watch other players' games with live streaming
+- **Microservices Authentication**: JWT-based authentication with Auth Service
+- **Connection Resilience**: Heartbeat mechanisms and reconnection support
 
 ## 🔧 Configuration
 
-### Development Configuration
+### Session Service Configuration
 
-The service uses a YAML configuration file. Here's the development setup:
+The service uses a comprehensive YAML configuration file located at `configs/development/session-service.yaml`:
 
 ```yaml
-# Development configuration (auto-generated)
+# HTTP/gRPC Server Configuration
 server:
   port: 8083          # HTTP API port
-  grpc_port: 9093     # gRPC port
+  grpc_port: 9093     # gRPC port for service communication
   host: "localhost"
+  timeout: "30s"
+  max_connections: 1000
 
+# SSH Server Configuration
 ssh:
   enabled: true
-  port: 2222          # SSH port (non-privileged for dev)
+  port: 2222          # SSH port (2222 for development, 22 for production)
   host: "localhost"
   banner: "Welcome to DungeonGate Development Server!\r\n"
   max_sessions: 10
   session_timeout: "1h"
   idle_timeout: "15m"
   
+  # SSH Authentication
   auth:
-    password_auth: true
-    public_key_auth: false
-    allow_anonymous: true
+    password_auth: false      # Disabled - using centralized auth
+    public_key_auth: false    # Public keys not implemented yet
+    allow_anonymous: true     # Allow anonymous connections in dev
     
+  # SSH Keepalive Configuration (NEW)
+  keepalive:
+    enabled: true
+    interval: "30s"           # Prevent timeout during NetHack idle periods
+    count_max: 3
+    
+  # Terminal Configuration
   terminal:
     default_size: "80x24"
     max_size: "120x40"
     supported_terminals: ["xterm", "xterm-256color", "screen", "tmux"]
 
+# Session Management Configuration
 session_management:
+  terminal:
+    default_size: "80x24"
+    max_size: "120x40"
+    encoding: "utf-8"
+    
+  # Session Timeout Configuration
+  timeouts:
+    idle_timeout: "15m"
+    max_session_duration: "1h"
+    cleanup_interval: "1m"
+    
+  # Heartbeat Configuration (NEW)
+  heartbeat:
+    enabled: true
+    interval: "60s"                    # General heartbeat interval
+    idle_detection_threshold: "2m"     # Detect idle state after 2 minutes
+    
+    # gRPC Stream Heartbeat
+    grpc_stream:
+      enabled: true
+      ping_interval: "45s"             # gRPC stream ping
+      pong_timeout: "10s"              # Timeout for pong response
+    
+  # TTY Recording
   ttyrec:
     enabled: true
-    directory: "./ttyrec"
     compression: "gzip"
+    directory: "/Users/caboose/Desktop/dungeongate/ttyrec"
+    max_file_size: "10MB"
+    retention_days: 7
     
+  # Spectating System
   spectating:
     enabled: true
     max_spectators_per_session: 3
+    spectator_timeout: "30m"
+
+# Service Integration
+services:
+  user_service: "localhost:8084"      # Future user service
+  game_service: "localhost:50051"     # Game Service gRPC
+  auth_service: "localhost:8082"      # Auth Service gRPC
+
+# Authentication Service Integration
+auth:
+  enabled: true
+  service_address: "localhost:8081"   # Auth Service HTTP
+  grpc_address: "localhost:8082"      # Auth Service gRPC
+  jwt_secret: "dev-secret-please-change-in-production"
+  jwt_issuer: "dungeongate-dev"
+  access_token_expiration: "15m"
+  refresh_token_expiration: "168h"    # 7 days
+  max_login_attempts: 3
+  lockout_duration: "15m"
 ```
 
-### Production Configuration
+### Production Configuration Differences
 
-For production deployment, use:
+For production deployment:
 
 ```yaml
 ssh:
   port: 22              # Standard SSH port
   host: "0.0.0.0"       # Listen on all interfaces
-  max_sessions: 100     # Higher limits
+  max_sessions: 1000    # Higher limits
   session_timeout: "4h"
   
   auth:
-    password_auth: true
-    public_key_auth: true  # Enable key-based auth
     allow_anonymous: false # Require authentication
     
 security:
   rate_limiting:
     enabled: true
-    max_connections_per_ip: 10
+    max_connections_per_ip: 100
     
   brute_force_protection:
     enabled: true
-    max_failed_attempts: 5
-    lockout_duration: "15m"
+    max_failed_attempts: 10
+    lockout_duration: "1m"
 ```
 
 ## 🎮 Game Integration
 
-### Supported Games
+### Stateless Game Session Management
 
-The SSH service supports various terminal games:
+The Session Service now operates in a **stateless mode** that enables:
 
-- **NetHack**: Classic roguelike dungeon crawler
-- **Dungeon Crawl Stone Soup**: Modern tactical roguelike
-- **Bash Shell**: Interactive shell for testing
-- **Custom Games**: Easy to add new terminal games
+- **Session Persistence**: NetHack games survive SSH disconnections
+- **Reconnection Support**: Users can reconnect to ongoing games
+- **Horizontal Scaling**: Multiple Session Service instances can handle the same user
+- **Process Independence**: Games run in Game Service, not Session Service
 
 ### Game Service Integration
 
-The Session Service integrates with the Game Service cluster through a microservices architecture. The Game Service operates as a **stateful, scalable backend** that runs inside containers/pods and handles:
-
-- **Multi-Game Pod Management**: Each pod runs multiple concurrent games
-- **World State Synchronization**: NetHack bones files and shared world state across pods  
-- **User Data Management**: Save files accessible from any pod in the cluster
-- **Load Balancing**: Session service routes games to available pods
-- **Cross-Pod Events**: Real-time synchronization of game state changes
-
-#### Service Communication Flow
-
 ```
-SSH Client → Session Service → Game Service Cluster
-     ↑              ↓              ↓
-  Terminal     Load Balancer   ┌─────────────┐
-   Output     PTY Bridge      │ Game Pod 1  │
-                              │- NetHack    │
-                              │- DCSS       │
-                              └─────────────┘
-                                     ↓
-                              ┌─────────────┐
-                              │ Game Pod 2  │  
-                              │- Multiple   │
-                              │  Games      │
-                              └─────────────┘
-                                     ↓
-                              ┌─────────────┐
-                              │Shared State │
-                              │- Bones      │
-                              │- Saves      │
-                              └─────────────┘
+┌─────────────┐    gRPC     ┌─────────────┐    PTY      ┌─────────────┐
+│   Session   │ ◄─────────► │    Game     │ ◄─────────► │   NetHack   │
+│   Service   │             │   Service   │             │   Process   │
+│             │             │             │             │             │
+│ • SSH Menu  │             │ • PTY Mgmt  │             │ • Game Loop │
+│ • Auth      │             │ • Process   │             │ • Save/Load │
+│ • Streaming │             │ • Adapters  │             │ • Terminal  │
+└─────────────┘             └─────────────┘             └─────────────┘
 ```
 
-#### Game Configuration
+### Supported Games
 
-Games are configured through the Game Service cluster with pod-aware options:
+- **NetHack 3.6.7**: Classic roguelike with full feature support
+- **Dungeon Crawl Stone Soup**: Modern tactical roguelike (planned)
+- **Custom Games**: Easy to add through Game Service adapters
 
-```go
-// Example game configuration
-{
-    ID:          "nethack",
-    Name:        "NetHack",
-    Description: "The classic roguelike dungeon crawler",
-    Enabled:     true,
-    Binary:      "/usr/games/nethack",
-    Args:        []string{"-u", "%USERNAME%"},
-    WorkingDir:  "/var/games/nethack",
-    Environment: map[string]string{
-        "NETHACKDIR": "/var/games/nethack",
-    },
-    MaxPlayers:  1,
-    Spectatable: true,
-}
-```
+### Game Session Flow
+
+1. **User Connection**: SSH connection to Session Service
+2. **Authentication**: JWT-based auth through Auth Service
+3. **Game Selection**: Menu-driven game selection
+4. **Session Creation**: Game Service creates PTY and starts process
+5. **Stream Bridging**: Session Service bridges SSH ↔ Game Service I/O
+6. **Session Persistence**: Games survive disconnections
+7. **Reconnection**: Users can reconnect to ongoing sessions
 
 ## 🔐 Security Features
 
-### Authentication
+### Multi-Layer Authentication
 
-The SSH service implements a multi-layered authentication approach:
-
-1. **SSH Layer**: Basic SSH authentication (allows all connections)
-2. **Application Layer**: Menu-based authentication with user service
-3. **Session Layer**: Token-based session management
+1. **SSH Layer**: SSH protocol authentication (currently allows all)
+2. **Application Layer**: JWT-based authentication with Auth Service
+3. **Service Layer**: gRPC service-to-service authentication
 
 ### Security Controls
 
-- **Rate Limiting**: Prevent connection flooding
-- **Brute Force Protection**: Lock out after failed attempts
-- **Session Encryption**: Encrypt sensitive session data
-- **Host Key Verification**: Secure server identity
-- **Connection Monitoring**: Track and log all connections
+- **Rate Limiting**: Configurable connection limits per IP
+- **Brute Force Protection**: Account lockout after failed attempts
+- **Session Security**: JWT tokens with configurable expiration
+- **Host Key Verification**: SSH server identity verification
+- **Connection Monitoring**: Comprehensive logging and tracking
+
+### Configuration Security
+
+```yaml
+security:
+  rate_limiting:
+    enabled: true
+    max_connections_per_ip: 100
+    connection_window: "1m"
+    
+  brute_force_protection:
+    enabled: true
+    max_failed_attempts: 10
+    lockout_duration: "1m"
+    
+  session_security:
+    require_encryption: false     # Development setting
+    session_token_length: 32
+    secure_random: true
+```
 
 ## 🛠️ Development
 
@@ -253,153 +314,114 @@ The SSH service implements a multi-layered authentication approach:
 
 ```
 internal/session/
-├── ssh.go                          # Main SSH server implementation
-├── pty_manager.go                  # PTY and terminal management
-├── session.go                      # Session management core
-├── service_clients.go              # Microservice clients
-├── service_clients_data_structures.go # Data structures
-├── grpc_service.go                 # gRPC service implementation
-└── http_handlers.go                # HTTP API handlers
+├── connection/
+│   └── handler.go                  # SSH connection and channel handling
+├── menu/
+│   └── menu.go                     # User interface and menu system
+├── terminal/
+│   └── input.go                    # Terminal input processing
+├── streaming/
+│   └── manager.go                  # I/O streaming and session management
+├── auth/
+│   └── service.go                  # Authentication service integration
+└── config.go                       # Session service configuration
+
+cmd/session-service/
+└── main.go                         # Service entry point
 
 pkg/config/
 ├── config.go                       # Base configuration
 └── session_config.go               # Session service configuration
-
-cmd/session-service/
-└── main.go                         # Service entry point
 ```
 
 ### Key Components
 
-#### SSH Server (`ssh.go`)
-- SSH protocol implementation
-- Connection and session management
-- Menu system and user interaction
-- Authentication handling
+#### Connection Handler (`connection/handler.go`)
+- SSH protocol implementation with stateless session management
+- Connection and channel lifecycle management
+- **Fixed**: No longer auto-terminates games on disconnection
+- Menu system integration and user interaction
 
-#### PTY Manager (`pty_manager.go`)
-- Pseudo-terminal allocation
-- Terminal I/O handling
-- Process management
-- Window resizing
+#### Streaming Manager (`streaming/manager.go`)
+- I/O bridging between SSH and Game Service
+- Session state tracking (stateless mode)
+- Connection cleanup without game termination
+- **New**: Heartbeat support for connection resilience
 
-#### Session Service (`session.go`)
-- Session lifecycle management
-- TTY recording
-- Spectator management
-- Cleanup and monitoring
+#### Menu System (`menu/menu.go`)
+- Text-based user interface
+- Authentication flow integration
+- Game selection and management
+- Real-time status display
+
+#### Authentication Service (`auth/service.go`)
+- JWT token management
+- User authentication and authorization
+- Integration with centralized Auth Service
+- Session state management
 
 ### API Endpoints
 
-The service exposes both HTTP and gRPC APIs:
-
 #### HTTP Endpoints
 - `GET /health` - Health check
-- `GET /metrics` - Prometheus metrics
-- `GET /sessions` - List active sessions
-- `POST /sessions` - Create new session
-- `GET /sessions/{id}` - Get session details
-- `DELETE /sessions/{id}` - End session
+- `GET /metrics` - Prometheus metrics (future)
+- `GET /connections` - List active connections (development)
 
 #### gRPC Services
-- `SessionService` - Core session management
-- `SpectatorService` - Spectator management
-- `RecordingService` - TTY recording management
+- Internal gRPC server on port 9093 for service communication
 
-### Testing
+### Recent Fixes and Improvements
 
-Comprehensive testing with Make targets:
+#### NetHack Session Persistence (FIXED)
+- **Issue**: NetHack processes were terminated immediately after startup
+- **Root Cause**: gRPC context binding and aggressive PTY cleanup
+- **Solution**: 
+  - Context-independent process creation (`exec.Command` vs `exec.CommandContext`)
+  - Session cleanup modifications to preserve running games
+  - Process lifecycle improvements for interactive games
 
-```bash
-# Basic testing
-make test                    # Run all tests
-make test-coverage          # Generate coverage reports
-make test-comprehensive     # Run all test suites
+#### Heartbeat and Reconnection Support (NEW)
+- Configurable SSH keepalive to prevent timeouts
+- gRPC stream heartbeat for connection health monitoring
+- Idle detection and graceful handling
+- Support for NetHack session reconnection
 
-# Component-specific testing
-make test-ssh               # SSH server tests
-make test-auth              # Authentication tests
-make test-spectating        # Spectating system tests
-
-# Performance testing
-make benchmark              # General benchmarks
-make benchmark-ssh          # SSH-specific benchmarks
-make benchmark-spectating   # Spectating benchmarks
-
-# SSH connection testing
-make ssh-check-server       # Check if SSH server is running
-make ssh-test-connection    # Test SSH connection
-```
-
-### Build System
-
-The project uses a comprehensive Makefile with 40+ targets:
-
-```bash
-# Essential commands
-make deps                    # Install Go dependencies
-make deps-tools             # Install development tools
-make build-all              # Build all services
-make dev                    # Run with auto-reload
-
-# Quality assurance
-make fmt                    # Format code
-make lint                   # Run linter
-make verify                 # Run all checks
-
-# Testing
-make test                   # Run all tests
-make test-comprehensive     # Full test suite
-make benchmark              # Performance tests
-
-# Environment management
-make setup-test-env         # Setup test environment
-make clean                  # Clean build artifacts
-make clean-all              # Clean everything
-
-# Docker integration
-make docker-build-all       # Build Docker images
-make docker-compose-up      # Start services
-make docker-compose-dev     # Development environment
-
-# Information
-make help                   # Display all available commands
-make info                   # Show project information
-```
+#### Stateless Architecture (IMPROVED)
+- Connection management without persistent state
+- Horizontal scaling support
+- Improved cleanup and resource management
 
 ## 📊 Monitoring
 
-### Metrics
+### Metrics (Future Implementation)
 
-The service exposes Prometheus metrics:
+The service will expose Prometheus metrics:
 
 - `ssh_total_connections` - Total SSH connections
 - `ssh_active_connections` - Active SSH connections
 - `ssh_failed_connections` - Failed SSH connections
-- `ssh_total_sessions` - Total SSH sessions
-- `ssh_active_sessions` - Active SSH sessions
+- `game_sessions_total` - Total game sessions started
+- `game_sessions_active` - Active game sessions
 - `session_duration_seconds` - Session duration histogram
-- `game_launches_total` - Total game launches by game type
 
 ### Health Checks
 
 - **HTTP Health**: `GET /health`
 - **SSH Health**: Connection test on SSH port
-- **Service Health**: Internal service status
+- **Service Dependencies**: Auth Service and Game Service health
 
 ### Logging
 
 Structured logging with configurable levels:
 
-```go
-// Example log entries
+```json
 {
-  "timestamp": "2024-01-20T10:30:00Z",
+  "timestamp": "2025-07-13T18:45:00Z",
   "level": "info",
   "message": "SSH connection established",
   "connection_id": "conn_123",
-  "username": "player1",
-  "remote_addr": "192.168.1.100:54321"
+  "username": "yellow",
+  "remote_addr": "127.0.0.1:54321"
 }
 ```
 
@@ -408,56 +430,53 @@ Structured logging with configurable levels:
 ### Development Deployment
 
 ```bash
-# Quick start
-make deps && make build-all
-make test-run-all          # Start both services
+# Quick start - all services
+make run-all
 
-# Alternative: Development with auto-reload
-make dev                   # Auto-reloading development server
+# Individual services (for debugging)
+make run-session      # Session service only
+make run-auth        # Auth service only  
+make run-game        # Game service only
 
 # Connect via SSH
 ssh -p 2222 localhost
-# Or test connection:
-make ssh-test-connection
 ```
 
 ### Production Deployment
 
 1. **Build for production:**
 ```bash
-make release-build         # Multi-platform binaries
-make release-check         # Run all release checks
+make build-all
 ```
 
-2. **Docker deployment:**
-```bash
-make docker-build-all      # Build all Docker images
-make docker-compose-up     # Start production services
+2. **Configure for production:**
+```yaml
+# Update configs/production/session-service.yaml
+ssh:
+  port: 22
+  host: "0.0.0.0"
+  allow_anonymous: false
+  
+security:
+  rate_limiting:
+    enabled: true
+  brute_force_protection:
+    enabled: true
 ```
 
-3. **Manual installation:**
+3. **Deploy services:**
 ```bash
 # Copy binaries
 sudo cp build/dungeongate-session-service /usr/local/bin/
 sudo cp build/dungeongate-auth-service /usr/local/bin/
+sudo cp build/dungeongate-game-service /usr/local/bin/
 
-# Install systemd services
-sudo cp configs/systemd/*.service /etc/systemd/system/
-sudo systemctl enable dungeongate-session dungeongate-auth
-sudo systemctl start dungeongate-session dungeongate-auth
-```
-
-4. **Configure firewall:**
-```bash
-sudo ufw allow 22/tcp      # SSH
-sudo ufw allow 8081/tcp    # Auth HTTP API
-sudo ufw allow 8082/tcp    # Auth gRPC
-sudo ufw allow 8083/tcp    # Session HTTP API
+# Install systemd services (if available)
+sudo systemctl enable dungeongate-session
+sudo systemctl start dungeongate-session
 ```
 
 ### Docker Deployment
-
-Use the provided Docker integration:
 
 ```bash
 # Build Docker images
@@ -468,91 +487,71 @@ make docker-compose-dev
 
 # Start production environment
 make docker-compose-up
-
-# View logs
-make docker-compose-logs
-
-# Stop services
-make docker-compose-down
-
-# Clean up Docker resources
-make docker-clean
 ```
-
-Docker images are built for:
-- `dungeongate/session-service` - Session service
-- `dungeongate/auth-service` - Auth service
-
-Exposed ports:
-- `22` - SSH
-- `8081` - Auth HTTP API
-- `8082` - Auth gRPC
-- `8083` - Session HTTP API
-- `9093` - Session gRPC
 
 ## 🎯 Usage Examples
 
-### Basic Connection
+### Basic Connection and Game Play
 
 ```bash
 # Connect to SSH service
-ssh -p 2222 admin@localhost
+ssh -p 2222 localhost
 
-# You'll see the main menu:
-# ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║                            DungeonGate - SSH Edition                         ║
-# ╠══════════════════════════════════════════════════════════════════════════════╣
-# ║  Welcome, anonymous user!                                                    ║
-# ║                                                                              ║
-# ║  [l] Login                                                                   ║
-# ║  [r] Register                                                                ║
-# ║  [w] Watch games                                                             ║
-# ║  [g] List games                                                              ║
-# ║  [q] Quit                                                                    ║
-# ╚══════════════════════════════════════════════════════════════════════════════╝
+# Main menu appears:
+# Welcome to DungeonGate Development Server!
+# 
+# Menu Options:
+#   [l] Login
+#   [r] Register  
+#   [w] Watch games
+#   [g] List games
+#   [q] Quit
+
+# Login with test account
+# Enter: l
+# Username: yellow
+# Password: password
+
+# After authentication:
+# Welcome back to DungeonGate, yellow!
+# 
+# Menu Options:
+#   [p] Play a game
+#   [w] Watch games
+#   [e] Edit profile
+#   [l] List games
+#   [s] Game Statistics
+#   [q] Quit
+
+# Start NetHack
+# Enter: p
+# Choose game: 1 (NetHack)
+# NetHack starts and you can play normally!
 ```
 
-### Playing Games
+### Session Persistence
 
-1. **Login**: Use `l` and enter `admin`/`admin`
-2. **Play**: Use `p` to see available games
-3. **Select**: Choose a game number to start playing
-4. **Exit**: Use `Ctrl+C` to exit the game
+One of the key features is that NetHack sessions now persist:
+
+1. **Start NetHack**: Connect and start a game
+2. **Network Issue**: If connection drops, NetHack keeps running
+3. **Reconnect**: SSH back in and the game session continues
+4. **Resume**: Pick up exactly where you left off
 
 ### Spectating Games
 
-The DungeonGate platform includes a comprehensive real-time spectating system built with immutable data sharing for high performance.
-
-1. **Access Watch Menu**: Use `w` from the main menu
-2. **View Active Sessions**: See formatted list with session details:
-   ```
-   a) player1           NH370   80x24   2025-07-06 02:56:44  5m 23s      0
-   b) player2           DCSS    120x40  2025-07-06 02:10:23  6s          1
-   ```
-3. **Select Session**: Choose by letter (a, b, c, etc.)
-4. **Watch Real-time**: Live terminal output streaming
-5. **Exit Spectating**: Use `Ctrl+C` to stop watching
-
-**Spectating Features:**
-- Real-time terminal output streaming
-- Multiple simultaneous spectators per session
-- Immutable data architecture for performance
-- Automatic spectator management
-- Terminal compatibility with all escape sequences
-
-For detailed spectating documentation, see [SPECTATING.md](./SPECTATING.md).
-
-### API Usage
-
 ```bash
-# Check service health
-curl http://localhost:8083/health
+# From main menu, select Watch
+# Enter: w
 
-# Get active sessions
-curl http://localhost:8083/sessions
+# View active sessions:
+# Active Game Sessions:
+# [1] yellow - NetHack - Started: 14:45:36
+# [q] Return to main menu
 
-# Get metrics
-curl http://localhost:8085/metrics
+# Select session to watch
+# Enter: 1
+# (Live NetHack gameplay streams to your terminal)
 ```
 
 ## 🔍 Troubleshooting
@@ -560,43 +559,44 @@ curl http://localhost:8085/metrics
 ### Common Issues
 
 #### SSH Connection Refused
-
 ```bash
-# Check if SSH server is running
+# Check if Session Service is running
 make ssh-check-server
-
-# Test SSH connection
-make ssh-test-connection
 
 # Check port availability
 lsof -i :2222
 
 # Start services if not running
-make test-run-all
+make run-all
 ```
 
-#### Permission Denied
-
+#### Authentication Issues
 ```bash
-# Check SSH host key permissions
-ls -la ssh_keys/ssh_host_rsa_key
+# Check Auth Service status
+curl http://localhost:8081/health
 
-# Should be 600 (read/write for owner only)
-chmod 600 ssh_keys/ssh_host_rsa_key
+# Verify Auth Service is running
+make run-auth
+
+# Check JWT configuration matches between services
 ```
 
 #### Game Won't Start
-
 ```bash
-# Check if game binary exists
+# Check Game Service status
+curl http://localhost:8085/health
+
+# Verify Game Service is running
+make run-game
+
+# Check NetHack installation
 which nethack
-
-# Install games (Ubuntu/Debian)
-sudo apt-get install nethack-console crawl
-
-# Check game configuration
-curl http://localhost:8083/games
 ```
+
+#### NetHack Process Termination (FIXED)
+- **Previous Issue**: NetHack was killed immediately after startup
+- **Status**: RESOLVED - NetHack now runs continuously and survives disconnections
+- **Verification**: Game logs should show "Process exited successfully" only when user quits
 
 ### Debug Mode
 
@@ -614,92 +614,78 @@ logging:
 For high-load scenarios:
 
 ```yaml
-ssh:
-  max_sessions: 1000
-  session_timeout: "8h"
-  idle_timeout: "1h"
-
 server:
   max_connections: 5000
   timeout: "120s"
+
+ssh:
+  max_sessions: 1000
+  session_timeout: "8h"
+  idle_timeout: "2h"
 ```
 
 ## 📖 API Reference
-
-### SSH Protocol Commands
-
-The SSH service implements standard SSH protocol with these extensions:
-
-- **Window Change**: Automatic terminal resize support
-- **Environment Variables**: Custom environment passing
-- **Signal Handling**: Proper signal forwarding to games
 
 ### Menu Commands
 
 | Key | Action | Description |
 |-----|--------|-------------|
-| `l` | Login | Authenticate user |
+| `l` | Login | Authenticate with Auth Service |
 | `r` | Register | Create new account |
-| `p` | Play | Start a game |
-| `w` | Watch | Spectate games |
-| `e` | Edit | Edit profile |
+| `p` | Play | Start a game session |
+| `w` | Watch | Spectate active games |
+| `e` | Edit | Edit user profile |
 | `g` | Games | List available games |
-| `s` | Stats | View statistics |
+| `s` | Stats | View game statistics |
 | `q` | Quit | Exit session |
 
-### Configuration API
+### Configuration Options
 
-The service supports dynamic configuration updates via HTTP API:
+Key configuration sections:
 
-```bash
-# Update SSH banner
-curl -X POST http://localhost:8083/config/ssh/banner \
-  -H "Content-Type: application/json" \
-  -d '{"banner": "New welcome message\r\n"}'
-
-# Update session timeout
-curl -X POST http://localhost:8083/config/ssh/session_timeout \
-  -H "Content-Type: application/json" \
-  -d '{"timeout": "2h"}'
-```
+- `server` - HTTP/gRPC server settings
+- `ssh` - SSH server and authentication
+- `ssh.keepalive` - SSH connection keepalive (NEW)
+- `session_management.heartbeat` - Heartbeat configuration (NEW)
+- `session_management.timeouts` - Session timeout settings
+- `services` - Microservice endpoints
+- `auth` - Authentication service integration
+- `security` - Security policies and limits
 
 ## 🤝 Contributing
 
 ### Development Setup
 
-1. **Fork the repository**
-2. **Create feature branch**: `git checkout -b feature/ssh-improvements`
-3. **Setup development environment**:
+1. **Fork and clone the repository**
+2. **Setup development environment**:
    ```bash
    make deps && make deps-tools
-   make setup-test-env
    ```
-4. **Make changes and test**:
+3. **Run all services**:
    ```bash
-   make verify                # Run all quality checks
-   make test-comprehensive    # Run full test suite
-   make benchmark            # Test performance
+   make run-all
    ```
-5. **Submit pull request**
+4. **Test changes**:
+   ```bash
+   make test
+   make verify
+   ```
 
 ### Code Style
 
 - Follow Go conventions
-- Use `make fmt` and `make lint` before committing
-- Run `make verify` to check all quality standards
-- Add comprehensive tests for new features
-- Document public APIs
 - Use structured logging
+- Add comprehensive tests
+- Document configuration options
+- Test with multiple terminal types
 
 ### Testing Guidelines
 
-- Write unit tests for all new features
-- Use component-specific test targets (`make test-ssh`, `make test-auth`, etc.)
-- Include integration tests for SSH functionality
-- Run `make test-comprehensive` before submitting
-- Use `make benchmark` to verify performance
-- Test with multiple terminal types
-- Test error handling paths
+- Test SSH protocol compatibility
+- Verify authentication flows
+- Test game session management
+- Validate reconnection scenarios
+- Test spectating functionality
 
 ## 📄 License
 
@@ -707,13 +693,13 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## 🙏 Acknowledgments
 
-- Original dgamelaunch project
+- Original dgamelaunch project inspiration
 - Go SSH library developers
 - Terminal games community
-- Contributors and testers
+- NetHack development team
 
 ---
 
 **Built with ❤️ for the roguelike gaming community**
 
-For questions, issues, or contributions, please visit our GitHub repository or join our community discussions.
+For questions, issues, or contributions, please visit our GitHub repository.
