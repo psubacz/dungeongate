@@ -12,17 +12,18 @@ import (
 
 // GameServiceConfig represents the game service configuration
 type GameServiceConfig struct {
-	Version    string              `yaml:"version"`
-	Server     *ServerConfig       `yaml:"server"`
-	Database   *DatabaseConfig     `yaml:"database"`
-	GameEngine *GameEngineConfig   `yaml:"game_engine"`
-	Games      []*GameConfig       `yaml:"games"`
-	Kubernetes *KubernetesConfig   `yaml:"kubernetes"`
-	Storage    *GameStorageConfig  `yaml:"storage"`
-	Logging    *LoggingConfig      `yaml:"logging"`
-	Metrics    *MetricsConfig      `yaml:"metrics"`
-	Health     *HealthConfig       `yaml:"health"`
-	Security   *GameSecurityConfig `yaml:"security"`
+	Version     string              `yaml:"version"`
+	InheritFrom string              `yaml:"inherit_from,omitempty"`
+	Server      *ServerConfig       `yaml:"server"`
+	Database    *DatabaseConfig     `yaml:"database"`
+	GameEngine  *GameEngineConfig   `yaml:"game_engine"`
+	Games       []*GameConfig       `yaml:"games"`
+	Kubernetes  *KubernetesConfig   `yaml:"kubernetes"`
+	Storage     *GameStorageConfig  `yaml:"storage"`
+	Logging     *LoggingConfig      `yaml:"logging"`
+	Metrics     *MetricsConfig      `yaml:"metrics"`
+	Health      *HealthConfig       `yaml:"health"`
+	Security    *GameSecurityConfig `yaml:"security"`
 }
 
 // GameEngineConfig represents game engine configuration
@@ -542,7 +543,7 @@ type SecurityMonitoringConfig struct {
 	MonitorNetworkAccess      bool `yaml:"monitor_network_access"`
 }
 
-// LoadGameServiceConfig loads game service configuration
+// LoadGameServiceConfig loads game service configuration with inheritance support
 func LoadGameServiceConfig(configPath string) (*GameServiceConfig, error) {
 	data, err := os.ReadFile(configPath)
 	if err != nil {
@@ -554,6 +555,19 @@ func LoadGameServiceConfig(configPath string) (*GameServiceConfig, error) {
 	var config GameServiceConfig
 	if err := yaml.Unmarshal([]byte(expanded), &config); err != nil {
 		return nil, fmt.Errorf("failed to parse config: %w", err)
+	}
+
+	// Load and merge common configuration if specified
+	if config.InheritFrom != "" {
+		commonConfigPath := FindCommonConfig(configPath)
+		if config.InheritFrom == "common.yaml" {
+			// Use the common.yaml in the same directory
+			commonConfig, err := LoadCommonConfig(commonConfigPath)
+			if err != nil {
+				return nil, fmt.Errorf("failed to load common config: %w", err)
+			}
+			MergeWithCommon(&config, commonConfig)
+		}
 	}
 
 	applyGameDefaults(&config)
