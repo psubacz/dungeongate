@@ -7,10 +7,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dungeongate/internal/session-old/client"
+	"github.com/dungeongate/internal/session/client"
 	"github.com/dungeongate/internal/session/pools"
 	"github.com/dungeongate/internal/session/resources"
-	"github.com/dungeongate/internal/session-old/terminal"
+	"github.com/dungeongate/internal/session/terminal"
 	authv1 "github.com/dungeongate/pkg/api/auth/v1"
 	"golang.org/x/crypto/ssh"
 )

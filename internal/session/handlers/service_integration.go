@@ -7,8 +7,8 @@ import (
 
 	"github.com/dungeongate/internal/session/pools"
 	"github.com/dungeongate/internal/session/resources"
-	"github.com/dungeongate/internal/session-old/client"
-	"github.com/dungeongate/internal/session-old/menu"
+	"github.com/dungeongate/internal/session/client"
+	"github.com/dungeongate/internal/session/menu"
 )
 
 // ServiceConfig holds configuration for the pool-based service

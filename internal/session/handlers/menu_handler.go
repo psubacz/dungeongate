@@ -9,7 +9,7 @@ import (
 
 	"github.com/dungeongate/internal/session/pools"
 	"github.com/dungeongate/internal/session/resources"
-	"github.com/dungeongate/internal/session-old/menu"
+	"github.com/dungeongate/internal/session/menu"
 	authv1 "github.com/dungeongate/pkg/api/auth/v1"
 	"golang.org/x/crypto/ssh"
 )
