@@ -75,6 +75,7 @@ type BannersConfig struct {
 	MainAnon  string `yaml:"main_anon"`
 	MainUser  string `yaml:"main_user"`
 	WatchMenu string `yaml:"watch_menu"`
+	IdleMode  string `yaml:"idle_mode"`
 }
 
 // MenuOptions represents menu options configuration
@@ -298,6 +299,7 @@ func applyDefaults(cfg *SessionServiceConfig) {
 			Enabled:               true,
 			Interval:              "60s",
 			IdleDetectionThreshold: "2m",
+			IdleRetryInterval:     "5s",
 			GRPCStream: &GRPCStreamConfig{
 				Enabled:     true,
 				PingInterval: "45s",
@@ -322,6 +324,7 @@ func applyDefaults(cfg *SessionServiceConfig) {
 				MainAnon:  "./assets/banners/main_anon.txt",
 				MainUser:  "./assets/banners/main_user.txt",
 				WatchMenu: "./assets/banners/watch_menu.txt",
+				IdleMode:  "./assets/banners/idle_mode.txt",
 			},
 			Options: &MenuOptions{
 				Anonymous: []*MenuOption{
@@ -445,6 +448,7 @@ func (c *SessionServiceConfig) GetMenu() *MenuConfig {
 				MainAnon:  "./assets/banners/main_anon.txt",
 				MainUser:  "./assets/banners/main_user.txt",
 				WatchMenu: "./assets/banners/watch_menu.txt",
+				IdleMode:  "./assets/banners/idle_mode.txt",
 			},
 			Options: &MenuOptions{
 				Anonymous: []*MenuOption{
@@ -687,6 +691,7 @@ func GetDefaultDevelopmentConfig() *SessionServiceConfig {
 				Enabled:               true,
 				Interval:              "60s",
 				IdleDetectionThreshold: "2m",
+				IdleRetryInterval:     "5s",
 				GRPCStream: &GRPCStreamConfig{
 					Enabled:     true,
 					PingInterval: "45s",

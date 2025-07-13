@@ -129,11 +129,23 @@ func main() {
 		MaxPTYs:        500,
 	}
 
+	// Set idle retry interval if available
+	if cfg.SessionManagement != nil && cfg.SessionManagement.Heartbeat != nil {
+		if interval, err := time.ParseDuration(cfg.SessionManagement.Heartbeat.IdleRetryInterval); err == nil {
+			sessionConfig.IdleRetryInterval = interval
+		} else {
+			sessionConfig.IdleRetryInterval = 5 * time.Second
+		}
+	} else {
+		sessionConfig.IdleRetryInterval = 5 * time.Second
+	}
+
 	// Set banner configuration if available
 	if cfg.Menu != nil && cfg.Menu.Banners != nil {
 		sessionConfig.Menu.Banners.MainAnon = cfg.Menu.Banners.MainAnon
 		sessionConfig.Menu.Banners.MainUser = cfg.Menu.Banners.MainUser
 		sessionConfig.Menu.Banners.WatchMenu = cfg.Menu.Banners.WatchMenu
+		sessionConfig.Menu.Banners.IdleMode = cfg.Menu.Banners.IdleMode
 	}
 
 	// Create stateless session service

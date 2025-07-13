@@ -21,21 +21,23 @@ import (
 
 // Handler handles SSH connections in a stateless manner
 type Handler struct {
-	manager     *Manager
-	gameClient  *client.GameClient
-	authClient  *client.AuthClient
-	menuHandler *menu.MenuHandler
-	logger      *slog.Logger
+	manager           *Manager
+	gameClient        *client.GameClient
+	authClient        *client.AuthClient
+	menuHandler       *menu.MenuHandler
+	logger            *slog.Logger
+	idleRetryInterval time.Duration
 }
 
 // NewHandler creates a new connection handler
-func NewHandler(manager *Manager, gameClient *client.GameClient, authClient *client.AuthClient, menuHandler *menu.MenuHandler, logger *slog.Logger) *Handler {
+func NewHandler(manager *Manager, gameClient *client.GameClient, authClient *client.AuthClient, menuHandler *menu.MenuHandler, logger *slog.Logger, idleRetryInterval time.Duration) *Handler {
 	return &Handler{
-		manager:     manager,
-		gameClient:  gameClient,
-		authClient:  authClient,
-		menuHandler: menuHandler,
-		logger:      logger,
+		manager:           manager,
+		gameClient:        gameClient,
+		authClient:        authClient,
+		menuHandler:       menuHandler,
+		logger:            logger,
+		idleRetryInterval: idleRetryInterval,
 	}
 }
 
@@ -515,48 +517,54 @@ func (a *AuthHandler) PublicKeyCallback(conn ssh.ConnMetadata, key ssh.PublicKey
 
 // handleIdleMode handles the idle state when game service is unavailable
 func (h *Handler) handleIdleMode(ctx context.Context, channel ssh.Channel, connID, username string) {
-	// Display idle banner with status message
-	banner := fmt.Sprintf("\r\n=== DungeonGate Terminal ===\r\n")
-	banner += fmt.Sprintf("Connected as: %s\r\n", username)
-	banner += fmt.Sprintf("Status: Idle\r\n")
-	banner += fmt.Sprintf("\r\n")
-	banner += fmt.Sprintf("┌─────────────────────────────────────────────────────┐\r\n")
-	banner += fmt.Sprintf("│                  SERVICE NOTICE                     │\r\n")
-	banner += fmt.Sprintf("├─────────────────────────────────────────────────────┤\r\n")
-	banner += fmt.Sprintf("│ No games are currently available.                   │\r\n")
-	banner += fmt.Sprintf("│ The game service is temporarily unavailable.       │\r\n")
-	banner += fmt.Sprintf("│                                                     │\r\n")
-	banner += fmt.Sprintf("│ Please try again later or contact an administrator │\r\n")
-	banner += fmt.Sprintf("│ if this problem persists.                          │\r\n")
-	banner += fmt.Sprintf("└─────────────────────────────────────────────────────┘\r\n")
-	banner += fmt.Sprintf("\r\n")
-	banner += fmt.Sprintf("Commands:\r\n")
-	banner += fmt.Sprintf("  [r] - Retry connecting to game service\r\n")
-	banner += fmt.Sprintf("  [q] - Quit\r\n")
-	banner += fmt.Sprintf("\r\n")
-	banner += fmt.Sprintf("Choice: ")
+	// Clear screen and position cursor at top
+	if _, err := channel.Write([]byte("\033[2J\033[H")); err != nil {
+		if err == io.EOF {
+			return
+		}
+		// For other errors, continue - the banner write will catch it
+	}
 
-	channel.Write([]byte(banner))
+	// Render the idle mode banner using the menu handler
+	banner, err := h.menuHandler.RenderIdleMode(username, h.idleRetryInterval)
+	if err != nil {
+		h.logger.Error("Failed to render idle mode banner", "error", err, "username", username)
+		return
+	}
 
-	// Set up periodic health checks
-	ticker := time.NewTicker(10 * time.Second)
+	// Display the banner
+	_, err = channel.Write([]byte(banner))
+	if err != nil {
+		if err == io.EOF {
+			return
+		}
+		h.logger.Error("Failed to write idle mode banner", "error", err, "username", username)
+		return
+	}
+
+	// Set up auto-retry cycle - use configurable interval
+	ticker := time.NewTicker(h.idleRetryInterval)
 	defer ticker.Stop()
 
-	// Handle user input and periodic health checks
+	// Handle auto-retry cycle and quit input
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			// Periodic health check
+			// Auto-retry health check
 			if h.gameClient.IsHealthy(ctx) {
-				h.logger.Info("Game service became available, notifying user", "username", username)
-				channel.Write([]byte("\r\n\r\n✓ Game service is now available! Press 'r' to retry or 'q' to quit.\r\nChoice: "))
+				h.logger.Info("Game service became available, auto-retrying", "username", username)
+				channel.Write([]byte("\r\n\r\n✓ Game service is now available! Connecting...\r\n"))
+				// Return to main handler to retry game start
+				return
+			} else {
+				// Show retry progress
+				channel.Write([]byte("\r\nRetrying connection... (Press 'q' to quit)\r"))
 			}
 		default:
-			// Check for user input
+			// Check only for quit input
 			buffer := make([]byte, 1)
-			// Use a simple blocking read with timeout via goroutine
 			readChan := make(chan struct{})
 			var n int
 			var err error
@@ -578,25 +586,14 @@ func (h *Handler) handleIdleMode(ctx context.Context, channel ssh.Channel, connI
 
 				if n > 0 {
 					input := string(buffer[:n])
-					switch strings.ToLower(input) {
-					case "r":
-						if h.gameClient.IsHealthy(ctx) {
-							h.logger.Info("Game service available, retrying game start", "username", username)
-							channel.Write([]byte("\r\n\r\n✓ Game service is available! Starting game...\r\n"))
-							// Return to main handler to retry game start
-							return
-						} else {
-							channel.Write([]byte("\r\n\r\n✗ Game service is still unavailable. Please try again later.\r\nChoice: "))
-						}
-					case "q":
+					if strings.ToLower(input) == "q" {
 						channel.Write([]byte("\r\n\r\nGoodbye!\r\n"))
 						return
-					default:
-						channel.Write([]byte("\r\n\r\nInvalid option. Use 'r' to retry or 'q' to quit.\r\nChoice: "))
 					}
+					// Ignore all other input - only quit is allowed
 				}
-			case <-time.After(100 * time.Millisecond):
-				// Timeout, continue loop
+			case <-time.After(50 * time.Millisecond):
+				// Short timeout, continue loop
 				continue
 			}
 		}

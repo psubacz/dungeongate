@@ -62,12 +62,13 @@ func (bm *BannerManager) RenderWatchMenu() (string, error) {
 }
 
 // RenderIdleMode renders the idle mode banner
-func (bm *BannerManager) RenderIdleMode(username string) (string, error) {
+func (bm *BannerManager) RenderIdleMode(username string, retryInterval time.Duration) (string, error) {
 	return bm.renderBanner(bm.config.IdleMode, map[string]string{
-		"$SERVERID": "DungeonGate",
-		"$USERNAME": username,
-		"$DATE":     time.Now().Format("2006-01-02"),
-		"$TIME":     time.Now().Format("15:04:05"),
+		"$SERVERID":       "DungeonGate",
+		"$USERNAME":       username,
+		"$DATE":           time.Now().Format("2006-01-02"),
+		"$TIME":           time.Now().Format("15:04:05"),
+		"$RETRY_INTERVAL": retryInterval.String(),
 	})
 }
 

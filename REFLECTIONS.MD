@@ -271,3 +271,5 @@ This migration will establish a robust, consistent, and observable logging found
 
 - debugging. Depending on what your trying to accomplish, it might be faster to regenerate a file than to fix it. i
 - longer term. there is an intereting issue here. As claude is coding at the level of a junior to mid level developer. For me this mean that the barrier to entry for younger individuals will be high to clear as you have to out complete llms for debugging and code generation. I think we might be seeing the commidiification of code here where writing software for projects will trend to the cost of maintancing a reference code base and infra to utilize the llms. what the issue is, for me, is that subject matter experts no longer have a pipeline to learn their trade craft.
+
+- [parrellization. use git worktrees ](https://docs.anthropic.com/en/docs/claude-code/common-workflows#run-parallel-claude-code-sessions-with-git-worktrees). 

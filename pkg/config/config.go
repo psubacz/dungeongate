@@ -115,6 +115,7 @@ type HeartbeatConfig struct {
 	Enabled               bool              `yaml:"enabled"`
 	Interval              string            `yaml:"interval"`
 	IdleDetectionThreshold string           `yaml:"idle_detection_threshold"`
+	IdleRetryInterval     string            `yaml:"idle_retry_interval"`
 	GRPCStream            *GRPCStreamConfig `yaml:"grpc_stream"`
 }
 

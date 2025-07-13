@@ -244,6 +244,13 @@ func (mh *MenuHandler) getFallbackUserBanner(username string) string {
 		time.Now().Format("15:04:05"))
 }
 
+// RenderIdleMode renders the idle mode banner
+func (mh *MenuHandler) RenderIdleMode(username string, retryInterval time.Duration) (string, error) {
+	// Render the idle mode banner
+	return mh.bannerManager.RenderIdleMode(username, retryInterval)
+}
+
+
 // ShowGameSelectionMenu displays the game selection menu and handles input
 func (mh *MenuHandler) ShowGameSelectionMenu(ctx context.Context, channel ssh.Channel, username string) (*MenuChoice, error) {
 	// Get list of available games from Game Service

@@ -63,12 +63,16 @@ type Config struct {
 	HealthCheckInterval time.Duration `yaml:"health_check_interval" default:"30s"`
 	HealthCheckTimeout  time.Duration `yaml:"health_check_timeout" default:"5s"`
 
+	// Idle mode settings
+	IdleRetryInterval time.Duration `yaml:"idle_retry_interval" default:"5s"`
+
 	// Menu configuration
 	Menu struct {
 		Banners struct {
 			MainAnon  string `yaml:"main_anon" default:"./assets/banners/main_anon.txt"`
 			MainUser  string `yaml:"main_user" default:"./assets/banners/main_user.txt"`
 			WatchMenu string `yaml:"watch_menu" default:"./assets/banners/watch_menu.txt"`
+			IdleMode  string `yaml:"idle_mode" default:"./assets/banners/idle_mode.txt"`
 		} `yaml:"banners"`
 	} `yaml:"menu"`
 }

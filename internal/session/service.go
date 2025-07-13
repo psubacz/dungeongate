@@ -72,9 +72,11 @@ func New(cfg *Config, logger *slog.Logger, metricsRegistry *metrics.Registry) (*
 		PasswordAuth:    cfg.SSH.PasswordAuth,
 		PublicKeyAuth:   cfg.SSH.PublicKeyAuth,
 		AllowAnonymous:  cfg.SSH.AllowAnonymous,
-		BannerMainAnon:  cfg.Menu.Banners.MainAnon,
-		BannerMainUser:  cfg.Menu.Banners.MainUser,
-		BannerWatchMenu: cfg.Menu.Banners.WatchMenu,
+		BannerMainAnon:    cfg.Menu.Banners.MainAnon,
+		BannerMainUser:    cfg.Menu.Banners.MainUser,
+		BannerWatchMenu:   cfg.Menu.Banners.WatchMenu,
+		BannerIdleMode:    cfg.Menu.Banners.IdleMode,
+		IdleRetryInterval: cfg.IdleRetryInterval,
 	}
 	sshServer, err := server.NewSSHServer(sshConfig, gameClient, authClient, logger)
 	if err != nil {

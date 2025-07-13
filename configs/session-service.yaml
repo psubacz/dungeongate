@@ -140,6 +140,9 @@ session_management:
     # Detect idle period after this much inactivity
     idle_detection_threshold: "2m"
     
+    # How often to retry connecting to game service when in idle mode
+    idle_retry_interval: "5s"
+    
     # gRPC stream heartbeat configuration
     grpc_stream:
       # Enable heartbeat for gRPC streams

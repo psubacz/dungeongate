@@ -11,6 +11,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/dungeongate/internal/session/banner"
 	"github.com/dungeongate/internal/session/client"
@@ -39,9 +40,11 @@ type SSHConfig struct {
 	PasswordAuth    bool
 	PublicKeyAuth   bool
 	AllowAnonymous  bool
-	BannerMainAnon  string
-	BannerMainUser  string
-	BannerWatchMenu string
+	BannerMainAnon    string
+	BannerMainUser    string
+	BannerWatchMenu   string
+	BannerIdleMode    string
+	IdleRetryInterval time.Duration
 }
 
 // NewSSHServer creates a new SSH server
@@ -54,6 +57,7 @@ func NewSSHServer(config *SSHConfig, gameClient *client.GameClient, authClient *
 		MainAnon:  config.BannerMainAnon,
 		MainUser:  config.BannerMainUser,
 		WatchMenu: config.BannerWatchMenu,
+		IdleMode:  config.BannerIdleMode,
 	}
 	bannerManager := banner.NewBannerManager(bannerConfig)
 
@@ -61,7 +65,7 @@ func NewSSHServer(config *SSHConfig, gameClient *client.GameClient, authClient *
 	menuHandler := menu.NewMenuHandler(bannerManager, gameClient, authClient, logger)
 
 	// Create connection handler
-	handler := connection.NewHandler(connManager, gameClient, authClient, menuHandler, logger)
+	handler := connection.NewHandler(connManager, gameClient, authClient, menuHandler, logger, config.IdleRetryInterval)
 
 	// Create SSH server config
 	sshConfig := &ssh.ServerConfig{
