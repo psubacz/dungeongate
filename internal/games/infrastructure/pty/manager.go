@@ -206,13 +206,17 @@ func (m *PTYManager) GetPTY(sessionID string) (*PTYSession, error) {
 
 // ClosePTY closes a PTY session
 func (m *PTYManager) ClosePTY(sessionID string) error {
+	fmt.Printf("DEBUG: ============ ClosePTY called for session %s ============\n", sessionID)
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	session, exists := m.sessions[sessionID]
 	if !exists {
+		fmt.Printf("DEBUG: ClosePTY: PTY not found for session %s\n", sessionID)
 		return fmt.Errorf("PTY not found for session %s", sessionID)
 	}
+
+	fmt.Printf("DEBUG: ClosePTY: Found PTY session %s, process PID: %d\n", sessionID, session.Cmd.Process.Pid)
 
 	// Clean up game environment using adapter
 	if err := session.adapter.CleanupGameEnvironment(session.session); err != nil {
@@ -220,11 +224,13 @@ func (m *PTYManager) ClosePTY(sessionID string) error {
 	}
 
 	// Close the session
+	fmt.Printf("DEBUG: ClosePTY: About to call session.Close() for session %s\n", sessionID)
 	session.Close()
 
 	// Remove from map
 	delete(m.sessions, sessionID)
 
+	fmt.Printf("DEBUG: ============ ClosePTY completed for session %s ============\n", sessionID)
 	m.logger.Info("Closed PTY for session", "session_id", sessionID)
 
 	return nil
@@ -293,28 +299,40 @@ func (s *PTYSession) handleOutput() {
 
 // waitForExit waits for the command to exit
 func (s *PTYSession) waitForExit() {
-	fmt.Printf("DEBUG: Starting waitForExit for session %s, PID: %d\n", s.SessionID, s.Cmd.Process.Pid)
+	fmt.Printf("DEBUG: ============ STARTING waitForExit for session %s, PID: %d ============\n", s.SessionID, s.Cmd.Process.Pid)
 	
 	// Check process status before waiting
 	err := s.Cmd.Process.Signal(syscall.Signal(0))
 	if err != nil {
-		fmt.Printf("DEBUG: Process %d already dead before Wait(): %v\n", s.Cmd.Process.Pid, err)
+		fmt.Printf("DEBUG: CRITICAL: Process %d already dead before Wait(): %v\n", s.Cmd.Process.Pid, err)
 	} else {
-		fmt.Printf("DEBUG: Process %d confirmed alive before Wait()\n", s.Cmd.Process.Pid)
+		fmt.Printf("DEBUG: Process %d confirmed alive and healthy before Wait()\n", s.Cmd.Process.Pid)
+	}
+	
+	// Add a small delay to see if the process gets killed immediately
+	fmt.Printf("DEBUG: Waiting 1 second to see if process stays alive...\n")
+	time.Sleep(1 * time.Second)
+	
+	// Check again after delay
+	err = s.Cmd.Process.Signal(syscall.Signal(0))
+	if err != nil {
+		fmt.Printf("DEBUG: CRITICAL: Process %d died during 1-second wait: %v\n", s.Cmd.Process.Pid, err)
+	} else {
+		fmt.Printf("DEBUG: Process %d still alive after 1-second delay\n", s.Cmd.Process.Pid)
 	}
 	
 	fmt.Printf("DEBUG: About to call Cmd.Wait() for session %s, PID: %d\n", s.SessionID, s.Cmd.Process.Pid)
 	err = s.Cmd.Wait()
-	fmt.Printf("DEBUG: Cmd.Wait() returned for session %s, PID: %d, error: %v\n", s.SessionID, s.Cmd.Process.Pid, err)
+	fmt.Printf("DEBUG: ============ Cmd.Wait() returned for session %s, PID: %d, error: %v ============\n", s.SessionID, s.Cmd.Process.Pid, err)
 
 	var exitCode *int
 	if err != nil {
-		fmt.Printf("DEBUG: Process exited with error for session %s: %v\n", s.SessionID, err)
+		fmt.Printf("DEBUG: CRITICAL: Process exited with error for session %s: %v\n", s.SessionID, err)
 		// Check if it's an exec.ExitError to get more details
 		if exitErr, ok := err.(*exec.ExitError); ok {
 			fmt.Printf("DEBUG: Exit code: %d, System: %v\n", exitErr.ExitCode(), exitErr.Sys())
 			if exitErr.ExitCode() == -1 {
-				fmt.Printf("DEBUG: Process was killed by signal\n")
+				fmt.Printf("DEBUG: CRITICAL: Process was killed by external signal (SIGKILL)\n")
 			}
 			code := exitErr.ExitCode()
 			exitCode = &code
@@ -335,10 +353,7 @@ func (s *PTYSession) waitForExit() {
 		s.onExit(s.session, exitCode, err)
 	}
 
-	// IMPORTANT: Only close if the process actually exited
-	// For interactive games like NetHack, we should NOT close on normal exit
-	// The streaming handler should manage session lifecycle
-	fmt.Printf("DEBUG: waitForExit completed for session %s, process state: %v\n", s.SessionID, s.Cmd.ProcessState)
+	fmt.Printf("DEBUG: ============ waitForExit completed for session %s, process state: %v ============\n", s.SessionID, s.Cmd.ProcessState)
 }
 
 // SendInput sends input to the PTY
@@ -371,7 +386,8 @@ func (s *PTYSession) Resize(rows, cols uint16) error {
 	return pty.Setsize(s.PTY, s.Size)
 }
 
-// Close closes the PTY session
+// Close closes the PTY session WITHOUT terminating the process
+// This allows games like NetHack to keep running for reconnection
 func (s *PTYSession) Close() {
 	fmt.Printf("DEBUG: Close() called for session %s\n", s.SessionID)
 	
@@ -379,41 +395,50 @@ func (s *PTYSession) Close() {
 		fmt.Printf("DEBUG: Executing Close() for session %s (first time)\n", s.SessionID)
 		close(s.closeChan)
 
-		// Gracefully terminate the process if it's still running
+		// FOR INTERACTIVE GAMES LIKE NETHACK: Do NOT terminate the process
+		// The process should continue running even if streams disconnect
+		// This enables reconnection and session persistence
 		if s.Cmd != nil && s.Cmd.Process != nil && s.Cmd.ProcessState == nil {
-			// Only terminate if process hasn't already exited
-			fmt.Printf("DEBUG: Attempting graceful termination of process %d for session %s\n", s.Cmd.Process.Pid, s.SessionID)
-			// First try SIGTERM with a grace period
-			s.Cmd.Process.Signal(syscall.SIGTERM)
-
-			// Give the process 5 seconds to terminate gracefully
-			// Don't call Wait() here as waitForExit() is already handling it
-			time.Sleep(5 * time.Second)
-
-			// Check if process is still running after grace period
-			if s.Cmd.ProcessState == nil {
-				// Process didn't terminate, force kill
-				fmt.Printf("DEBUG: Force killing process %d for session %s after 5s grace period\n", s.Cmd.Process.Pid, s.SessionID)
-				s.Cmd.Process.Signal(syscall.SIGKILL)
-			} else {
-				fmt.Printf("DEBUG: Process %d terminated gracefully during grace period for session %s\n", s.Cmd.Process.Pid, s.SessionID)
-			}
+			fmt.Printf("DEBUG: Keeping process %d alive for session %s (interactive game)\n", s.Cmd.Process.Pid, s.SessionID)
+			fmt.Printf("DEBUG: Process will continue running for potential reconnection\n")
 		} else if s.Cmd != nil && s.Cmd.ProcessState != nil {
 			fmt.Printf("DEBUG: Process already exited for session %s with state: %v\n", s.SessionID, s.Cmd.ProcessState)
 		}
 
-		// Close the PTY
-		if s.PTY != nil {
-			s.PTY.Close()
-		}
-
-		// Close channels
+		// Close channels but do NOT close the PTY file descriptor yet
+		// Closing the PTY would cause NetHack to exit due to lost terminal
 		close(s.inputChan)
 		close(s.outputChan)
 		close(s.errorChan)
 		
-		fmt.Printf("DEBUG: Close() completed for session %s\n", s.SessionID)
+		fmt.Printf("DEBUG: Close() completed for session %s - process and PTY kept alive\n", s.SessionID)
 	})
+}
+
+// ForceTerminate forcefully terminates the game process (for explicit user quit)
+func (s *PTYSession) ForceTerminate() {
+	fmt.Printf("DEBUG: ForceTerminate() called for session %s\n", s.SessionID)
+	
+	if s.Cmd != nil && s.Cmd.Process != nil && s.Cmd.ProcessState == nil {
+		fmt.Printf("DEBUG: Force terminating process %d for session %s\n", s.Cmd.Process.Pid, s.SessionID)
+		
+		// Send SIGTERM first
+		s.Cmd.Process.Signal(syscall.SIGTERM)
+		
+		// Give it 5 seconds to exit gracefully
+		time.Sleep(5 * time.Second)
+		
+		// Force kill if still running
+		if s.Cmd.ProcessState == nil {
+			fmt.Printf("DEBUG: Sending SIGKILL to process %d for session %s\n", s.Cmd.Process.Pid, s.SessionID)
+			s.Cmd.Process.Signal(syscall.SIGKILL)
+		}
+	}
+	
+	// Now close the PTY
+	if s.PTY != nil {
+		s.PTY.Close()
+	}
 }
 
 // GetExitCode returns the exit code of the process

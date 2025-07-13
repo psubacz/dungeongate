@@ -70,6 +70,17 @@ ssh:
     # Useful for development and demo environments
     allow_anonymous: true
     
+  # SSH Keepalive Configuration
+  keepalive:
+    # Enable SSH keepalive to prevent connection timeouts during idle periods
+    enabled: true
+    
+    # Interval between keepalive messages (prevents timeouts during NetHack idle)
+    interval: "30s"
+    
+    # Maximum number of unanswered keepalive messages before disconnect
+    count_max: 3
+    
   # Terminal Configuration
   terminal:
     # Default terminal size for new sessions (widthxheight)
@@ -107,6 +118,28 @@ session_management:
     
     # How often to check for expired sessions
     cleanup_interval: "1m"
+    
+  # Heartbeat configuration for maintaining connections during idle periods
+  heartbeat:
+    # Enable heartbeat messages to keep sessions alive
+    enabled: true
+    
+    # Interval between heartbeat messages during idle periods
+    interval: "60s"
+    
+    # Detect idle period after this much inactivity
+    idle_detection_threshold: "2m"
+    
+    # gRPC stream heartbeat configuration
+    grpc_stream:
+      # Enable heartbeat for gRPC streams
+      enabled: true
+      
+      # Interval for gRPC stream ping messages
+      ping_interval: "45s"
+      
+      # Timeout waiting for pong response
+      pong_timeout: "10s"
     
   # TTY Recording (Terminal Recording)
   ttyrec:

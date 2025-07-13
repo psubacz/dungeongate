@@ -40,6 +40,7 @@ type SSHConfig struct {
 	IdleTimeout    string             `yaml:"idle_timeout"`
 	Auth           *SSHAuthConfig     `yaml:"auth"`
 	Terminal       *SSHTerminalConfig `yaml:"terminal"`
+	Keepalive      *SSHKeepaliveConfig `yaml:"keepalive"`
 }
 
 // SSHAuthConfig represents SSH authentication configuration
@@ -54,6 +55,13 @@ type SSHTerminalConfig struct {
 	DefaultSize        string   `yaml:"default_size"`
 	MaxSize            string   `yaml:"max_size"`
 	SupportedTerminals []string `yaml:"supported_terminals"`
+}
+
+// SSHKeepaliveConfig represents SSH keepalive configuration
+type SSHKeepaliveConfig struct {
+	Enabled  bool   `yaml:"enabled"`
+	Interval string `yaml:"interval"`
+	CountMax int    `yaml:"count_max"`
 }
 
 // MenuConfig represents menu configuration
@@ -230,6 +238,13 @@ func applyDefaults(cfg *SessionServiceConfig) {
 			AllowAnonymous: true,
 		}
 	}
+	if cfg.SSH.Keepalive == nil {
+		cfg.SSH.Keepalive = &SSHKeepaliveConfig{
+			Enabled:  true,
+			Interval: "30s",
+			CountMax: 3,
+		}
+	}
 	if cfg.SSH.Terminal == nil {
 		cfg.SSH.Terminal = &SSHTerminalConfig{
 			DefaultSize:        "80x24",
@@ -276,6 +291,18 @@ func applyDefaults(cfg *SessionServiceConfig) {
 			Enabled:                 true,
 			MaxSpectatorsPerSession: 10,
 			SpectatorTimeout:        "2h",
+		}
+	}
+	if cfg.SessionManagement.Heartbeat == nil {
+		cfg.SessionManagement.Heartbeat = &HeartbeatConfig{
+			Enabled:               true,
+			Interval:              "60s",
+			IdleDetectionThreshold: "2m",
+			GRPCStream: &GRPCStreamConfig{
+				Enabled:     true,
+				PingInterval: "45s",
+				PongTimeout:  "10s",
+			},
 		}
 	}
 
@@ -627,6 +654,11 @@ func GetDefaultDevelopmentConfig() *SessionServiceConfig {
 				MaxSize:            "120x40",
 				SupportedTerminals: []string{"xterm", "xterm-256color"},
 			},
+			Keepalive: &SSHKeepaliveConfig{
+				Enabled:  true,
+				Interval: "30s",
+				CountMax: 3,
+			},
 		},
 		SessionManagement: &SessionManagementConfig{
 			Terminal: &TerminalConfig{
@@ -650,6 +682,16 @@ func GetDefaultDevelopmentConfig() *SessionServiceConfig {
 				Enabled:                 true,
 				MaxSpectatorsPerSession: 3,
 				SpectatorTimeout:        "30m",
+			},
+			Heartbeat: &HeartbeatConfig{
+				Enabled:               true,
+				Interval:              "60s",
+				IdleDetectionThreshold: "2m",
+				GRPCStream: &GRPCStreamConfig{
+					Enabled:     true,
+					PingInterval: "45s",
+					PongTimeout:  "10s",
+				},
 			},
 		},
 		Services: &ServicesConfig{
