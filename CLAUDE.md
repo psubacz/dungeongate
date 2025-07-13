@@ -126,8 +126,6 @@ The project supports dual-mode database operation:
 - **Environment Variables**: Support for templating and overrides
 - **Locations**:
   - `configs/development/` - Full development configurations
-  - `configs/production/` - Production templates
-  - `configs/testing/` - Database testing configurations
 
 ## Testing the Platform
 

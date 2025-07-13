@@ -330,7 +330,7 @@ logging:
   level: "debug"
   
   # Log format: text (human readable), json (machine readable)
-  format: "json"
+  format: "text"
   
   # Log output: stdout, stderr, file, journald
   output: "stdout"

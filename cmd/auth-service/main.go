@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"flag"
 	"fmt"
-	"log"
 	"log/slog"
 	"net"
 	"net/http"
@@ -21,6 +20,8 @@ import (
 	"github.com/dungeongate/pkg/config"
 	"github.com/dungeongate/pkg/database"
 	"github.com/dungeongate/pkg/encryption"
+	dungeongate_log "github.com/dungeongate/pkg/log"
+	"github.com/op/go-logging"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 )
@@ -30,6 +31,8 @@ var (
 	buildTime string = "unknown"
 	gitCommit string = "unknown"
 )
+
+var serviceLogger *logging.Logger
 
 func main() {
 	var (
@@ -46,16 +49,20 @@ func main() {
 		return
 	}
 
+	// Initialize standardized logging
+	serviceLogger = dungeongate_log.SetupLoggerLegacy()
+	serviceLogger.Info("Starting DungeonGate Auth Service")
+
 	// Load configuration
 	cfg, err := config.LoadUserServiceConfig(*configFile)
 	if err != nil {
-		log.Fatalf("Failed to load configuration: %v", err)
+		serviceLogger.Fatalf("Failed to load configuration: %v", err)
 	}
 
 	// Setup database
 	db, err := database.NewConnection(cfg.Database)
 	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
+		serviceLogger.Fatalf("Failed to connect to database: %v", err)
 	}
 	defer db.Close()
 
@@ -66,23 +73,23 @@ func main() {
 		KeyRotationInterval: "24h",
 	})
 	if err != nil {
-		log.Fatalf("Failed to initialize encryption: %v", err)
+		serviceLogger.Fatalf("Failed to initialize encryption: %v", err)
 	}
 
 	// Setup user service
 	sessionCfg := config.GetDefaultDevelopmentConfig()
 	userService, err := user.NewService(db, cfg, sessionCfg)
 	if err != nil {
-		log.Fatalf("Failed to create user service: %v", err)
+		serviceLogger.Fatalf("Failed to create user service: %v", err)
 	}
 
 	// Generate JWT secret if not provided
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
-		log.Println("JWT_SECRET not set, generating random secret (not recommended for production)")
+		serviceLogger.Info("JWT_SECRET not set, generating random secret (not recommended for production)")
 		secretBytes := make([]byte, 32)
 		if _, err := rand.Read(secretBytes); err != nil {
-			log.Fatalf("Failed to generate JWT secret: %v", err)
+			serviceLogger.Fatalf("Failed to generate JWT secret: %v", err)
 		}
 		jwtSecret = hex.EncodeToString(secretBytes)
 	}
@@ -124,13 +131,13 @@ func main() {
 	// Start gRPC server
 	grpcListener, err := net.Listen("tcp", fmt.Sprintf(":%d", grpcPort))
 	if err != nil {
-		log.Fatalf("Failed to listen on port %d: %v", grpcPort, err)
+		serviceLogger.Fatalf("Failed to listen on port %d: %v", grpcPort, err)
 	}
 
 	go func() {
-		log.Printf("Starting Auth Service gRPC server on port %d", grpcPort)
+		serviceLogger.Infof("Starting Auth Service gRPC server on port %d", grpcPort)
 		if err := grpcServer.Serve(grpcListener); err != nil {
-			log.Printf("gRPC server error: %v", err)
+			serviceLogger.Infof("gRPC server error: %v", err)
 		}
 	}()
 
@@ -155,9 +162,9 @@ func main() {
 	}
 
 	go func() {
-		log.Printf("Starting Auth Service HTTP server on port %d", httpPort)
+		serviceLogger.Infof("Starting Auth Service HTTP server on port %d", httpPort)
 		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Printf("HTTP server error: %v", err)
+			serviceLogger.Infof("HTTP server error: %v", err)
 		}
 	}()
 
@@ -166,7 +173,7 @@ func main() {
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
 	<-sigChan
-	log.Println("Shutting down gracefully...")
+	serviceLogger.Info("Shutting down gracefully...")
 
 	// Shutdown gRPC server
 	grpcServer.GracefulStop()
@@ -176,11 +183,11 @@ func main() {
 	defer shutdownCancel()
 
 	if err := httpServer.Shutdown(shutdownCtx); err != nil {
-		log.Printf("HTTP server shutdown error: %v", err)
+		serviceLogger.Infof("HTTP server shutdown error: %v", err)
 	}
 
 	// Cancel context
 	cancel()
 
-	log.Println("Auth Service stopped")
+	serviceLogger.Info("Auth Service stopped")
 }
