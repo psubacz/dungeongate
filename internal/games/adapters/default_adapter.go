@@ -33,7 +33,9 @@ func (a *DefaultAdapter) Configure(config *config.GameConfig) error {
 
 // PrepareCommand sets up a basic command
 func (a *DefaultAdapter) PrepareCommand(ctx context.Context, session *domain.GameSession, gamePath string, baseArgs []string, baseEnv []string) (*exec.Cmd, error) {
-	cmd := exec.CommandContext(ctx, gamePath, baseArgs...)
+	// Create command without context binding to prevent process termination
+	// when gRPC contexts are cancelled. Games should run independently.
+	cmd := exec.Command(gamePath, baseArgs...)
 	cmd.Env = baseEnv
 	return cmd, nil
 }

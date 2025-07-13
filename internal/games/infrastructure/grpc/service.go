@@ -231,7 +231,10 @@ func (s *GameServiceServer) StartGameSession(ctx context.Context, req *games_pb.
 		exitSession.End(exitCode, signal)
 	}
 
-	_, err = s.ptyManager.CreatePTYWithCallback(ctx, session, gamePath, gameArgs, gameEnv, processExitCallback)
+	// Use a detached context for PTY creation so the process doesn't get killed when the gRPC call completes
+	// The NetHack process should live independently of the initial gRPC request
+	detachedCtx := context.Background()
+	_, err = s.ptyManager.CreatePTYWithCallback(detachedCtx, session, gamePath, gameArgs, gameEnv, processExitCallback)
 	if err != nil {
 		s.logger.Error("Failed to create PTY", "error", err, "session_id", session.ID().String())
 		// TODO: Clean up the session in the database

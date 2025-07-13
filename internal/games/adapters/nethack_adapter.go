@@ -82,8 +82,9 @@ func (a *NetHackAdapter) PrepareCommand(ctx context.Context, session *domain.Gam
 		fmt.Sprintf("NETHACK_CONFIGDIR=%s/%s", homeDir, a.config.Paths.User.ConfigDir),
 	)
 
-	// Create the command
-	cmd := exec.CommandContext(ctx, gamePath, args...)
+	// Create the command without context binding to prevent process termination
+	// when gRPC contexts are cancelled. NetHack should run independently.
+	cmd := exec.Command(gamePath, args...)
 	cmd.Env = env
 
 	// Set working directory from configuration
