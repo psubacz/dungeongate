@@ -1,0 +1,17 @@
+Welcome to $SERVERID!
+Connected as: $USERNAME
+Date: $DATE | Time: $TIME
+
+Status: Waiting for game service...
+
+┌─────────────────────────────────────────────────────┐
+│                  SERVICE NOTICE                     │
+├─────────────────────────────────────────────────────┤
+│ No games are currently available.                   │
+│ The game service is temporarily unavailable.       │
+│                                                     │
+│ Automatically retrying connection...               │
+│ Press [q] to quit                                   │
+└─────────────────────────────────────────────────────┘
+
+Checking game service availability...
