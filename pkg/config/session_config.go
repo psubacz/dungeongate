@@ -72,10 +72,11 @@ type MenuConfig struct {
 
 // BannersConfig represents banner configuration
 type BannersConfig struct {
-	MainAnon  string `yaml:"main_anon"`
-	MainUser  string `yaml:"main_user"`
-	WatchMenu string `yaml:"watch_menu"`
-	IdleMode  string `yaml:"idle_mode"`
+	MainAnon           string `yaml:"main_anon"`
+	MainUser           string `yaml:"main_user"`
+	WatchMenu          string `yaml:"watch_menu"`
+	IdleMode           string `yaml:"idle_mode"`
+	ServiceUnavailable string `yaml:"service_unavailable"`
 }
 
 // MenuOptions represents menu options configuration
@@ -321,10 +322,11 @@ func applyDefaults(cfg *SessionServiceConfig) {
 	if cfg.Menu == nil {
 		cfg.Menu = &MenuConfig{
 			Banners: &BannersConfig{
-				MainAnon:  "./assets/banners/main_anon.txt",
-				MainUser:  "./assets/banners/main_user.txt",
-				WatchMenu: "./assets/banners/watch_menu.txt",
-				IdleMode:  "./assets/banners/idle_mode.txt",
+				MainAnon:           "./assets/banners/main_anon.txt",
+				MainUser:           "./assets/banners/main_user.txt",
+				WatchMenu:          "./assets/banners/watch_menu.txt",
+				IdleMode:           "./assets/banners/idle_mode.txt",
+				ServiceUnavailable: "./assets/banners/service_unavailable.txt",
 			},
 			Options: &MenuOptions{
 				Anonymous: []*MenuOption{
@@ -445,10 +447,11 @@ func (c *SessionServiceConfig) GetMenu() *MenuConfig {
 	if c.Menu == nil {
 		return &MenuConfig{
 			Banners: &BannersConfig{
-				MainAnon:  "./assets/banners/main_anon.txt",
-				MainUser:  "./assets/banners/main_user.txt",
-				WatchMenu: "./assets/banners/watch_menu.txt",
-				IdleMode:  "./assets/banners/idle_mode.txt",
+				MainAnon:           "./assets/banners/main_anon.txt",
+				MainUser:           "./assets/banners/main_user.txt",
+				WatchMenu:          "./assets/banners/watch_menu.txt",
+				IdleMode:           "./assets/banners/idle_mode.txt",
+				ServiceUnavailable: "./assets/banners/service_unavailable.txt",
 			},
 			Options: &MenuOptions{
 				Anonymous: []*MenuOption{

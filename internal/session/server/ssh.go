@@ -27,24 +27,27 @@ type SSHServer struct {
 	sshConfig   *ssh.ServerConfig
 	handler     *connection.Handler
 	connManager *connection.Manager
+	gameClient  *client.GameClient
+	authClient  *client.AuthClient
 	logger      *slog.Logger
 }
 
 // SSHConfig holds SSH server configuration
 type SSHConfig struct {
-	Address         string
-	Port            int
-	HostKey         string
-	MaxConns        int
-	IdleTimeout     string
-	PasswordAuth    bool
-	PublicKeyAuth   bool
-	AllowAnonymous  bool
-	BannerMainAnon    string
-	BannerMainUser    string
-	BannerWatchMenu   string
-	BannerIdleMode    string
-	IdleRetryInterval time.Duration
+	Address               string
+	Port                  int
+	HostKey               string
+	MaxConns              int
+	IdleTimeout           string
+	PasswordAuth          bool
+	PublicKeyAuth         bool
+	AllowAnonymous        bool
+	BannerMainAnon        string
+	BannerMainUser        string
+	BannerWatchMenu       string
+	BannerIdleMode        string
+	BannerServiceUnavailable string
+	IdleRetryInterval     time.Duration
 }
 
 // NewSSHServer creates a new SSH server
@@ -54,10 +57,11 @@ func NewSSHServer(config *SSHConfig, gameClient *client.GameClient, authClient *
 
 	// Create banner manager
 	bannerConfig := &banner.BannerConfig{
-		MainAnon:  config.BannerMainAnon,
-		MainUser:  config.BannerMainUser,
-		WatchMenu: config.BannerWatchMenu,
-		IdleMode:  config.BannerIdleMode,
+		MainAnon:           config.BannerMainAnon,
+		MainUser:           config.BannerMainUser,
+		WatchMenu:          config.BannerWatchMenu,
+		IdleMode:           config.BannerIdleMode,
+		ServiceUnavailable: config.BannerServiceUnavailable,
 	}
 	bannerManager := banner.NewBannerManager(bannerConfig)
 
@@ -95,6 +99,8 @@ func NewSSHServer(config *SSHConfig, gameClient *client.GameClient, authClient *
 		sshConfig:   sshConfig,
 		handler:     handler,
 		connManager: connManager,
+		gameClient:  gameClient,
+		authClient:  authClient,
 		logger:      logger,
 	}
 
@@ -117,6 +123,9 @@ func (s *SSHServer) Start(ctx context.Context) error {
 	if err := s.connManager.Start(ctx); err != nil {
 		return fmt.Errorf("failed to start connection manager: %w", err)
 	}
+
+	// Start service health monitoring
+	go s.monitorServiceHealth(ctx)
 
 	// Accept connections
 	go s.acceptConnections(ctx)
@@ -220,4 +229,43 @@ func loadOrGenerateHostKey(hostKeyPath string) (ssh.Signer, error) {
 	}
 
 	return signer, nil
+}
+
+// monitorServiceHealth periodically checks service health and logs status
+func (s *SSHServer) monitorServiceHealth(ctx context.Context) {
+	// Check interval matches idle retry interval for consistency
+	ticker := time.NewTicker(s.config.IdleRetryInterval)
+	defer ticker.Stop()
+
+	// Initial health check
+	s.logServiceHealth(ctx)
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			s.logServiceHealth(ctx)
+		}
+	}
+}
+
+// logServiceHealth checks and logs the current health status of all services
+func (s *SSHServer) logServiceHealth(ctx context.Context) {
+	authHealthy := s.authClient.IsHealthy(ctx)
+	gameHealthy := s.gameClient.IsHealthy(ctx)
+
+	if authHealthy && gameHealthy {
+		s.logger.Info("Service health check", "auth_service", "available", "game_service", "available", "status", "all_healthy")
+	} else {
+		authStatus := "available"
+		if !authHealthy {
+			authStatus = "unavailable"
+		}
+		gameStatus := "available"
+		if !gameHealthy {
+			gameStatus = "unavailable"
+		}
+		s.logger.Warn("Service health check", "auth_service", authStatus, "game_service", gameStatus, "status", "degraded")
+	}
 }

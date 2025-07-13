@@ -15,10 +15,11 @@ type BannerManager struct {
 
 // BannerConfig contains paths to banner files
 type BannerConfig struct {
-	MainAnon  string
-	MainUser  string
-	WatchMenu string
-	IdleMode  string
+	MainAnon           string
+	MainUser           string
+	WatchMenu          string
+	IdleMode           string
+	ServiceUnavailable string
 }
 
 // NewBannerManager creates a new banner manager
@@ -61,25 +62,29 @@ func (bm *BannerManager) RenderWatchMenu() (string, error) {
 	})
 }
 
-// RenderIdleMode renders the idle mode banner
-func (bm *BannerManager) RenderIdleMode(username string, retryInterval time.Duration) (string, error) {
-	return bm.renderBanner(bm.config.IdleMode, map[string]string{
-		"$SERVERID":       "DungeonGate",
-		"$USERNAME":       username,
-		"$DATE":           time.Now().Format("2006-01-02"),
-		"$TIME":           time.Now().Format("15:04:05"),
-		"$RETRY_INTERVAL": retryInterval.String(),
-	})
-}
 
-// RenderIdleModeWithCountdown renders the idle mode banner with countdown
-func (bm *BannerManager) RenderIdleModeWithCountdown(username string, retryInterval time.Duration, remainingSeconds int) (string, error) {
-	return bm.renderBanner(bm.config.IdleMode, map[string]string{
+// RenderServiceUnavailable renders the service unavailable banner with countdown and service status
+func (bm *BannerManager) RenderServiceUnavailable(username string, remainingMinutes, remainingSeconds int, serviceStatus string) (string, error) {
+	var countdown string
+	if remainingMinutes > 0 {
+		countdown = fmt.Sprintf("%dm %ds", remainingMinutes, remainingSeconds)
+	} else {
+		countdown = fmt.Sprintf("%ds", remainingSeconds)
+	}
+	
+	// Use fallback path if ServiceUnavailable is empty
+	filePath := bm.config.ServiceUnavailable
+	if filePath == "" {
+		filePath = "./assets/banners/service_unavailable.txt"
+	}
+	
+	return bm.renderBanner(filePath, map[string]string{
 		"$SERVERID":       "DungeonGate",
 		"$USERNAME":       username,
 		"$DATE":           time.Now().Format("2006-01-02"),
 		"$TIME":           time.Now().Format("15:04:05"),
-		"$RETRY_INTERVAL": fmt.Sprintf("%ds", remainingSeconds),
+		"$COUNTDOWN":      countdown,
+		"$SERVICE_STATUS": serviceStatus,
 	})
 }
 
@@ -128,6 +133,7 @@ func (bm *BannerManager) ValidateBannerFiles() error {
 		{"main_user", bm.config.MainUser},
 		{"watch_menu", bm.config.WatchMenu},
 		{"idle_mode", bm.config.IdleMode},
+		{"service_unavailable", bm.config.ServiceUnavailable},
 	}
 
 	for _, file := range files {
@@ -147,10 +153,11 @@ func (bm *BannerManager) GetBannerInfo() map[string]fs.FileInfo {
 	info := make(map[string]fs.FileInfo)
 
 	files := map[string]string{
-		"main_anon":  bm.config.MainAnon,
-		"main_user":  bm.config.MainUser,
-		"watch_menu": bm.config.WatchMenu,
-		"idle_mode":  bm.config.IdleMode,
+		"main_anon":           bm.config.MainAnon,
+		"main_user":           bm.config.MainUser,
+		"watch_menu":          bm.config.WatchMenu,
+		"idle_mode":           bm.config.IdleMode,
+		"service_unavailable": bm.config.ServiceUnavailable,
 	}
 
 	for name, path := range files {
