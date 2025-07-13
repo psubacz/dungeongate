@@ -231,9 +231,39 @@ logging:
   # Log format: text (dev), json (prod for log aggregation)
   format: "text"
   
-  # Log output: stdout, stderr, or file path
+  # Log output: stdout, stderr, file, journald
   # Consider centralized logging for production auth service
   output: "stdout"
+  
+  # File logging configuration (when output is "file")
+  file:
+    # Directory for log files
+    directory: "./logs"
+    
+    # Log file name pattern (service name will be prepended)
+    filename: "auth-service.log"
+    
+    # Maximum size of each log file before rotation
+    max_size: "100MB"
+    
+    # Maximum number of old log files to retain
+    max_files: 10
+    
+    # Maximum age of log files before deletion
+    max_age: "30d"
+    
+    # Compress rotated log files
+    compress: true
+  
+  # Journald configuration (when output is "journald")
+  journald:
+    # Service identifier for journald
+    identifier: "dungeongate-auth"
+    
+    # Additional fields to include in journald logs
+    fields:
+      service: "auth-service"
+      component: "dungeongate"
 
 
 # ============================================================================
