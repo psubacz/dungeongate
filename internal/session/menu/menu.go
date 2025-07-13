@@ -53,8 +53,7 @@ func (mh *MenuHandler) ShowAnonymousMenu(ctx context.Context, channel ssh.Channe
 	banner, err := mh.bannerManager.RenderMainAnon()
 	if err != nil {
 		mh.logger.Error("Failed to render anonymous banner", "error", err)
-		// Fallback to simple banner
-		banner = mh.getFallbackAnonymousBanner()
+		return nil, fmt.Errorf("failed to render banner: %w", err)
 	}
 
 	// Display the banner
@@ -134,8 +133,7 @@ func (mh *MenuHandler) ShowUserMenu(ctx context.Context, channel ssh.Channel, us
 	banner, err := mh.bannerManager.RenderMainUser(username)
 	if err != nil {
 		mh.logger.Error("Failed to render user banner", "error", err, "username", username)
-		// Fallback to simple banner
-		banner = mh.getFallbackUserBanner(username)
+		return nil, fmt.Errorf("failed to render banner: %w", err)
 	}
 
 	// Display the banner
