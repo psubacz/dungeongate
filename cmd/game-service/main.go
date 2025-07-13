@@ -23,6 +23,7 @@ import (
 	"github.com/dungeongate/pkg/config"
 	"github.com/dungeongate/pkg/database"
 	"github.com/dungeongate/pkg/logging"
+	"github.com/dungeongate/pkg/metrics"
 )
 
 var (
@@ -75,6 +76,18 @@ func main() {
 	logger = logging.NewLoggerBasic(serviceName, level, format, output)
 	logger.Info("Starting Game Service", "version", version)
 
+	// Initialize metrics registry
+	metricsRegistry := metrics.NewRegistry(serviceName, version, buildTime, gitCommit, logger)
+
+	// Start metrics server if enabled
+	if cfg.Metrics != nil && cfg.Metrics.Enabled {
+		go func() {
+			if err := metricsRegistry.StartMetricsServer(cfg.Metrics.Port); err != nil {
+				logger.Error("Failed to start metrics server", "error", err)
+			}
+		}()
+		logger.Info("Metrics server starting", "port", cfg.Metrics.Port)
+	}
 
 	// Initialize database
 	db, err := initializeDatabase(cfg)
@@ -85,10 +98,10 @@ func main() {
 	defer db.Close()
 
 	// Initialize application services
-	appServices := initializeApplicationServices(db)
+	appServices := initializeApplicationServices(db, metricsRegistry)
 
 	// Initialize gRPC server
-	grpcServer := initializeGRPCServer(cfg, appServices)
+	grpcServer := initializeGRPCServer(cfg, appServices, metricsRegistry)
 
 	// Initialize HTTP server
 	httpServer := initializeHTTPServer(cfg, appServices)
@@ -114,7 +127,7 @@ func main() {
 	}()
 
 	// Wait for shutdown signal
-	waitForShutdown(ctx, cancel, grpcServer, httpServer)
+	waitForShutdown(ctx, cancel, grpcServer, httpServer, metricsRegistry, cfg)
 }
 
 // loadConfig loads the service configuration
@@ -214,7 +227,7 @@ type ApplicationServices struct {
 }
 
 // initializeApplicationServices initializes all application services
-func initializeApplicationServices(db *database.Connection) *ApplicationServices {
+func initializeApplicationServices(db *database.Connection, metricsRegistry *metrics.Registry) *ApplicationServices {
 	// Initialize stub repositories for development
 	gameRepo := repository.NewStubGameRepository()
 	sessionRepo := repository.NewStubSessionRepository()
@@ -238,7 +251,7 @@ func initializeApplicationServices(db *database.Connection) *ApplicationServices
 }
 
 // initializeGRPCServer initializes the gRPC server
-func initializeGRPCServer(cfg *config.GameServiceConfig, appServices *ApplicationServices) *grpc.Server {
+func initializeGRPCServer(cfg *config.GameServiceConfig, appServices *ApplicationServices, metricsRegistry *metrics.Registry) *grpc.Server {
 	server := grpc.NewServer()
 
 	// Register health check service
@@ -350,7 +363,7 @@ func startHTTPServer(ctx context.Context, cfg *config.GameServiceConfig, server 
 }
 
 // waitForShutdown waits for shutdown signals and gracefully shuts down servers
-func waitForShutdown(ctx context.Context, cancel context.CancelFunc, grpcServer *grpc.Server, httpServer *http.Server) {
+func waitForShutdown(ctx context.Context, cancel context.CancelFunc, grpcServer *grpc.Server, httpServer *http.Server, metricsRegistry *metrics.Registry, cfg *config.GameServiceConfig) {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
@@ -358,6 +371,15 @@ func waitForShutdown(ctx context.Context, cancel context.CancelFunc, grpcServer 
 	logger.Info("Shutdown signal received, starting graceful shutdown...")
 
 	cancel()
+
+	// Stop metrics server
+	if cfg.Metrics != nil && cfg.Metrics.Enabled {
+		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer shutdownCancel()
+		if err := metricsRegistry.StopMetricsServer(shutdownCtx); err != nil {
+			logger.Error("Error stopping metrics server", "error", err)
+		}
+	}
 
 	// Wait a bit for servers to shut down gracefully
 	time.Sleep(2 * time.Second)
