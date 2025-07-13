@@ -209,47 +209,11 @@ func (mh *MenuHandler) ShowUserMenu(ctx context.Context, channel ssh.Channel, us
 	}
 }
 
-// getFallbackAnonymousBanner returns a simple fallback banner for anonymous users
-func (mh *MenuHandler) getFallbackAnonymousBanner() string {
-	return fmt.Sprintf("\r\n=== DungeonGate ===\r\n\r\n"+
-		"Connected as: Anonymous\r\n"+
-		"Date: %s | Time: %s\r\n\r\n"+
-		"Menu Options:\r\n"+
-		"  [l] Login\r\n"+
-		"  [r] Register\r\n"+
-		"  [w] Watch games\r\n"+
-		"  [g] List games\r\n"+
-		"  [q] Quit\r\n\r\n"+
-		"Choice: ",
-		time.Now().Format("2006-01-02"),
-		time.Now().Format("15:04:05"))
-}
-
-// getFallbackUserBanner returns a simple fallback banner for authenticated users
-func (mh *MenuHandler) getFallbackUserBanner(username string) string {
-	return fmt.Sprintf("\r\n=== DungeonGate ===\r\n\r\n"+
-		"Welcome back, %s!\r\n"+
-		"Date: %s | Time: %s\r\n\r\n"+
-		"Menu Options:\r\n"+
-		"  [p] Play a game\r\n"+
-		"  [w] Watch games\r\n"+
-		"  [e] Edit profile\r\n"+
-		"  [l] List games\r\n"+
-		"  [r] View recordings\r\n"+
-		"  [s] Statistics\r\n"+
-		"  [q] Quit\r\n\r\n"+
-		"Choice: ",
-		username,
-		time.Now().Format("2006-01-02"),
-		time.Now().Format("15:04:05"))
-}
-
 // RenderIdleMode renders the idle mode banner
 func (mh *MenuHandler) RenderIdleMode(username string, retryInterval time.Duration) (string, error) {
 	// Render the idle mode banner
 	return mh.bannerManager.RenderIdleMode(username, retryInterval)
 }
-
 
 // ShowGameSelectionMenu displays the game selection menu and handles input
 func (mh *MenuHandler) ShowGameSelectionMenu(ctx context.Context, channel ssh.Channel, username string) (*MenuChoice, error) {
