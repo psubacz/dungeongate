@@ -15,163 +15,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// SSHMetrics contains all SSH server related Prometheus metrics
-type SSHMetrics struct {
-	// Connection metrics
-	ConnectionsTotal   prometheus.Counter
-	ConnectionsActive  prometheus.Gauge
-	ConnectionsFailed  prometheus.Counter
-	ConnectionDuration prometheus.Histogram
-
-	// Session metrics
-	SessionsTotal     prometheus.Counter
-	SessionsActive    prometheus.Gauge
-	SessionDuration   prometheus.Histogram
-	SessionBytesRead  prometheus.Counter
-	SessionBytesWrite prometheus.Counter
-
-	// Authentication metrics
-	AuthAttemptsTotal *prometheus.CounterVec
-	AuthFailuresTotal *prometheus.CounterVec
-	AuthDuration      prometheus.Histogram
-
-	// Game metrics
-	GamesStartedTotal *prometheus.CounterVec
-	GamesActive       *prometheus.GaugeVec
-	GameDuration      *prometheus.HistogramVec
-	GameSessionErrors *prometheus.CounterVec
-
-	// Terminal metrics
-	TerminalSizeChanges prometheus.Counter
-	TerminalTypes       *prometheus.CounterVec
-}
-
-// NewSSHMetrics creates and registers all SSH metrics
-func NewSSHMetrics(namespace, subsystem string) *SSHMetrics {
-	return &SSHMetrics{
-		// Connection metrics
-		ConnectionsTotal: promauto.NewCounter(prometheus.CounterOpts{
-			Namespace: namespace,
-			Subsystem: subsystem,
-			Name:      "connections_total",
-			Help:      "Total number of SSH connections",
-		}),
-		ConnectionsActive: promauto.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Subsystem: subsystem,
-			Name:      "connections_active",
-			Help:      "Number of active SSH connections",
-		}),
-		ConnectionsFailed: promauto.NewCounter(prometheus.CounterOpts{
-			Namespace: namespace,
-			Subsystem: subsystem,
-			Name:      "connections_failed_total",
-			Help:      "Total number of failed SSH connections",
-		}),
-		ConnectionDuration: promauto.NewHistogram(prometheus.HistogramOpts{
-			Namespace: namespace,
-			Subsystem: subsystem,
-			Name:      "connection_duration_seconds",
-			Help:      "SSH connection duration in seconds",
-			Buckets:   prometheus.DefBuckets,
-		}),
-
-		// Session metrics
-		SessionsTotal: promauto.NewCounter(prometheus.CounterOpts{
-			Namespace: namespace,
-			Subsystem: subsystem,
-			Name:      "sessions_total",
-			Help:      "Total number of SSH sessions",
-		}),
-		SessionsActive: promauto.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Subsystem: subsystem,
-			Name:      "sessions_active",
-			Help:      "Number of active SSH sessions",
-		}),
-		SessionDuration: promauto.NewHistogram(prometheus.HistogramOpts{
-			Namespace: namespace,
-			Subsystem: subsystem,
-			Name:      "session_duration_seconds",
-			Help:      "SSH session duration in seconds",
-			Buckets:   prometheus.DefBuckets,
-		}),
-		SessionBytesRead: promauto.NewCounter(prometheus.CounterOpts{
-			Namespace: namespace,
-			Subsystem: subsystem,
-			Name:      "session_bytes_read_total",
-			Help:      "Total bytes read from SSH sessions",
-		}),
-		SessionBytesWrite: promauto.NewCounter(prometheus.CounterOpts{
-			Namespace: namespace,
-			Subsystem: subsystem,
-			Name:      "session_bytes_written_total",
-			Help:      "Total bytes written to SSH sessions",
-		}),
-
-		// Authentication metrics
-		AuthAttemptsTotal: promauto.NewCounterVec(prometheus.CounterOpts{
-			Namespace: namespace,
-			Subsystem: subsystem,
-			Name:      "auth_attempts_total",
-			Help:      "Total number of authentication attempts",
-		}, []string{"method", "username"}),
-		AuthFailuresTotal: promauto.NewCounterVec(prometheus.CounterOpts{
-			Namespace: namespace,
-			Subsystem: subsystem,
-			Name:      "auth_failures_total",
-			Help:      "Total number of authentication failures",
-		}, []string{"method", "reason"}),
-		AuthDuration: promauto.NewHistogram(prometheus.HistogramOpts{
-			Namespace: namespace,
-			Subsystem: subsystem,
-			Name:      "auth_duration_seconds",
-			Help:      "Authentication duration in seconds",
-			Buckets:   prometheus.DefBuckets,
-		}),
-
-		// Game metrics
-		GamesStartedTotal: promauto.NewCounterVec(prometheus.CounterOpts{
-			Namespace: namespace,
-			Subsystem: subsystem,
-			Name:      "games_started_total",
-			Help:      "Total number of games started",
-		}, []string{"game_id", "game_name"}),
-		GamesActive: promauto.NewGaugeVec(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Subsystem: subsystem,
-			Name:      "games_active",
-			Help:      "Number of active game sessions",
-		}, []string{"game_id", "game_name"}),
-		GameDuration: promauto.NewHistogramVec(prometheus.HistogramOpts{
-			Namespace: namespace,
-			Subsystem: subsystem,
-			Name:      "game_duration_seconds",
-			Help:      "Game session duration in seconds",
-			Buckets:   prometheus.DefBuckets,
-		}, []string{"game_id", "game_name"}),
-		GameSessionErrors: promauto.NewCounterVec(prometheus.CounterOpts{
-			Namespace: namespace,
-			Subsystem: subsystem,
-			Name:      "game_session_errors_total",
-			Help:      "Total number of game session errors",
-		}, []string{"game_id", "error_type"}),
-
-		// Terminal metrics
-		TerminalSizeChanges: promauto.NewCounter(prometheus.CounterOpts{
-			Namespace: namespace,
-			Subsystem: subsystem,
-			Name:      "terminal_size_changes_total",
-			Help:      "Total number of terminal size changes",
-		}),
-		TerminalTypes: promauto.NewCounterVec(prometheus.CounterOpts{
-			Namespace: namespace,
-			Subsystem: subsystem,
-			Name:      "terminal_types_total",
-			Help:      "Terminal types used for connections",
-		}, []string{"type"}),
-	}
-}
+// CommonMetrics contains metrics shared by all services
 
 // ServiceMetrics contains general service health metrics
 type ServiceMetrics struct {
@@ -275,6 +119,7 @@ func NewServiceMetrics(namespace string) *ServiceMetrics {
 	}
 }
 
+
 // Registry represents a metrics registry for a service
 type Registry struct {
 	serviceName    string
@@ -284,8 +129,10 @@ type Registry struct {
 	logger         *slog.Logger
 
 	// Core metrics
-	SSH     *SSHMetrics
-	Service *ServiceMetrics
+	Service            *ServiceMetrics
+	SessionService     *SessionServiceMetrics
+	GameService        *GameServiceMetrics
+	AuthService        *AuthServiceMetrics
 
 	// HTTP server for metrics endpoint
 	server *http.Server
@@ -301,9 +148,18 @@ func NewRegistry(serviceName, version, buildTime, gitCommit string, logger *slog
 		logger:         logger,
 	}
 
-	// Initialize metrics
-	reg.SSH = NewSSHMetrics("dungeongate", "ssh")
+	// Initialize common service metrics
 	reg.Service = NewServiceMetrics("dungeongate")
+
+	// Initialize service-specific metrics based on service name
+	switch serviceName {
+	case "session-service":
+		reg.SessionService = NewSessionServiceMetrics("dungeongate")
+	case "game-service":
+		reg.GameService = NewGameServiceMetrics("dungeongate")
+	case "auth-service":
+		reg.AuthService = NewAuthServiceMetrics("dungeongate")
+	}
 
 	// Set build info
 	reg.Service.BuildInfo.WithLabelValues(version, gitCommit, buildTime).Set(1)
