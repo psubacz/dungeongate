@@ -1,5 +1,3 @@
-Welcome back to $SERVERID, $USERNAME!
-
 Authenticated User: $USERNAME
 Date: $DATE | Time: $TIME
 

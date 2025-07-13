@@ -1,15 +1,19 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/dungeongate/internal/session"
 	"github.com/dungeongate/pkg/config"
+	"github.com/dungeongate/pkg/logging"
+	"github.com/dungeongate/pkg/metrics"
 )
 
 var (
@@ -18,9 +22,31 @@ var (
 	gitCommit string = "unknown"
 )
 
+// setupLogger creates a configured slog logger
+func setupLogger(cfg *config.SessionServiceConfig) *slog.Logger {
+	// Set defaults if values are empty
+	level := "info"
+	format := "text"
+	output := "stdout"
+	
+	if cfg.Logging != nil {
+		if cfg.Logging.Level != "" {
+			level = cfg.Logging.Level
+		}
+		if cfg.Logging.Format != "" {
+			format = cfg.Logging.Format
+		}
+		if cfg.Logging.Output != "" {
+			output = cfg.Logging.Output
+		}
+	}
+	
+	return logging.NewLoggerBasic("session-service", level, format, output)
+}
+
 func main() {
 	var (
-		configFile  = flag.String("config", "configs/development/session-service.yaml", "Path to configuration file")
+		configFile  = flag.String("config", "configs/session-service.yaml", "Path to configuration file")
 		showVersion = flag.Bool("version", false, "Show version information")
 	)
 	flag.Parse()
@@ -33,16 +59,27 @@ func main() {
 		return
 	}
 
-	// Setup structured logging
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
-		Level: slog.LevelInfo,
-	}))
-
-	// Load configuration
+	// Load configuration first to setup logging properly
 	cfg, err := config.LoadSessionServiceConfig(*configFile)
 	if err != nil {
-		logger.Error("Failed to load configuration", "error", err)
+			fmt.Fprintf(os.Stderr, "Failed to load configuration: %v\n", err)
 		os.Exit(1)
+	}
+
+	// Setup structured logging based on configuration  
+	logger := setupLogger(cfg)
+
+	// Initialize metrics registry
+	metricsRegistry := metrics.NewRegistry("session-service", version, buildTime, gitCommit, logger)
+
+	// Start metrics server if enabled
+	if cfg.Metrics != nil && cfg.Metrics.Enabled {
+		go func() {
+			if err := metricsRegistry.StartMetricsServer(cfg.Metrics.Port); err != nil {
+				logger.Error("Failed to start metrics server", "error", err)
+			}
+		}()
+		logger.Info("Metrics server starting", "port", cfg.Metrics.Port)
 	}
 
 	// Convert to session config format
@@ -100,7 +137,7 @@ func main() {
 	}
 
 	// Create stateless session service
-	sessionService, err := session.New(sessionConfig, logger)
+	sessionService, err := session.New(sessionConfig, logger, metricsRegistry)
 	if err != nil {
 		logger.Error("Failed to create session service", "error", err)
 		os.Exit(1)
@@ -129,6 +166,15 @@ func main() {
 	// Shutdown the service
 	if err := sessionService.Stop(); err != nil {
 		logger.Error("Error during shutdown", "error", err)
+	}
+
+	// Stop metrics server
+	if cfg.Metrics != nil && cfg.Metrics.Enabled {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := metricsRegistry.StopMetricsServer(shutdownCtx); err != nil {
+			logger.Error("Error stopping metrics server", "error", err)
+		}
 	}
 
 	logger.Info("Session Service stopped")

@@ -3,6 +3,7 @@ package adapters
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -15,11 +16,18 @@ import (
 // NetHackAdapter handles NetHack-specific setup and configuration
 type NetHackAdapter struct {
 	config *config.GameConfig
+	logger *slog.Logger
 }
 
 // NewNetHackAdapter creates a new NetHack adapter
-func NewNetHackAdapter() *NetHackAdapter {
-	return &NetHackAdapter{}
+func NewNetHackAdapter(logger *slog.Logger) *NetHackAdapter {
+	if logger == nil {
+		// Create a default logger if none provided
+		logger = slog.Default().With("component", "nethack-adapter")
+	}
+	return &NetHackAdapter{
+		logger: logger.With("adapter", "nethack"),
+	}
 }
 
 // GetGameID returns the game ID this adapter handles
@@ -93,11 +101,11 @@ func (a *NetHackAdapter) PrepareCommand(ctx context.Context, session *domain.Gam
 	}
 	// Note: SysProcAttr will be set by PTY manager using StartWithAttrs
 
-	fmt.Printf("DEBUG: NetHack adapter prepared command:\n")
-	fmt.Printf("  Path: %s\n", gamePath)
-	fmt.Printf("  Args: %v\n", args)
-	fmt.Printf("  Working Dir: %s\n", cmd.Dir)
-	fmt.Printf("  Env additions: TERM=xterm, USER=%s\n", username)
+	a.logger.Debug("NetHack adapter prepared command",
+		"path", gamePath,
+		"args", args,
+		"working_dir", cmd.Dir,
+		"username", username)
 
 	return cmd, nil
 }
@@ -119,29 +127,29 @@ func (a *NetHackAdapter) ProcessOutput(data []byte) []byte {
 
 	// Log all NetHack output for debugging
 	if len(output) > 2 || (len(output) <= 2 && output != "\r\n") {
-		fmt.Printf("DEBUG: NetHack output [%d bytes]: %q\n", len(data), output)
+		a.logger.Debug("NetHack output", "bytes", len(data), "content", output)
 	}
 
 	// Handle common NetHack startup messages
 	if strings.Contains(output, "Shall I pick a character") {
-		fmt.Printf("DEBUG: NetHack character selection prompt detected\n")
+		a.logger.Debug("NetHack character selection prompt detected")
 	}
 
 	if strings.Contains(output, "Welcome to NetHack!") {
-		fmt.Printf("DEBUG: NetHack welcome message detected\n")
+		a.logger.Debug("NetHack welcome message detected")
 	}
 
 	if strings.Contains(output, "It is written in the Book of the Dead") {
-		fmt.Printf("DEBUG: NetHack intro text detected\n")
+		a.logger.Debug("NetHack intro text detected")
 	}
 
 	if strings.Contains(output, "restoring") {
-		fmt.Printf("DEBUG: NetHack save game restoration detected\n")
+		a.logger.Debug("NetHack save game restoration detected")
 	}
 
 	// Check for character creation prompts
 	if strings.Contains(output, "What is your name?") {
-		fmt.Printf("DEBUG: NetHack name prompt detected\n")
+		a.logger.Debug("NetHack name prompt detected")
 	}
 
 	// Return the data as-is
@@ -163,7 +171,7 @@ func (a *NetHackAdapter) IsGameReady(output []byte) bool {
 		len(outputStr) > 50 // Assume ready if we get substantial output
 
 	if ready {
-		fmt.Printf("DEBUG: NetHack appears ready, output: %q\n", outputStr)
+		a.logger.Debug("NetHack appears ready", "output", outputStr)
 	}
 
 	return ready
@@ -202,10 +210,11 @@ func (a *NetHackAdapter) SetupGameEnvironment(session *domain.GameSession) error
 		}
 	}
 
-	fmt.Printf("DEBUG: NetHack environment setup completed for user %s\n", username)
-	fmt.Printf("  Home: %s\n", homeDir)
-	fmt.Printf("  Game dir: %s/%s\n", homeDir, a.config.Paths.User.BaseDir)
-	fmt.Printf("  Created %d directories from configuration\n", len(directories))
+	a.logger.Debug("NetHack environment setup completed",
+		"username", username,
+		"home_dir", homeDir,
+		"game_dir", fmt.Sprintf("%s/%s", homeDir, a.config.Paths.User.BaseDir),
+		"directories_created", len(directories))
 	return nil
 }
 
@@ -213,6 +222,6 @@ func (a *NetHackAdapter) SetupGameEnvironment(session *domain.GameSession) error
 func (a *NetHackAdapter) CleanupGameEnvironment(session *domain.GameSession) error {
 	// For now, we don't need to clean up much
 	// In the future, we might want to backup saves, clean temp files, etc.
-	fmt.Printf("DEBUG: NetHack cleanup completed for session %s\n", session.ID().String())
+	a.logger.Debug("NetHack cleanup completed", "session_id", session.ID().String())
 	return nil
 }

@@ -51,7 +51,7 @@ func NewGameAdapterRegistry() *GameAdapterRegistry {
 	}
 
 	// Register built-in adapters (without configuration)
-	registry.Register(NewNetHackAdapter())
+	registry.Register(NewNetHackAdapter(nil))
 
 	return registry
 }
@@ -72,7 +72,7 @@ func NewGameAdapterRegistryWithConfig(gameConfigs []*config.GameConfig) (*GameAd
 
 	// Register and configure built-in adapters
 	if nethackConfig, exists := configMap["nethack"]; exists {
-		adapter := NewNetHackAdapter()
+		adapter := NewNetHackAdapter(nil)
 		if err := adapter.Configure(nethackConfig); err != nil {
 			return nil, fmt.Errorf("failed to configure NetHack adapter: %w", err)
 		}

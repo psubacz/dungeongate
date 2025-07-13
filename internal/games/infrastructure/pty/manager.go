@@ -40,6 +40,7 @@ type PTYSession struct {
 	adapter    adapters.GameAdapter
 	session    *domain.GameSession
 	onExit     ProcessExitCallback
+	logger     *slog.Logger
 }
 
 // NewPTYManager creates a new PTY manager
@@ -84,7 +85,7 @@ func (m *PTYManager) CreatePTYWithCallback(ctx context.Context, session *domain.
 	gameID := session.GameID().String()
 	adapter := m.adapters.GetAdapter(gameID)
 
-	fmt.Printf("DEBUG: Using adapter for game %s: %T\n", gameID, adapter)
+	m.logger.Debug("Using adapter for game", "game_id", gameID, "adapter_type", fmt.Sprintf("%T", adapter))
 
 	// Setup game environment using adapter
 	if err := adapter.SetupGameEnvironment(session); err != nil {
@@ -106,24 +107,24 @@ func (m *PTYManager) CreatePTYWithCallback(ctx context.Context, session *domain.
 	// Note: Using standard pty.Start instead of StartWithAttrs
 	// as it works better with NetHack on macOS
 
-	fmt.Printf("DEBUG: Starting PTY with command: %s %v\n", cmd.Path, cmd.Args)
-	fmt.Printf("DEBUG: Working directory: %s\n", cmd.Dir)
+	m.logger.Debug("Starting PTY with command", "path", cmd.Path, "args", cmd.Args)
+	m.logger.Debug("Working directory", "dir", cmd.Dir)
 
 	// Look for NetHack-specific environment variables
-	fmt.Printf("DEBUG: Total environment variables: %d\n", len(cmd.Env))
+	m.logger.Debug("Total environment variables", "count", len(cmd.Env))
 	for _, env := range cmd.Env {
 		if strings.HasPrefix(env, "TERM=") ||
 			strings.HasPrefix(env, "USER=") ||
 			strings.HasPrefix(env, "HOME=") ||
 			strings.HasPrefix(env, "NETHACK") ||
 			strings.HasPrefix(env, "HACKDIR") {
-			fmt.Printf("DEBUG: NetHack env: %s\n", env)
+			m.logger.Debug("NetHack env", "variable", env)
 		}
 	}
 
 	// Check if the binary exists
 	if _, err := os.Stat(cmd.Path); err != nil {
-		fmt.Printf("DEBUG: Binary not found at path %s: %v\n", cmd.Path, err)
+		m.logger.Debug("Binary not found at path", "path", cmd.Path, "error", err)
 		return nil, fmt.Errorf("game binary not found at %s: %w", cmd.Path, err)
 	}
 
@@ -131,26 +132,26 @@ func (m *PTYManager) CreatePTYWithCallback(ctx context.Context, session *domain.
 	startTime := time.Now()
 	ptmx, err := pty.Start(cmd)
 	if err != nil {
-		fmt.Printf("DEBUG: Failed to start PTY: %v\n", err)
+		m.logger.Error("Failed to start PTY", "error", err)
 		return nil, fmt.Errorf("failed to start PTY: %w", err)
 	}
-	fmt.Printf("DEBUG: PTY.Start took %v\n", time.Since(startTime))
+	m.logger.Debug("PTY.Start took", "duration", time.Since(startTime))
 
 	// Set the window size after starting
 	if err := pty.Setsize(ptmx, size); err != nil {
-		fmt.Printf("DEBUG: Warning: Failed to set initial PTY size: %v\n", err)
+		m.logger.Warn("Failed to set initial PTY size", "error", err)
 	}
 
-	fmt.Printf("DEBUG: PTY started successfully, PID: %d\n", cmd.Process.Pid)
+	m.logger.Debug("PTY started successfully", "pid", cmd.Process.Pid)
 
 	// Check if process is still alive immediately after starting
 	time.Sleep(100 * time.Millisecond)
 	// Send signal 0 to check if process exists without affecting it
 	err = cmd.Process.Signal(syscall.Signal(0))
 	if err != nil {
-		fmt.Printf("DEBUG: Process not found after 100ms: %v\n", err)
+		m.logger.Debug("Process not found after 100ms", "error", err)
 	} else {
-		fmt.Printf("DEBUG: Process still running after 100ms\n")
+		m.logger.Debug("Process still running after 100ms")
 	}
 
 	// Create PTY session
@@ -166,12 +167,12 @@ func (m *PTYManager) CreatePTYWithCallback(ctx context.Context, session *domain.
 		adapter:    adapter,
 		session:    session,
 		onExit:     onExit,
+		logger:     m.logger.With(slog.String("session_id", sessionID)),
 	}
 
 	// Set initial terminal size
-	fmt.Printf("DEBUG: Setting terminal size: %dx%d\n", ptySession.Size.Cols, ptySession.Size.Rows)
+	m.logger.Debug("Setting terminal size", "cols", ptySession.Size.Cols, "rows", ptySession.Size.Rows)
 	if err := pty.Setsize(ptmx, ptySession.Size); err != nil {
-		fmt.Printf("DEBUG: Failed to set PTY size: %v\n", err)
 		m.logger.Warn("Failed to set initial PTY size", "error", err, "session_id", sessionID)
 	}
 
@@ -206,17 +207,17 @@ func (m *PTYManager) GetPTY(sessionID string) (*PTYSession, error) {
 
 // ClosePTY closes a PTY session
 func (m *PTYManager) ClosePTY(sessionID string) error {
-	fmt.Printf("DEBUG: ============ ClosePTY called for session %s ============\n", sessionID)
+	m.logger.Debug("ClosePTY called for session", "session_id", sessionID)
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	session, exists := m.sessions[sessionID]
 	if !exists {
-		fmt.Printf("DEBUG: ClosePTY: PTY not found for session %s\n", sessionID)
+		m.logger.Debug("ClosePTY: PTY not found for session", "session_id", sessionID)
 		return fmt.Errorf("PTY not found for session %s", sessionID)
 	}
 
-	fmt.Printf("DEBUG: ClosePTY: Found PTY session %s, process PID: %d\n", sessionID, session.Cmd.Process.Pid)
+	m.logger.Debug("ClosePTY: Found PTY session", "session_id", sessionID, "pid", session.Cmd.Process.Pid)
 
 	// Clean up game environment using adapter
 	if err := session.adapter.CleanupGameEnvironment(session.session); err != nil {
@@ -224,13 +225,13 @@ func (m *PTYManager) ClosePTY(sessionID string) error {
 	}
 
 	// Close the session
-	fmt.Printf("DEBUG: ClosePTY: About to call session.Close() for session %s\n", sessionID)
+	m.logger.Debug("ClosePTY: About to call session.Close()", "session_id", sessionID)
 	session.Close()
 
 	// Remove from map
 	delete(m.sessions, sessionID)
 
-	fmt.Printf("DEBUG: ============ ClosePTY completed for session %s ============\n", sessionID)
+	m.logger.Debug("ClosePTY completed for session", "session_id", sessionID)
 	m.logger.Info("Closed PTY for session", "session_id", sessionID)
 
 	return nil
@@ -271,7 +272,7 @@ func (s *PTYSession) handleOutput() {
 		n, err := s.PTY.Read(buffer)
 		if err != nil {
 			if err != io.EOF {
-				fmt.Printf("DEBUG: PTY Read error for session %s: %v\n", s.SessionID, err)
+				s.logger.Debug("PTY Read error for session", "session_id", s.SessionID, "error", err)
 				select {
 				case s.errorChan <- err:
 				default:
@@ -281,7 +282,7 @@ func (s *PTYSession) handleOutput() {
 		}
 
 		if n > 0 {
-			fmt.Printf("DEBUG: PTY received %d bytes for session %s: %q\n", n, s.SessionID, string(buffer[:n]))
+			s.logger.Debug("PTY received bytes for session", "session_id", s.SessionID, "bytes", n, "data", string(buffer[:n]))
 			rawData := make([]byte, n)
 			copy(rawData, buffer[:n])
 
@@ -299,40 +300,40 @@ func (s *PTYSession) handleOutput() {
 
 // waitForExit waits for the command to exit
 func (s *PTYSession) waitForExit() {
-	fmt.Printf("DEBUG: ============ STARTING waitForExit for session %s, PID: %d ============\n", s.SessionID, s.Cmd.Process.Pid)
+	s.logger.Debug("STARTING waitForExit for session", "session_id", s.SessionID, "pid", s.Cmd.Process.Pid)
 	
 	// Check process status before waiting
 	err := s.Cmd.Process.Signal(syscall.Signal(0))
 	if err != nil {
-		fmt.Printf("DEBUG: CRITICAL: Process %d already dead before Wait(): %v\n", s.Cmd.Process.Pid, err)
+		s.logger.Error("CRITICAL: Process already dead before Wait()", "pid", s.Cmd.Process.Pid, "error", err)
 	} else {
-		fmt.Printf("DEBUG: Process %d confirmed alive and healthy before Wait()\n", s.Cmd.Process.Pid)
+		s.logger.Debug("Process confirmed alive and healthy before Wait()", "pid", s.Cmd.Process.Pid)
 	}
 	
 	// Add a small delay to see if the process gets killed immediately
-	fmt.Printf("DEBUG: Waiting 1 second to see if process stays alive...\n")
+	s.logger.Debug("Waiting 1 second to see if process stays alive...")
 	time.Sleep(1 * time.Second)
 	
 	// Check again after delay
 	err = s.Cmd.Process.Signal(syscall.Signal(0))
 	if err != nil {
-		fmt.Printf("DEBUG: CRITICAL: Process %d died during 1-second wait: %v\n", s.Cmd.Process.Pid, err)
+		s.logger.Error("CRITICAL: Process died during 1-second wait", "pid", s.Cmd.Process.Pid, "error", err)
 	} else {
-		fmt.Printf("DEBUG: Process %d still alive after 1-second delay\n", s.Cmd.Process.Pid)
+		s.logger.Debug("Process still alive after 1-second delay", "pid", s.Cmd.Process.Pid)
 	}
 	
-	fmt.Printf("DEBUG: About to call Cmd.Wait() for session %s, PID: %d\n", s.SessionID, s.Cmd.Process.Pid)
+	s.logger.Debug("About to call Cmd.Wait() for session", "session_id", s.SessionID, "pid", s.Cmd.Process.Pid)
 	err = s.Cmd.Wait()
-	fmt.Printf("DEBUG: ============ Cmd.Wait() returned for session %s, PID: %d, error: %v ============\n", s.SessionID, s.Cmd.Process.Pid, err)
+	s.logger.Debug("Cmd.Wait() returned for session", "session_id", s.SessionID, "pid", s.Cmd.Process.Pid, "error", err)
 
 	var exitCode *int
 	if err != nil {
-		fmt.Printf("DEBUG: CRITICAL: Process exited with error for session %s: %v\n", s.SessionID, err)
+		s.logger.Error("CRITICAL: Process exited with error for session", "session_id", s.SessionID, "error", err)
 		// Check if it's an exec.ExitError to get more details
 		if exitErr, ok := err.(*exec.ExitError); ok {
-			fmt.Printf("DEBUG: Exit code: %d, System: %v\n", exitErr.ExitCode(), exitErr.Sys())
+			s.logger.Debug("Exit code", "code", exitErr.ExitCode(), "system", exitErr.Sys())
 			if exitErr.ExitCode() == -1 {
-				fmt.Printf("DEBUG: CRITICAL: Process was killed by external signal (SIGKILL)\n")
+				s.logger.Error("CRITICAL: Process was killed by external signal (SIGKILL)")
 			}
 			code := exitErr.ExitCode()
 			exitCode = &code
@@ -342,18 +343,18 @@ func (s *PTYSession) waitForExit() {
 		default:
 		}
 	} else {
-		fmt.Printf("DEBUG: Process exited successfully for session %s\n", s.SessionID)
+		s.logger.Debug("Process exited successfully for session", "session_id", s.SessionID)
 		code := 0
 		exitCode = &code
 	}
 
 	// Call the exit callback if provided
 	if s.onExit != nil {
-		fmt.Printf("DEBUG: Calling onExit callback for session %s\n", s.SessionID)
+		s.logger.Debug("Calling onExit callback for session", "session_id", s.SessionID)
 		s.onExit(s.session, exitCode, err)
 	}
 
-	fmt.Printf("DEBUG: ============ waitForExit completed for session %s, process state: %v ============\n", s.SessionID, s.Cmd.ProcessState)
+	s.logger.Debug("waitForExit completed for session", "session_id", s.SessionID, "process_state", s.Cmd.ProcessState)
 }
 
 // SendInput sends input to the PTY
@@ -389,20 +390,20 @@ func (s *PTYSession) Resize(rows, cols uint16) error {
 // Close closes the PTY session WITHOUT terminating the process
 // This allows games like NetHack to keep running for reconnection
 func (s *PTYSession) Close() {
-	fmt.Printf("DEBUG: Close() called for session %s\n", s.SessionID)
+	s.logger.Debug("Close() called for session", "session_id", s.SessionID)
 	
 	s.closeOnce.Do(func() {
-		fmt.Printf("DEBUG: Executing Close() for session %s (first time)\n", s.SessionID)
+		s.logger.Debug("Executing Close() for session (first time)", "session_id", s.SessionID)
 		close(s.closeChan)
 
 		// FOR INTERACTIVE GAMES LIKE NETHACK: Do NOT terminate the process
 		// The process should continue running even if streams disconnect
 		// This enables reconnection and session persistence
 		if s.Cmd != nil && s.Cmd.Process != nil && s.Cmd.ProcessState == nil {
-			fmt.Printf("DEBUG: Keeping process %d alive for session %s (interactive game)\n", s.Cmd.Process.Pid, s.SessionID)
-			fmt.Printf("DEBUG: Process will continue running for potential reconnection\n")
+			s.logger.Debug("Keeping process alive for session (interactive game)", "pid", s.Cmd.Process.Pid, "session_id", s.SessionID)
+			s.logger.Debug("Process will continue running for potential reconnection")
 		} else if s.Cmd != nil && s.Cmd.ProcessState != nil {
-			fmt.Printf("DEBUG: Process already exited for session %s with state: %v\n", s.SessionID, s.Cmd.ProcessState)
+			s.logger.Debug("Process already exited for session", "session_id", s.SessionID, "state", s.Cmd.ProcessState)
 		}
 
 		// Close channels but do NOT close the PTY file descriptor yet
@@ -411,16 +412,16 @@ func (s *PTYSession) Close() {
 		close(s.outputChan)
 		close(s.errorChan)
 		
-		fmt.Printf("DEBUG: Close() completed for session %s - process and PTY kept alive\n", s.SessionID)
+		s.logger.Debug("Close() completed for session - process and PTY kept alive", "session_id", s.SessionID)
 	})
 }
 
 // ForceTerminate forcefully terminates the game process (for explicit user quit)
 func (s *PTYSession) ForceTerminate() {
-	fmt.Printf("DEBUG: ForceTerminate() called for session %s\n", s.SessionID)
+	s.logger.Debug("ForceTerminate() called for session", "session_id", s.SessionID)
 	
 	if s.Cmd != nil && s.Cmd.Process != nil && s.Cmd.ProcessState == nil {
-		fmt.Printf("DEBUG: Force terminating process %d for session %s\n", s.Cmd.Process.Pid, s.SessionID)
+		s.logger.Debug("Force terminating process for session", "pid", s.Cmd.Process.Pid, "session_id", s.SessionID)
 		
 		// Send SIGTERM first
 		s.Cmd.Process.Signal(syscall.SIGTERM)
@@ -430,7 +431,7 @@ func (s *PTYSession) ForceTerminate() {
 		
 		// Force kill if still running
 		if s.Cmd.ProcessState == nil {
-			fmt.Printf("DEBUG: Sending SIGKILL to process %d for session %s\n", s.Cmd.Process.Pid, s.SessionID)
+			s.logger.Debug("Sending SIGKILL to process for session", "pid", s.Cmd.Process.Pid, "session_id", s.SessionID)
 			s.Cmd.Process.Signal(syscall.SIGKILL)
 		}
 	}
@@ -461,7 +462,7 @@ func (s *PTYSession) sendInitialInput() {
 
 	// Get initial input from adapter
 	if initialInput := s.adapter.GetInitialInput(); initialInput != nil {
-		fmt.Printf("DEBUG: Sending initial input for session %s: %q\n", s.SessionID, string(initialInput))
+		s.logger.Debug("Sending initial input for session", "session_id", s.SessionID, "input", string(initialInput))
 		s.SendInput(initialInput)
 	}
 }

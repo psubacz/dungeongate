@@ -66,9 +66,9 @@ type Config struct {
 	// Menu configuration
 	Menu struct {
 		Banners struct {
-			MainAnon  string `yaml:"main_anon" default:"./banners/main_anon.txt"`
-			MainUser  string `yaml:"main_user" default:"./banners/main_user.txt"`
-			WatchMenu string `yaml:"watch_menu" default:"./banners/watch_menu.txt"`
+			MainAnon  string `yaml:"main_anon" default:"./assets/banners/main_anon.txt"`
+			MainUser  string `yaml:"main_user" default:"./assets/banners/main_user.txt"`
+			WatchMenu string `yaml:"watch_menu" default:"./assets/banners/watch_menu.txt"`
 		} `yaml:"banners"`
 	} `yaml:"menu"`
 }

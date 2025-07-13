@@ -1,0 +1,282 @@
+# ============================================================================
+# DungeonGate Common Development Configuration
+# ============================================================================
+# This file contains shared configuration settings used across all services
+# in the development environment. Service-specific configurations inherit
+# from this file and can override these defaults as needed.
+
+# Configuration file format version
+version: "1.0"
+
+# ============================================================================
+# Shared Database Configuration
+# ============================================================================
+# All services share the same database in development for data consistency
+# and simplified development workflow.
+database:
+  # Database mode: "embedded" for SQLite, "external" for PostgreSQL/MySQL
+  mode: "embedded"
+  
+  # Database type: sqlite, postgresql, mysql
+  type: "sqlite"
+  
+  # Embedded Database Configuration (SQLite for development/small deployments)
+  embedded:
+    # Database engine type
+    type: "sqlite"
+    
+    # Path to SQLite database file (shared with other services)
+    path: "./data/sqlite/dungeongate-dev.db"
+    
+    # Directory containing database migration files
+    migration_path: "./migrations"
+    
+    # Enable automatic database backups
+    backup_enabled: false
+    
+    # SQLite Write-Ahead Logging mode (better concurrency)
+    wal_mode: true
+    
+    # Database caching configuration
+    cache:
+      # Enable query result caching
+      enabled: true
+      
+      # Cache size in MB
+      size: 64
+      
+      # Time-to-live for cached entries
+      ttl: "1h"
+      
+      # Cache type: memory, redis
+      type: "memory"
+  
+  # External Database Configuration (PostgreSQL/MySQL for production)
+  external:
+    # Database type for external mode
+    type: "postgresql"
+    
+    # Writer database endpoint (primary/master database)
+    writer_endpoint: "localhost:5432"
+    
+    # Whether to use writer endpoint for read operations
+    reader_use_writer: true
+    
+    # Reader database endpoint (replica/slave)
+    reader_endpoint: "localhost:5432"
+    
+    # Database name to connect to
+    database: "postgres"
+    
+    # Database username
+    username: "postgres"
+    
+    # Database password (use environment variables in production)
+    password: "mysecretpassword"
+    
+    # SSL mode: disable, require, verify-ca, verify-full
+    ssl_mode: "disable"
+    
+    # Maximum total database connections
+    max_connections: 25
+    
+    # Maximum idle connections in pool
+    max_idle_conns: 10
+    
+    # Maximum lifetime for database connections
+    conn_max_lifetime: "1h"
+    
+    # Maximum connections for read operations
+    reader_max_connections: 15
+    
+    # Maximum idle connections for readers
+    reader_max_idle_conns: 5
+    
+    # Path to database migration files
+    migration_path: "./migrations"
+    
+    # Database schema name
+    schema: "public"
+    
+    # Database failover configuration
+    failover:
+      # Enable automatic failover on connection issues
+      enabled: true
+      
+      # How often to check database health
+      health_check_interval: "30s"
+      
+      # Timeout before triggering failover
+      failover_timeout: "10s"
+      
+      # Retry interval for failed connections
+      retry_interval: "5s"
+      
+      # Maximum retry attempts before giving up
+      max_retries: 3
+      
+      # Fall back to writer if reader fails
+      reader_to_writer_fallback: true
+  
+  # Common database settings
+  settings:
+    # Log all SQL queries (disable in production for security)
+    log_queries: true
+    
+    # Database operation timeout
+    timeout: "30s"
+    
+    # Number of retry attempts for failed operations
+    retry_attempts: 3
+    
+    # Retry delay between attempts
+    retry_delay: "1s"
+    
+    # Query timeout for individual operations
+    query_timeout: "10s"
+  
+  # Legacy database pool configuration
+  pool:
+    # Deprecated: Use external.max_connections instead
+    max_connections: 25
+    
+    # Deprecated: Use external.max_idle_conns instead
+    max_idle_conns: 10
+    
+    # Deprecated: Use external.conn_max_lifetime instead
+    max_lifetime: "1h"
+
+# ============================================================================
+# Shared Logging Configuration
+# ============================================================================
+# Base logging configuration that all services inherit from.
+# Services can override specific settings like filename and identifier.
+logging:
+  # Log level: debug, info, warn, error
+  level: "debug"
+  
+  # Log format: text (human readable), json (machine readable)
+  format: "text"
+  
+  # Log output: stdout, stderr, file, journald
+  output: "stdout"
+  
+  # File logging configuration (when output is "file")
+  file:
+    # Directory for log files
+    directory: "./logs"
+    
+    # Log file name pattern (services should override this)
+    filename: "service.log"
+    
+    # Maximum size of each log file before rotation
+    max_size: "100MB"
+    
+    # Maximum number of old log files to retain
+    max_files: 10
+    
+    # Maximum age of log files before deletion
+    max_age: "30d"
+    
+    # Compress rotated log files
+    compress: true
+  
+  # Journald configuration (when output is "journald")
+  journald:
+    # Service identifier for journald (services should override this)
+    identifier: "dungeongate-service"
+    
+    # Additional fields to include in journald logs
+    fields:
+      service: "generic-service"
+      environment: "development"
+      version: "dev"
+
+# ============================================================================
+# Shared Health Check Configuration
+# ============================================================================
+# Common health check settings for all services
+health_check:
+  # Enable health check endpoint
+  enabled: true
+  
+  # Health check endpoint path
+  path: "/health"
+  
+  # Health check timeout
+  timeout: "5s"
+  
+  # Health check interval for internal monitoring
+  interval: "30s"
+
+# ============================================================================
+# Shared Security Configuration
+# ============================================================================
+# Base security settings for development environment
+security:
+  # Rate limiting configuration
+  rate_limiting:
+    # Enable rate limiting (disabled in development)
+    enabled: false
+    
+    # Maximum requests per window
+    max_requests: 100
+    
+    # Time window for rate limiting
+    window: "1m"
+    
+    # Skip rate limiting for localhost
+    skip_localhost: true
+  
+  # Brute force protection
+  brute_force_protection:
+    # Enable brute force protection (disabled in development)
+    enabled: false
+    
+    # Maximum failed attempts before temporary lockout
+    max_attempts: 5
+    
+    # Lockout duration after max attempts
+    lockout_duration: "15m"
+    
+    # Reset failed attempts counter after this duration
+    reset_after: "1h"
+
+# ============================================================================
+# Shared Server Configuration
+# ============================================================================
+# Common server settings
+server:
+  # Default host for all services
+  host: "localhost"
+  
+  # Default timeout for server operations
+  timeout: "30s"
+  
+  # Default read timeout
+  read_timeout: "10s"
+  
+  # Default write timeout
+  write_timeout: "10s"
+  
+  # Default idle timeout
+  idle_timeout: "60s"
+  
+  # Enable graceful shutdown
+  graceful_shutdown: true
+  
+  # Graceful shutdown timeout
+  shutdown_timeout: "30s"
+
+# ============================================================================
+# Environment Metadata
+# ============================================================================
+# Information about the current environment
+environment:
+  name: "development"
+  description: "Local development environment"
+  debug: true
+  monitoring:
+    enabled: false
+  metrics:
+    enabled: false

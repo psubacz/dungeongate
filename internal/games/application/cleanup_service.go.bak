@@ -73,7 +73,7 @@ func (s *CleanupService) CleanupOrphanedProcesses(ctx context.Context) error {
 		if processInfo.PID != 0 {
 			// Check if process is still running
 			if !s.isProcessRunning(processInfo.PID) {
-				s.logger.Info("Found orphaned session %s with dead process %d",
+				s.logger.Printf("Found orphaned session %s with dead process %d",
 					session.ID().String(), processInfo.PID)
 
 				// Mark session as crashed
@@ -82,7 +82,7 @@ func (s *CleanupService) CleanupOrphanedProcesses(ctx context.Context) error {
 				// Update session in database
 				err := s.sessionRepo.Save(ctx, session)
 				if err != nil {
-					s.logger.Info("Failed to update orphaned session %s: %v",
+					s.logger.Printf("Failed to update orphaned session %s: %v",
 						session.ID().String(), err)
 				}
 
@@ -107,7 +107,7 @@ func (s *CleanupService) CleanupOrphanedProcesses(ctx context.Context) error {
 	}
 
 	if orphanedCount > 0 {
-		s.logger.Info("Cleaned up %d orphaned sessions", orphanedCount)
+		s.logger.Printf("Cleaned up %d orphaned sessions", orphanedCount)
 	}
 
 	return nil
@@ -135,7 +135,7 @@ func (s *CleanupService) CleanupGameData(ctx context.Context, sessionID uuid.UUI
 	// Ensure all saves are properly stored before cleanup
 	for _, save := range saves {
 		if !save.Verify() {
-			s.logger.Info("Warning: Save %s failed verification before cleanup", save.ID().String())
+			s.logger.Printf("Warning: Save %s failed verification before cleanup", save.ID().String())
 			save.MarkCorrupt()
 			s.saveRepo.Save(ctx, save)
 		}
@@ -144,7 +144,7 @@ func (s *CleanupService) CleanupGameData(ctx context.Context, sessionID uuid.UUI
 	// Clean up temporary session directory
 	sessionTempDir := filepath.Join(gameDataPath, "sessions", sessionID.String())
 	if _, err := os.Stat(sessionTempDir); err == nil {
-		s.logger.Info("Removing session temp directory: %s", sessionTempDir)
+		s.logger.Printf("Removing session temp directory: %s", sessionTempDir)
 		err = os.RemoveAll(sessionTempDir)
 		if err != nil {
 			return fmt.Errorf("failed to remove session temp directory: %w", err)
@@ -204,7 +204,7 @@ func (s *CleanupService) BackupAndCleanupOldSaves(ctx context.Context, userID in
 		// Copy file to backup location
 		err := s.copyFile(save.FilePath(), backupPath)
 		if err != nil {
-			s.logger.Info("Failed to create backup for save %s: %v", save.ID().String(), err)
+			s.logger.Printf("Failed to create backup for save %s: %v", save.ID().String(), err)
 			continue
 		}
 
@@ -212,17 +212,17 @@ func (s *CleanupService) BackupAndCleanupOldSaves(ctx context.Context, userID in
 		backup := save.CreateBackup(backupID, backupPath)
 		err = s.saveRepo.SaveBackup(ctx, save.ID(), backup)
 		if err != nil {
-			s.logger.Info("Failed to record backup for save %s: %v", save.ID().String(), err)
+			s.logger.Printf("Failed to record backup for save %s: %v", save.ID().String(), err)
 		}
 
 		// Mark save as archived
 		save.Archive()
 		err = s.saveRepo.Save(ctx, save)
 		if err != nil {
-			s.logger.Info("Failed to archive save %s: %v", save.ID().String(), err)
+			s.logger.Printf("Failed to archive save %s: %v", save.ID().String(), err)
 		}
 
-		s.logger.Info("Archived old save %s for user %d, game %d",
+		s.logger.Printf("Archived old save %s for user %d, game %d",
 			save.ID().String(), userID, gameID)
 	}
 
@@ -234,24 +234,24 @@ func (s *CleanupService) StartPeriodicCleanup(ctx context.Context, interval time
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
-	s.logger.Info("Starting periodic cleanup every %v", interval)
+	s.logger.Printf("Starting periodic cleanup every %v", interval)
 
 	for {
 		select {
 		case <-ctx.Done():
-			s.logger.Info("Stopping periodic cleanup")
+			s.logger.Println("Stopping periodic cleanup")
 			return
 		case <-ticker.C:
 			// Cleanup expired sessions (older than 24 hours)
 			err := s.CleanupExpiredSessions(ctx, 24*time.Hour)
 			if err != nil {
-				s.logger.Info("Error during session cleanup: %v", err)
+				s.logger.Printf("Error during session cleanup: %v", err)
 			}
 
 			// Find and cleanup orphaned processes
 			err = s.CleanupOrphanedProcesses(ctx)
 			if err != nil {
-				s.logger.Info("Error during orphaned process cleanup: %v", err)
+				s.logger.Printf("Error during orphaned process cleanup: %v", err)
 			}
 		}
 	}

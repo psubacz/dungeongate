@@ -6,8 +6,6 @@ import (
 	"encoding/hex"
 	"flag"
 	"fmt"
-	"log"
-	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -21,6 +19,8 @@ import (
 	"github.com/dungeongate/pkg/config"
 	"github.com/dungeongate/pkg/database"
 	"github.com/dungeongate/pkg/encryption"
+	"github.com/dungeongate/pkg/logging"
+	"github.com/dungeongate/pkg/metrics"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 )
@@ -31,9 +31,10 @@ var (
 	gitCommit string = "unknown"
 )
 
+
 func main() {
 	var (
-		configFile  = flag.String("config", "configs/development/auth-service.yaml", "Path to configuration file")
+		configFile  = flag.String("config", "configs/auth-service.yaml", "Path to configuration file")
 		showVersion = flag.Bool("version", false, "Show version information")
 	)
 	flag.Parse()
@@ -46,16 +47,35 @@ func main() {
 		return
 	}
 
-	// Load configuration
+	// Load configuration first to get logging config
 	cfg, err := config.LoadUserServiceConfig(*configFile)
 	if err != nil {
-		log.Fatalf("Failed to load configuration: %v", err)
+		fmt.Fprintf(os.Stderr, "Failed to load configuration: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Initialize standardized logging
+	logger := logging.NewLoggerBasic("auth-service", cfg.Logging.Level, cfg.Logging.Format, cfg.Logging.Output)
+	logger.Info("Starting DungeonGate Auth Service")
+
+	// Initialize metrics registry
+	metricsRegistry := metrics.NewRegistry("auth-service", version, buildTime, gitCommit, logger)
+
+	// Start metrics server if enabled
+	if cfg.Metrics != nil && cfg.Metrics.Enabled {
+		go func() {
+			if err := metricsRegistry.StartMetricsServer(cfg.Metrics.Port); err != nil {
+				logger.Error("Failed to start metrics server", "error", err)
+			}
+		}()
+		logger.Info("Metrics server starting", "port", cfg.Metrics.Port)
 	}
 
 	// Setup database
 	db, err := database.NewConnection(cfg.Database)
 	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
+		logger.Error("Failed to connect to database", "error", err)
+		os.Exit(1)
 	}
 	defer db.Close()
 
@@ -66,31 +86,30 @@ func main() {
 		KeyRotationInterval: "24h",
 	})
 	if err != nil {
-		log.Fatalf("Failed to initialize encryption: %v", err)
+		logger.Error("Failed to initialize encryption", "error", err)
+		os.Exit(1)
 	}
 
 	// Setup user service
 	sessionCfg := config.GetDefaultDevelopmentConfig()
 	userService, err := user.NewService(db, cfg, sessionCfg)
 	if err != nil {
-		log.Fatalf("Failed to create user service: %v", err)
+		logger.Error("Failed to create user service", "error", err)
+		os.Exit(1)
 	}
 
 	// Generate JWT secret if not provided
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
-		log.Println("JWT_SECRET not set, generating random secret (not recommended for production)")
+		logger.Info("JWT_SECRET not set, generating random secret (not recommended for production)")
 		secretBytes := make([]byte, 32)
 		if _, err := rand.Read(secretBytes); err != nil {
-			log.Fatalf("Failed to generate JWT secret: %v", err)
+			logger.Error("Failed to generate JWT secret", "error", err)
+			os.Exit(1)
 		}
 		jwtSecret = hex.EncodeToString(secretBytes)
 	}
 
-	// Setup logger
-	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
-		Level: slog.LevelInfo,
-	}))
 
 	// Setup auth service
 	authConfig := &auth.Config{
@@ -108,8 +127,11 @@ func main() {
 	_, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Setup gRPC server
-	grpcServer := grpc.NewServer()
+	// Setup gRPC server with metrics interceptors
+	grpcServer := grpc.NewServer(
+		grpc.UnaryInterceptor(metricsRegistry.UnaryServerInterceptor()),
+		grpc.StreamInterceptor(metricsRegistry.StreamServerInterceptor()),
+	)
 	proto.RegisterAuthServiceServer(grpcServer, authService)
 	reflection.Register(grpcServer)
 
@@ -124,13 +146,14 @@ func main() {
 	// Start gRPC server
 	grpcListener, err := net.Listen("tcp", fmt.Sprintf(":%d", grpcPort))
 	if err != nil {
-		log.Fatalf("Failed to listen on port %d: %v", grpcPort, err)
+		logger.Error("Failed to listen on gRPC port", "port", grpcPort, "error", err)
+		os.Exit(1)
 	}
 
 	go func() {
-		log.Printf("Starting Auth Service gRPC server on port %d", grpcPort)
+		logger.Info("Starting Auth Service gRPC server", "port", grpcPort)
 		if err := grpcServer.Serve(grpcListener); err != nil {
-			log.Printf("gRPC server error: %v", err)
+			logger.Info("gRPC server error", "error", err)
 		}
 	}()
 
@@ -141,23 +164,26 @@ func main() {
 	}
 
 	// Setup HTTP server for health checks
+	mux := http.NewServeMux()
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprintf(w, `{"status":"healthy","service":"auth-service","version":"%s"}`, version)
+	})
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotImplemented)
+		fmt.Fprintf(w, "Auth Service - gRPC API available on port %d", grpcPort)
+	})
+
 	httpServer := &http.Server{
-		Addr: fmt.Sprintf(":%d", httpPort),
-		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if r.URL.Path == "/health" {
-				w.WriteHeader(http.StatusOK)
-				fmt.Fprintf(w, "Auth Service OK")
-				return
-			}
-			w.WriteHeader(http.StatusNotImplemented)
-			fmt.Fprintf(w, "Auth Service - gRPC API available on port %d", grpcPort)
-		}),
+		Addr:    fmt.Sprintf(":%d", httpPort),
+		Handler: metricsRegistry.HTTPMiddleware()(mux),
 	}
 
 	go func() {
-		log.Printf("Starting Auth Service HTTP server on port %d", httpPort)
+		logger.Info("Starting Auth Service HTTP server", "port", httpPort)
 		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Printf("HTTP server error: %v", err)
+			logger.Info("HTTP server error", "error", err)
 		}
 	}()
 
@@ -166,7 +192,7 @@ func main() {
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
 	<-sigChan
-	log.Println("Shutting down gracefully...")
+	logger.Info("Shutting down gracefully...")
 
 	// Shutdown gRPC server
 	grpcServer.GracefulStop()
@@ -176,11 +202,18 @@ func main() {
 	defer shutdownCancel()
 
 	if err := httpServer.Shutdown(shutdownCtx); err != nil {
-		log.Printf("HTTP server shutdown error: %v", err)
+		logger.Info("HTTP server shutdown error", "error", err)
+	}
+
+	// Stop metrics server
+	if cfg.Metrics != nil && cfg.Metrics.Enabled {
+		if err := metricsRegistry.StopMetricsServer(shutdownCtx); err != nil {
+			logger.Error("Error stopping metrics server", "error", err)
+		}
 	}
 
 	// Cancel context
 	cancel()
 
-	log.Println("Auth Service stopped")
+	logger.Info("Auth Service stopped")
 }

@@ -9,22 +9,22 @@ DungeonGate is a microservices-based platform for hosting terminal games like Ne
 ## Architecture
 
 ### Microservices Design
-- **Session Service** (port 8083/9093): SSH server, PTY management, terminal sessions
-- **Auth Service** (port 8081/8082): Centralized authentication, authorization, and user management via gRPC
-- **Game Service** (port 8085/50051): Game management, configuration, and session orchestration
+- **Session Service** (ports 8083/9093/2222): SSH server, PTY management, terminal sessions
+- **Auth Service** (ports 8081/8082): Centralized authentication, authorization, and user management via gRPC
+- **Game Service** (ports 8085/50051): Game management, configuration, and session orchestration
 
 ### API Structure
 Protocol Buffers with versioned APIs:
-- **Auth API**: `api/proto/auth/auth_service.proto` → `pkg/api/auth/v1/`
-- **Games API v1**: `api/proto/games/game_service_v1.proto` → `pkg/api/games/v1/`
-- **Games API v2**: `api/proto/games/game_service_v2.proto` → `pkg/api/games/v2/`
+- **Auth API v1**: `api/proto/auth/auth_service.proto` → `pkg/api/auth/v1/`
+- **Games API v1**: `api/proto/games/game_service_v1.proto` → `pkg/api/games/v1/` (legacy)
+- **Games API v2**: `api/proto/games/game_service_v2.proto` → `pkg/api/games/v2/` (current)
 
 ### Key Directories
 - `cmd/` - Service entry points (session-service, auth-service, game-service)
 - `internal/` - Business logic organized by domain
-- `pkg/` - Shared packages (config, database, encryption, ttyrec)
+- `pkg/` - Shared packages (config, database, encryption, ttyrec, logging, metrics)
 - `api/proto/` - Protocol Buffer definitions with versioned APIs
-- `configs/` - Environment-specific configurations
+- `configs/` - Service-specific configurations
 - `migrations/` - Database migrations
 
 ## Development Commands
@@ -40,7 +40,7 @@ Protocol Buffers with versioned APIs:
 - `make build-all` - Build all service binaries
 
 ### Running Services
-- `make run-session` - Run session service (SSH on port 2222, HTTP on 8083)
+- `make run-session` - Run session service (SSH on port 2222, HTTP on 8083, gRPC on 9093)
 - `make run-auth` - Run auth service (gRPC on 8082, HTTP on 8081)
 - `make run-game` - Run game service (gRPC on 50051, HTTP on 8085)
 - `make run-all` - Run all services with proper startup sequence
@@ -85,14 +85,15 @@ Protocol Buffers with versioned APIs:
 - Database abstraction with dual-mode support (SQLite/PostgreSQL)
 - gRPC communication between services
 - Comprehensive configuration management
-- Versioned Protocol Buffer APIs
+- Versioned Protocol Buffer APIs (Auth v1, Games v2)
+- **Prometheus Metrics**: Comprehensive metrics collection across all services
+- **Structured Logging**: Standardized logging framework with context correlation
 
 ### 🚧 In Progress
-- Comprehensive test suite for Session Service
 - Game service domain implementation
 - Save file management
-- Game configuration and path management
 - Session lifecycle management
+- Advanced game configuration and path management
 
 ### 📋 Planned Features
 - NetHack integration with event broadcasting
@@ -107,7 +108,7 @@ The project supports dual-mode database operation:
 - **Production**: PostgreSQL/MySQL with read/write endpoint separation
 
 ### Configuration
-- **Development config**: `./configs/development/local.yaml`
+- **Service configs**: Individual YAML files per service inherit from `./configs/common.yaml`
 - All services share the same database for consistency
 - Database connection pooling and failover support
 
@@ -121,13 +122,37 @@ The project supports dual-mode database operation:
 
 ## Configuration System
 
-- **YAML-based**: Environment-specific configs with validation
-- **Service-specific**: Each service has its own configuration file
+- **YAML-based**: Service-specific configs with inheritance from common.yaml
 - **Environment Variables**: Support for templating and overrides
 - **Locations**:
-  - `configs/development/` - Full development configurations
-  - `configs/production/` - Production templates
-  - `configs/testing/` - Database testing configurations
+  - `configs/session-service.yaml` - Session service configuration
+  - `configs/auth-service.yaml` - Auth service configuration
+  - `configs/game-service.yaml` - Game service configuration
+  - `configs/common.yaml` - Shared configuration base
+
+## Service Communication
+
+### Port Assignment
+**Session Service:**
+- SSH: 2222
+- HTTP API: 8083
+- gRPC: 9093
+- Metrics: 8085
+
+**Auth Service:**
+- HTTP API: 8081
+- gRPC: 8082
+- Metrics: 9091
+
+**Game Service:**
+- HTTP API: 8085
+- gRPC: 50051
+- Metrics: 9090
+
+### gRPC APIs
+- **Auth Service**: Uses Auth API v1 for authentication operations
+- **Game Service**: Uses Games API v2 for game management and session orchestration
+- **Session Service**: Consumer of both Auth v1 and Games v2 APIs
 
 ## Testing the Platform
 
@@ -137,7 +162,7 @@ The project follows Go standard layout with tests organized as follows:
 
 - **Unit Tests**: Co-located with source files (`*_test.go`)
 - **Integration Tests**: In `/test` directory for larger test suites
-- **Test Data**: Uses `/test/data` or `/test/testdata` for fixtures
+- **Test Data**: Uses `/test-data` directory for fixtures
 - **Mock Objects**: Extensive use of `testify/mock` for dependency isolation
 
 ### Core Test Commands
@@ -226,7 +251,7 @@ When a player dies in NetHack:
 ## Dependencies
 
 ### Core Technologies
-- Go 1.24+ with modern toolchain
+- Go 1.24.0+ with modern toolchain
 - gRPC for inter-service communication
 - Protocol Buffers for API definitions
 - SQLite (dev) / PostgreSQL (prod) databases
@@ -239,6 +264,8 @@ When a player dies in NetHack:
 - `github.com/lib/pq` - PostgreSQL driver
 - `github.com/mattn/go-sqlite3` - SQLite driver
 - `gopkg.in/yaml.v3` - YAML configuration parsing
+- `github.com/prometheus/client_golang` - Metrics collection
+- `github.com/stretchr/testify` - Testing framework
 
 ### Development Tools
 - `air` - Live reload for Go applications
@@ -250,14 +277,35 @@ When a player dies in NetHack:
 ### Docker Commands
 - `make docker-build-session` - Build session service image
 - `make docker-build-auth` - Build auth service image
+- `make docker-build-game` - Build game service image
 - `make docker-build-all` - Build all Docker images
 - `make docker-compose-up` - Start all services with docker-compose
-- `make docker-compose-dev` - Start development environment
+- `make docker-compose-down` - Stop and remove all containers
 
 ### Database Management
 - `make db-migrate` - Run database migrations
 - `make db-migrate-down` - Rollback migrations
 - `make db-reset` - Reset database (DESTRUCTIVE)
+
+## Observability
+
+### Metrics Collection
+All services implement comprehensive Prometheus metrics:
+- **Session Service**: SSH connections, terminal operations, session lifecycle
+- **Auth Service**: Authentication attempts, token operations, security events
+- **Game Service**: Game instances, resource usage, session duration
+
+**Metrics Endpoints:**
+- Session Service: `:8085/metrics`
+- Auth Service: `:9091/metrics`
+- Game Service: `:9090/metrics`
+
+### Structured Logging
+Standardized logging using `pkg/logging` with:
+- Context correlation (session_id, user_id, etc.)
+- Structured fields for searchability
+- Service-specific log files in `logs/` directory
+- Support for file rotation and journald output
 
 ## Development Notes
 
@@ -269,10 +317,37 @@ When a player dies in NetHack:
   - Functions prefixed with `_` are unused/stubbed
   - Functions prefixed with `__` are deprecated
   - **NEVER hardcode paths in the code** - all paths must come from configuration files or environment variables
-  - Game adapters should read configuration from `configs/development/game-service.yaml` 
+  - Game adapters should read configuration from `configs/game-service.yaml` 
   - Use configuration injection rather than hardcoded values
 - **Security**: JWT tokens, rate limiting, input validation
 - **Terminal Recording**: TTY recording for session playback and spectating
+- **Observability**: All new features MUST include metrics and structured logging
+
+### Logging Standards
+
+All new features and redesigned components MUST implement comprehensive structured logging using the standardized logging framework from `pkg/logging`.
+
+#### Mandatory Logging Requirements
+
+**✅ Required for ALL new features:**
+- **Structured Logging**: Use `*slog.Logger` from `pkg/logging` package
+- **Context Correlation**: Include request/session/user IDs for traceability
+- **Error Logging**: Log all errors with context and stack traces where appropriate
+- **Performance Logging**: Log operation durations for critical paths
+- **Security Events**: Log authentication, authorization, and security-related events
+
+### Metrics Standards
+
+All new features and redesigned components MUST implement Prometheus metrics for monitoring and alerting.
+
+#### Mandatory Metrics Requirements
+
+**✅ Required for ALL new features:**
+- **Operation Counters**: Track total operations with success/failure labels
+- **Duration Histograms**: Measure operation performance with appropriate buckets
+- **Active Gauge Metrics**: Track concurrent operations and resource usage
+- **Error Rate Tracking**: Count and categorize errors for alerting
+- **Business Metrics**: Track domain-specific KPIs and user behavior
 
 ## Version Information
 

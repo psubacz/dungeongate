@@ -11,12 +11,16 @@ import (
 	"github.com/dungeongate/internal/session/connection"
 	"github.com/dungeongate/internal/session/server"
 	"github.com/dungeongate/internal/session/streaming"
+	"github.com/dungeongate/pkg/metrics"
 )
 
 // Service represents the stateless Session Service
 type Service struct {
 	config *Config
 	logger *slog.Logger
+
+	// Metrics
+	metricsRegistry *metrics.Registry
 
 	// Clients for external services
 	gameClient *client.GameClient
@@ -38,7 +42,7 @@ type Service struct {
 }
 
 // New creates a new stateless Session Service instance
-func New(cfg *Config, logger *slog.Logger) (*Service, error) {
+func New(cfg *Config, logger *slog.Logger, metricsRegistry *metrics.Registry) (*Service, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	// Initialize service clients
@@ -93,6 +97,7 @@ func New(cfg *Config, logger *slog.Logger) (*Service, error) {
 	return &Service{
 		config:            cfg,
 		logger:            logger,
+		metricsRegistry:   metricsRegistry,
 		gameClient:        gameClient,
 		authClient:        authClient,
 		connectionManager: connectionManager,

@@ -270,7 +270,7 @@ Choose an option:
 
 func TestShowUserMenu_Success(t *testing.T) {
 	bannerConfig := &banner.BannerConfig{
-		MainUser: "/Users/caboose/dungeongate/configs/development/banners/main_user.txt",
+		MainUser: "/Users/caboose/dungeongate/assets/banners/main_user.txt",
 	}
 	bannerManager := banner.NewBannerManager(bannerConfig)
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
@@ -324,7 +324,7 @@ func TestShowUserMenu_AllChoices(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run("input_"+tc.input, func(t *testing.T) {
 			bannerConfig := &banner.BannerConfig{
-				MainUser: "/Users/caboose/dungeongate/configs/development/banners/main_user.txt",
+				MainUser: "/Users/caboose/dungeongate/assets/banners/main_user.txt",
 			}
 			bannerManager := banner.NewBannerManager(bannerConfig)
 			logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
@@ -383,7 +383,7 @@ func TestParseGameChoice(t *testing.T) {
 
 func TestBuildGameSelectionBanner(t *testing.T) {
 	bannerConfig := &banner.BannerConfig{
-		MainUser: "/Users/caboose/dungeongate/configs/development/banners/main_user.txt",
+		MainUser: "/Users/caboose/dungeongate/assets/banners/main_user.txt",
 	}
 	bannerManager := banner.NewBannerManager(bannerConfig)
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
