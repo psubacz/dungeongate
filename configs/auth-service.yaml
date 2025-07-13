@@ -181,3 +181,14 @@ security:
     
     # Use cryptographically secure random for tokens
     secure_random: true
+
+# ============================================================================
+# Metrics and Monitoring
+# ============================================================================
+# Prometheus metrics and health monitoring for auth service
+metrics:
+  # Enable Prometheus metrics collection
+  enabled: true
+  
+  # Port for metrics endpoint (/metrics)
+  port: 9091

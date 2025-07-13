@@ -129,6 +129,7 @@ type UserServiceConfig struct {
 	Security       *SecurityConfig     `yaml:"security"`
 	Logging        *LoggingConfig      `yaml:"logging"`
 	Health         *HealthConfig       `yaml:"health"`
+	Metrics        *MetricsConfig      `yaml:"metrics"`
 }
 
 // RegistrationConfig represents registration configuration

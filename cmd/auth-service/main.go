@@ -20,6 +20,7 @@ import (
 	"github.com/dungeongate/pkg/database"
 	"github.com/dungeongate/pkg/encryption"
 	"github.com/dungeongate/pkg/logging"
+	"github.com/dungeongate/pkg/metrics"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 )
@@ -57,6 +58,18 @@ func main() {
 	logger := logging.NewLoggerBasic("auth-service", cfg.Logging.Level, cfg.Logging.Format, cfg.Logging.Output)
 	logger.Info("Starting DungeonGate Auth Service")
 
+	// Initialize metrics registry
+	metricsRegistry := metrics.NewRegistry("auth-service", version, buildTime, gitCommit, logger)
+
+	// Start metrics server if enabled
+	if cfg.Metrics != nil && cfg.Metrics.Enabled {
+		go func() {
+			if err := metricsRegistry.StartMetricsServer(cfg.Metrics.Port); err != nil {
+				logger.Error("Failed to start metrics server", "error", err)
+			}
+		}()
+		logger.Info("Metrics server starting", "port", cfg.Metrics.Port)
+	}
 
 	// Setup database
 	db, err := database.NewConnection(cfg.Database)
@@ -114,8 +127,11 @@ func main() {
 	_, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Setup gRPC server
-	grpcServer := grpc.NewServer()
+	// Setup gRPC server with metrics interceptors
+	grpcServer := grpc.NewServer(
+		grpc.UnaryInterceptor(metricsRegistry.UnaryServerInterceptor()),
+		grpc.StreamInterceptor(metricsRegistry.StreamServerInterceptor()),
+	)
 	proto.RegisterAuthServiceServer(grpcServer, authService)
 	reflection.Register(grpcServer)
 
@@ -148,17 +164,20 @@ func main() {
 	}
 
 	// Setup HTTP server for health checks
+	mux := http.NewServeMux()
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprintf(w, `{"status":"healthy","service":"auth-service","version":"%s"}`, version)
+	})
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotImplemented)
+		fmt.Fprintf(w, "Auth Service - gRPC API available on port %d", grpcPort)
+	})
+
 	httpServer := &http.Server{
-		Addr: fmt.Sprintf(":%d", httpPort),
-		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if r.URL.Path == "/health" {
-				w.WriteHeader(http.StatusOK)
-				fmt.Fprintf(w, "Auth Service OK")
-				return
-			}
-			w.WriteHeader(http.StatusNotImplemented)
-			fmt.Fprintf(w, "Auth Service - gRPC API available on port %d", grpcPort)
-		}),
+		Addr:    fmt.Sprintf(":%d", httpPort),
+		Handler: metricsRegistry.HTTPMiddleware()(mux),
 	}
 
 	go func() {
@@ -184,6 +203,13 @@ func main() {
 
 	if err := httpServer.Shutdown(shutdownCtx); err != nil {
 		logger.Info("HTTP server shutdown error", "error", err)
+	}
+
+	// Stop metrics server
+	if cfg.Metrics != nil && cfg.Metrics.Enabled {
+		if err := metricsRegistry.StopMetricsServer(shutdownCtx); err != nil {
+			logger.Error("Error stopping metrics server", "error", err)
+		}
 	}
 
 	// Cancel context
