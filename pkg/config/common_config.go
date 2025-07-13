@@ -5,7 +5,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/dungeongate/pkg/log"
 	"gopkg.in/yaml.v3"
 )
 
@@ -13,7 +12,7 @@ import (
 type CommonConfig struct {
 	Version     string                  `yaml:"version"`
 	Database    *DatabaseConfig         `yaml:"database"`
-	Logging     *log.Config             `yaml:"logging"`
+	Logging     *LoggingConfig          `yaml:"logging"`
 	HealthCheck *HealthConfig           `yaml:"health_check"`
 	Security    *CommonSecurityConfig   `yaml:"security"`
 	Server      *CommonServerConfig     `yaml:"server"`
@@ -89,7 +88,7 @@ func MergeWithCommonUser(serviceConfig *UserServiceConfig, commonConfig *CommonC
 
 	// Merge logging configuration
 	if serviceConfig.Logging == nil && commonConfig.Logging != nil {
-		// Convert log.Config to LoggingConfig for compatibility
+		// Use common logging config if service doesn't have one
 		serviceConfig.Logging = &LoggingConfig{
 			Level:  commonConfig.Logging.Level,
 			Format: commonConfig.Logging.Format,
@@ -121,7 +120,7 @@ func MergeWithCommon(serviceConfig *GameServiceConfig, commonConfig *CommonConfi
 
 	// Merge logging configuration
 	if serviceConfig.Logging == nil && commonConfig.Logging != nil {
-		// Convert log.Config to LoggingConfig for compatibility
+		// Use common logging config if service doesn't have one
 		serviceConfig.Logging = &LoggingConfig{
 			Level:  commonConfig.Logging.Level,
 			Format: commonConfig.Logging.Format,
@@ -144,7 +143,7 @@ func MergeWithCommon(serviceConfig *GameServiceConfig, commonConfig *CommonConfi
 }
 
 // mergeLoggingConfigWithCommon merges logging configuration with service overrides taking precedence
-func mergeLoggingConfigWithCommon(service *LoggingConfig, common *log.Config) {
+func mergeLoggingConfigWithCommon(service *LoggingConfig, common *LoggingConfig) {
 	if service.Level == "" {
 		service.Level = common.Level
 	}
@@ -154,8 +153,14 @@ func mergeLoggingConfigWithCommon(service *LoggingConfig, common *log.Config) {
 	if service.Output == "" {
 		service.Output = common.Output
 	}
-	// Note: File and Journald configurations are currently not supported in the simple LoggingConfig
-	// For full logging features, services would need to use log.Config directly
+	// Merge file config if service doesn't have one but common does
+	if service.File == nil && common.File != nil {
+		service.File = common.File
+	}
+	// Merge journald config if service doesn't have one but common does
+	if service.Journald == nil && common.Journald != nil {
+		service.Journald = common.Journald
+	}
 }
 
 // mergeServerConfig merges server configuration
