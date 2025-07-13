@@ -208,7 +208,7 @@ games:
     # Game executable configuration
     binary:
       # Path to the game executable
-      path: "/usr/games/nethack"
+      path: "/opt/homebrew/bin/nethack"
       
       # Command line arguments passed to the game
       args: []
@@ -321,105 +321,13 @@ games:
       # Validate cleanup operations
       validate_cleanup: true
       
-  # Dungeon Crawl Stone Soup Configuration  
-  - id: "dcss"                           # Unique identifier
-    name: "Dungeon Crawl Stone Soup"      # Display name
-    short_name: "DCSS"                    # Short name
-    version: "0.30"                       # Game version
-    enabled: true                         # Available to users
-    
-    # DCSS executable configuration
-    binary:
-      # Path to crawl executable
-      path: "/usr/games/crawl"
-      
-      # Command line arguments
-      args: []
-      
-      # Working directory
-      working_directory: "/tmp"
-      
-    # DCSS-specific settings
-    settings:
-      # Maximum concurrent DCSS players
-      max_players: 30
-      
-      # DCSS sessions can be very long
-      max_session_duration: "12h"
-      
-      # Longer idle timeout for DCSS
-      idle_timeout: "45m"
-      
-      # Enable automatic saving
-      auto_save: true
-      
-    # DCSS path configuration
-    paths:
-      # DCSS doesn't support --showpaths like NetHack
-      auto_detect: false
-      
-      # System paths for DCSS (manually configured)
-      system:
-        # DCSS score directory
-        score_dir: "/var/games/crawl"
-        
-        # System configuration file
-        sysconf_file: "/etc/crawl/init.txt"
-        
-        # Symbols/tiles directory
-        symbols_file: "/usr/share/crawl/dat/tiles"
-        
-        # Data file identifier
-        data_file: "crawl_data"
-        
-      # User-specific paths for DCSS
-      user:
-        base_dir: "games/dcss"
-        save_dir: "games/dcss/saves"
-        config_dir: "games/dcss/config"
-        bones_dir: "games/dcss/bones"
-        level_dir: "games/dcss/levels"
-        lock_dir: "games/dcss/locks"
-        trouble_dir: "games/dcss/trouble"
-        
-    # DCSS setup configuration
-    setup:
-      create_user_dirs: true
-      copy_default_config: true
-      initialize_shared: true
-      
-      # Don't validate DCSS paths as they may not exist in all installations
-      validate_paths: false
-      
-      set_permissions: true
-      
-      # DCSS doesn't support auto-detection
-      detect_system_paths: false
-      
-      # DCSS doesn't use save links like NetHack
-      create_save_links: false
-      
-    # DCSS cleanup configuration
-    cleanup:
-      remove_user_dirs: false
-      clear_temp_files: true
-      remove_lock_files: true
-      clear_personal_bones: false
-      preserve_config: true
-      backup_saves: true
-      
-      # No save links to clean up
-      cleanup_save_links: false
-      
-      validate_cleanup: true
-
 # ============================================================================
 # Logging Configuration
 # ============================================================================
 # Game service logging for debugging and monitoring
 logging:
   # Log level: debug, info, warn, error
-  level: "info"
+  level: "debug"
   
   # Log format: text (human readable), json (machine readable)
   format: "json"

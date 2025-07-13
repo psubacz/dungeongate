@@ -2,19 +2,21 @@ package grpc
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
-	"os"
+	"os/exec"
+	"syscall"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/dungeongate/internal/games/adapters"
 	"github.com/dungeongate/internal/games/application"
 	"github.com/dungeongate/internal/games/domain"
 	"github.com/dungeongate/internal/games/infrastructure/pty"
 	games_pb "github.com/dungeongate/pkg/api/games/v2"
+	"github.com/dungeongate/pkg/config"
 )
 
 // GameServiceServer implements the gRPC GameService interface
@@ -25,11 +27,20 @@ type GameServiceServer struct {
 	ptyManager     *pty.PTYManager
 	streamHandler  *StreamHandler
 	logger         *slog.Logger
+	gameConfigs    []*config.GameConfig
 }
 
 // NewGameServiceServer creates a new GameServiceServer
-func NewGameServiceServer(gameService *application.GameService, sessionService *application.SessionService, logger *slog.Logger) *GameServiceServer {
-	ptyManager := pty.NewPTYManager(logger)
+func NewGameServiceServer(cfg *config.GameServiceConfig, gameService *application.GameService, sessionService *application.SessionService, logger *slog.Logger) *GameServiceServer {
+	// Create adapter registry with configuration
+	adapterRegistry, err := adapters.NewGameAdapterRegistryWithConfig(cfg.Games)
+	if err != nil {
+		logger.Error("Failed to create adapter registry with config, using default", "error", err)
+		adapterRegistry = adapters.NewGameAdapterRegistry()
+	}
+
+	// Create PTY manager with configured adapters
+	ptyManager := pty.NewPTYManagerWithAdapters(logger, adapterRegistry)
 	streamHandler := NewStreamHandler(ptyManager, logger)
 
 	return &GameServiceServer{
@@ -38,6 +49,7 @@ func NewGameServiceServer(gameService *application.GameService, sessionService *
 		ptyManager:     ptyManager,
 		streamHandler:  streamHandler,
 		logger:         logger,
+		gameConfigs:    cfg.Games,
 	}
 }
 
@@ -58,10 +70,32 @@ func (s *GameServiceServer) ListGames(ctx context.Context, req *games_pb.ListGam
 		return nil, status.Error(codes.Unavailable, "game service not available")
 	}
 
-	// For now, return an empty list until repository implementations are complete
+	// Get games from the application service
+	domainGames, err := s.gameService.ListEnabledGames(ctx)
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to list games: "+err.Error())
+	}
+
+	// Convert domain games to protobuf games
+	games := make([]*games_pb.Game, 0, len(domainGames))
+	for _, domainGame := range domainGames {
+		game := &games_pb.Game{
+			Id:          domainGame.ID().String(),
+			Name:        domainGame.Metadata().Name,
+			ShortName:   domainGame.Metadata().ShortName,
+			Description: domainGame.Metadata().Description,
+			Category:    domainGame.Metadata().Category,
+			Tags:        domainGame.Metadata().Tags,
+			Version:     domainGame.Metadata().Version,
+			Difficulty:  int32(domainGame.Metadata().Difficulty),
+			Status:      games_pb.GameStatus_GAME_STATUS_ENABLED, // TODO: Convert domain status
+		}
+		games = append(games, game)
+	}
+
 	return &games_pb.ListGamesResponse{
-		Games:      []*games_pb.Game{},
-		TotalCount: 0,
+		Games:      games,
+		TotalCount: int32(len(games)),
 	}, nil
 }
 
@@ -157,16 +191,50 @@ func (s *GameServiceServer) StartGameSession(ctx context.Context, req *games_pb.
 		}
 	}
 
-	// Create PTY for the game session
-	// TODO: Get actual game binary path and args from game configuration
-	gamePath := "/usr/games/nethack" // Hardcoded for now
-	gameArgs := []string{}
-	gameEnv := append(os.Environ(),
-		fmt.Sprintf("TERM=%s", "xterm-256color"),
-		fmt.Sprintf("USER=%s", req.Username),
-	)
+	// Get game configuration
+	var gameConfig *config.GameConfig
+	for _, cfg := range s.gameConfigs {
+		if cfg.ID == req.GameId {
+			gameConfig = cfg
+			break
+		}
+	}
+	if gameConfig == nil {
+		return nil, status.Error(codes.NotFound, "game configuration not found")
+	}
 
-	_, err = s.ptyManager.CreatePTY(ctx, session, gamePath, gameArgs, gameEnv)
+	// Use the configured game path
+	gamePath := gameConfig.Binary.Path
+	// Let the adapter handle args and env - pass empty slices
+	gameArgs := []string{}
+	gameEnv := []string{}
+
+	// Create callback to handle process exit
+	processExitCallback := func(exitSession *domain.GameSession, exitCode *int, processErr error) {
+		// Handle session cleanup when process exits
+		s.logger.Info("Game process exited", "session_id", exitSession.ID().String(), "exit_code", exitCode)
+
+		// Mark session as ended in the session service
+		// Note: This is a simplified approach. In a full implementation,
+		// we'd want to coordinate with the session manager for save creation
+		var signal *string
+		if processErr != nil {
+			if exitError, ok := processErr.(*exec.ExitError); ok {
+				if sys := exitError.Sys(); sys != nil {
+					if ws, ok := sys.(syscall.WaitStatus); ok && ws.Signaled() {
+						sig := ws.Signal().String()
+						signal = &sig
+					}
+				}
+			}
+		}
+		exitSession.End(exitCode, signal)
+	}
+
+	// Use a detached context for PTY creation so the process doesn't get killed when the gRPC call completes
+	// The NetHack process should live independently of the initial gRPC request
+	detachedCtx := context.Background()
+	_, err = s.ptyManager.CreatePTYWithCallback(detachedCtx, session, gamePath, gameArgs, gameEnv, processExitCallback)
 	if err != nil {
 		s.logger.Error("Failed to create PTY", "error", err, "session_id", session.ID().String())
 		// TODO: Clean up the session in the database
@@ -192,7 +260,23 @@ func (s *GameServiceServer) StopGameSession(ctx context.Context, req *games_pb.S
 		return nil, status.Error(codes.Unavailable, "session service not available")
 	}
 
-	return nil, status.Error(codes.Unimplemented, "method StopGameSession not implemented")
+	// Stop the session through the session service
+	err := s.sessionService.StopGameSession(ctx, req.SessionId, req.Reason)
+	if err != nil {
+		s.logger.Error("Failed to stop game session", "error", err, "session_id", req.SessionId)
+		return nil, status.Error(codes.Internal, "failed to stop session: "+err.Error())
+	}
+
+	// Stop the PTY if it exists
+	err = s.ptyManager.ClosePTY(req.SessionId)
+	if err != nil {
+		s.logger.Warn("Failed to close PTY", "error", err, "session_id", req.SessionId)
+		// Don't return error for PTY cleanup failure, session is already stopped
+	}
+
+	return &games_pb.StopGameSessionResponse{
+		Success: true,
+	}, nil
 }
 
 // GetGameSession gets a specific game session

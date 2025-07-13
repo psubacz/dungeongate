@@ -70,6 +70,17 @@ ssh:
     # Useful for development and demo environments
     allow_anonymous: true
     
+  # SSH Keepalive Configuration
+  keepalive:
+    # Enable SSH keepalive to prevent connection timeouts during idle periods
+    enabled: true
+    
+    # Interval between keepalive messages (prevents timeouts during NetHack idle)
+    interval: "30s"
+    
+    # Maximum number of unanswered keepalive messages before disconnect
+    count_max: 3
+    
   # Terminal Configuration
   terminal:
     # Default terminal size for new sessions (widthxheight)
@@ -107,6 +118,28 @@ session_management:
     
     # How often to check for expired sessions
     cleanup_interval: "1m"
+    
+  # Heartbeat configuration for maintaining connections during idle periods
+  heartbeat:
+    # Enable heartbeat messages to keep sessions alive
+    enabled: true
+    
+    # Interval between heartbeat messages during idle periods
+    interval: "60s"
+    
+    # Detect idle period after this much inactivity
+    idle_detection_threshold: "2m"
+    
+    # gRPC stream heartbeat configuration
+    grpc_stream:
+      # Enable heartbeat for gRPC streams
+      enabled: true
+      
+      # Interval for gRPC stream ping messages
+      ping_interval: "45s"
+      
+      # Timeout waiting for pong response
+      pong_timeout: "10s"
     
   # TTY Recording (Terminal Recording)
   ttyrec:
@@ -496,22 +529,22 @@ games:
       # Command line arguments (${USERNAME} is replaced with actual username)
       args: ["-u", "${USERNAME}"]
       
-      # Working directory for game execution
-      working_directory: "/opt/homebrew/Cellar/nethack/3.6.7/libexec"
+      # Working directory for game execution (empty means use default)
+      working_directory: ""
       
       # File permissions for game executable
       permissions: "0755"
       
     # File and directory configuration
     files:
-      # Directory containing game data files
-      data_directory: "/opt/homebrew/Cellar/nethack/3.6.7/libexec"
+      # Directory containing game data files (empty means use default)
+      data_directory: ""
       
-      # Directory for save files
-      save_directory: "/opt/homebrew/Cellar/nethack/3.6.7/libexec/save"
+      # Directory for save files (empty means use default)
+      save_directory: ""
       
-      # Directory for configuration files
-      config_directory: "/opt/homebrew/Cellar/nethack/3.6.7/libexec"
+      # Directory for configuration files (empty means use default)
+      config_directory: ""
       
       # Directory for game logs
       log_directory: "/tmp/nethack-logs"
@@ -586,25 +619,17 @@ games:
         SEDLEVEL: "5"                     # Security level
         DUMPLOG: "1"                      # Enable dump logs
         LIVELOG: "1"                      # Enable live logging
-        XLOGFILE: "/opt/homebrew/Cellar/nethack/3.6.7/libexec/xlogfile"
-        LIVELOGFILE: "/opt/homebrew/Cellar/nethack/3.6.7/libexec/livelog"
+        XLOGFILE: ""
+        LIVELOGFILE: ""
         
     # Environment variables set when running the game
     environment:
-      # NetHack options file path
-      NETHACKOPTIONS: "@/opt/homebrew/Cellar/nethack/3.6.7/libexec/${USERNAME}.nethackrc"
-      
-      # NetHack data directory
-      HACKDIR: "/opt/homebrew/Cellar/nethack/3.6.7/libexec"
-      NETHACKDIR: "/opt/homebrew/Cellar/nethack/3.6.7/libexec"
-      
       # Terminal type for game display
       TERM: "xterm-256color"
       
       # User information
       USER: "${USERNAME}"
-      HOME: "/opt/homebrew/Cellar/nethack/3.6.7/libexec/${USERNAME}"
-      SHELL: "/bin/sh"
+      LOGNAME: "${USERNAME}"
       
     # Resource limits for game processes
     resources:

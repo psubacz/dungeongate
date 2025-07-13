@@ -28,10 +28,10 @@ const (
 	KeyCtrlC
 	KeyCtrlD
 	KeyCtrlZ
-	KeyCtrlU  // Clear line
-	KeyCtrlK  // Kill to end of line
-	KeyCtrlA  // Beginning of line
-	KeyCtrlE  // End of line
+	KeyCtrlU // Clear line
+	KeyCtrlK // Kill to end of line
+	KeyCtrlA // Beginning of line
+	KeyCtrlE // End of line
 	KeyLeft
 	KeyRight
 	KeyUp
@@ -72,24 +72,24 @@ func NewInputHandler(channel ssh.Channel) *InputHandler {
 // ReadInput reads and parses terminal input
 func (h *InputHandler) ReadInput(ctx context.Context) (*InputEvent, error) {
 	buffer := make([]byte, 1)
-	
+
 	select {
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	default:
 	}
-	
+
 	n, err := h.channel.Read(buffer)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	if n == 0 {
 		return &InputEvent{Type: EventCharacter, Character: 0}, nil
 	}
-	
+
 	char := buffer[0]
-	
+
 	// Handle control characters
 	switch char {
 	case 3: // Ctrl+C
@@ -126,7 +126,7 @@ func (h *InputHandler) ReadInput(ctx context.Context) (*InputEvent, error) {
 func (h *InputHandler) handleEscapeSequence(ctx context.Context) (*InputEvent, error) {
 	// Read the next character to see if this is an escape sequence
 	buffer := make([]byte, 1)
-	
+
 	// Set a short timeout for escape sequence detection
 	// In a real implementation, you might want non-blocking reads here
 	n, err := h.channel.Read(buffer)
@@ -134,12 +134,12 @@ func (h *InputHandler) handleEscapeSequence(ctx context.Context) (*InputEvent, e
 		// Just ESC key pressed
 		return &InputEvent{Type: EventKey, KeyCode: KeyEscape}, nil
 	}
-	
+
 	if buffer[0] == '[' {
 		// This is likely an ANSI escape sequence
 		return h.handleAnsiSequence(ctx)
 	}
-	
+
 	// Not an escape sequence we recognize, treat as ESC
 	return &InputEvent{Type: EventKey, KeyCode: KeyEscape}, nil
 }
@@ -151,7 +151,7 @@ func (h *InputHandler) handleAnsiSequence(ctx context.Context) (*InputEvent, err
 	if err != nil || n == 0 {
 		return &InputEvent{Type: EventKey, KeyCode: KeyEscape}, nil
 	}
-	
+
 	switch buffer[0] {
 	case 'A': // Up arrow
 		return &InputEvent{Type: EventKey, KeyCode: KeyUp}, nil
@@ -193,31 +193,31 @@ func NewLineEditor(channel ssh.Channel, inputType InputType) *LineEditor {
 func (e *LineEditor) ReadLine(ctx context.Context) (string, error) {
 	e.line = e.line[:0] // Clear line
 	e.cursor = 0
-	
+
 	for {
 		event, err := e.handler.ReadInput(ctx)
 		if err != nil {
 			return "", err
 		}
-		
+
 		switch event.Type {
 		case EventCharacter:
 			if event.Character >= 32 && event.Character <= 126 {
 				// Insert character at cursor position
 				e.insertCharacter(event.Character)
 			}
-			
+
 		case EventKey:
 			switch event.KeyCode {
 			case KeyEnter:
 				// Move to next line and return the input
 				e.handler.channel.Write([]byte("\r\n"))
 				return string(e.line), nil
-				
+
 			case KeyCtrlC:
 				// User wants to cancel
 				return "", fmt.Errorf("user cancelled")
-				
+
 			case KeyCtrlD:
 				// EOF - if line is empty, treat as cancel
 				if len(e.line) == 0 {
@@ -225,35 +225,35 @@ func (e *LineEditor) ReadLine(ctx context.Context) (string, error) {
 				}
 				// Otherwise, delete character at cursor
 				e.deleteCharacter()
-				
+
 			case KeyBackspace:
 				e.backspace()
-				
+
 			case KeyCtrlU:
 				// Clear entire line
 				e.clearLine()
-				
+
 			case KeyCtrlK:
 				// Kill to end of line
 				e.killToEnd()
-				
+
 			case KeyCtrlA:
 				// Move to beginning of line
 				e.moveToBeginning()
-				
+
 			case KeyCtrlE:
 				// Move to end of line
 				e.moveToEnd()
-				
+
 			case KeyLeft:
 				e.moveCursorLeft()
-				
+
 			case KeyRight:
 				e.moveCursorRight()
-				
+
 			case KeyHome:
 				e.moveToBeginning()
-				
+
 			case KeyEnd:
 				e.moveToEnd()
 			}
@@ -269,19 +269,19 @@ func (e *LineEditor) insertCharacter(ch rune) {
 	newLine[e.cursor] = ch
 	copy(newLine[e.cursor+1:], e.line[e.cursor:])
 	e.line = newLine
-	
+
 	// Echo character (or asterisk for password)
 	if e.inputType == InputTypePassword {
 		e.handler.channel.Write([]byte("*"))
 	} else {
 		e.handler.channel.Write([]byte(string(ch)))
 	}
-	
+
 	// If we inserted in the middle, redraw the rest of the line
 	if e.cursor < len(e.line)-1 {
 		e.redrawFromCursor()
 	}
-	
+
 	e.cursor++
 }
 
@@ -294,7 +294,7 @@ func (e *LineEditor) backspace() {
 		copy(newLine[e.cursor-1:], e.line[e.cursor:])
 		e.line = newLine
 		e.cursor--
-		
+
 		// Move cursor back and redraw
 		e.handler.channel.Write([]byte("\b"))
 		e.redrawFromCursor()
@@ -310,7 +310,7 @@ func (e *LineEditor) deleteCharacter() {
 		copy(newLine[:e.cursor], e.line[:e.cursor])
 		copy(newLine[e.cursor:], e.line[e.cursor+1:])
 		e.line = newLine
-		
+
 		// Redraw from cursor
 		e.redrawFromCursor()
 		e.handler.channel.Write([]byte(" \b")) // Clear the last character
@@ -324,16 +324,16 @@ func (e *LineEditor) clearLine() {
 		e.handler.channel.Write([]byte("\b"))
 		e.cursor--
 	}
-	
+
 	// Clear the line
 	spaces := strings.Repeat(" ", len(e.line))
 	e.handler.channel.Write([]byte(spaces))
-	
+
 	// Move back to beginning
 	for i := 0; i < len(e.line); i++ {
 		e.handler.channel.Write([]byte("\b"))
 	}
-	
+
 	e.line = e.line[:0]
 	e.cursor = 0
 }
@@ -345,12 +345,12 @@ func (e *LineEditor) killToEnd() {
 		remaining := len(e.line) - e.cursor
 		spaces := strings.Repeat(" ", remaining)
 		e.handler.channel.Write([]byte(spaces))
-		
+
 		// Move cursor back
 		for i := 0; i < remaining; i++ {
 			e.handler.channel.Write([]byte("\b"))
 		}
-		
+
 		e.line = e.line[:e.cursor]
 	}
 }
@@ -398,7 +398,7 @@ func (e *LineEditor) moveCursorRight() {
 // redrawFromCursor redraws the line from the current cursor position
 func (e *LineEditor) redrawFromCursor() {
 	oldCursor := e.cursor
-	
+
 	// Draw from cursor to end
 	for i := e.cursor; i < len(e.line); i++ {
 		if e.inputType == InputTypePassword {
@@ -407,7 +407,7 @@ func (e *LineEditor) redrawFromCursor() {
 			e.handler.channel.Write([]byte(string(e.line[i])))
 		}
 	}
-	
+
 	// Move cursor back to original position
 	for i := len(e.line); i > oldCursor; i-- {
 		e.handler.channel.Write([]byte("\b"))

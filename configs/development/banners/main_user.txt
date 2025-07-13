@@ -10,5 +10,5 @@ Menu Options:
   [l] List games
   [r] View recordings
   [s] Game Statistics
-  [c] Credit
+  [c] Credits
   [q] Quit

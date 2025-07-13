@@ -59,6 +59,7 @@ type SessionManagementConfig struct {
 	TTYRec     *TTYRecConfig     `yaml:"ttyrec"`
 	Monitoring *MonitoringConfig `yaml:"monitoring"`
 	Spectating *SpectatingConfig `yaml:"spectating"`
+	Heartbeat  *HeartbeatConfig  `yaml:"heartbeat"`
 }
 
 // TerminalConfig represents terminal configuration
@@ -89,6 +90,21 @@ type SpectatingConfig struct {
 	Enabled                 bool   `yaml:"enabled"`
 	MaxSpectatorsPerSession int    `yaml:"max_spectators_per_session"`
 	SpectatorTimeout        string `yaml:"spectator_timeout"`
+}
+
+// HeartbeatConfig represents general heartbeat configuration
+type HeartbeatConfig struct {
+	Enabled               bool              `yaml:"enabled"`
+	Interval              string            `yaml:"interval"`
+	IdleDetectionThreshold string           `yaml:"idle_detection_threshold"`
+	GRPCStream            *GRPCStreamConfig `yaml:"grpc_stream"`
+}
+
+// GRPCStreamConfig represents gRPC stream heartbeat configuration
+type GRPCStreamConfig struct {
+	Enabled     bool   `yaml:"enabled"`
+	PingInterval string `yaml:"ping_interval"`
+	PongTimeout  string `yaml:"pong_timeout"`
 }
 
 // Load configuration from file

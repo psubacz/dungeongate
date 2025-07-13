@@ -67,7 +67,7 @@ func main() {
 	appServices := initializeApplicationServices(db)
 
 	// Initialize gRPC server
-	grpcServer := initializeGRPCServer(appServices)
+	grpcServer := initializeGRPCServer(cfg, appServices)
 
 	// Initialize HTTP server
 	httpServer := initializeHTTPServer(cfg, appServices)
@@ -215,7 +215,7 @@ func initializeApplicationServices(db *database.Connection) *ApplicationServices
 }
 
 // initializeGRPCServer initializes the gRPC server
-func initializeGRPCServer(appServices *ApplicationServices) *grpc.Server {
+func initializeGRPCServer(cfg *config.GameServiceConfig, appServices *ApplicationServices) *grpc.Server {
 	server := grpc.NewServer()
 
 	// Register health check service
@@ -225,7 +225,7 @@ func initializeGRPCServer(appServices *ApplicationServices) *grpc.Server {
 
 	// Register game service
 	logger := slog.Default() // TODO: Use proper logger configuration
-	gameServiceServer := grpc_service.NewGameServiceServer(appServices.GameService, appServices.SessionService, logger)
+	gameServiceServer := grpc_service.NewGameServiceServer(cfg, appServices.GameService, appServices.SessionService, logger)
 	games_pb.RegisterGameServiceServer(server, gameServiceServer)
 
 	return server

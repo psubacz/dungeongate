@@ -1,489 +1,782 @@
-# Game Service Documentation
+# DungeonGate Game Service
 
-## Overview
+The Game Service is the core game management backend in the DungeonGate microservices architecture. It handles game process lifecycle, PTY management, and provides gRPC APIs for the Session Service to create and manage terminal-based games like NetHack and Dungeon Crawl Stone Soup.
 
-The Game Service is a **stateful, scalable game backend** in the DungeonGate architecture. It runs inside containers/pods and can scale independently to handle multiple concurrent terminal-based games like NetHack, Dungeon Crawl Stone Soup, and other roguelike adventures. Each pod runs multiple games and synchronizes world state across the cluster.
+## 🚀 Overview
 
-## Architecture
+The Game Service provides:
 
-The Game Service is a **stateful microservice** designed to run in a clustered environment with horizontal scaling:
+- **Game Process Management**: Start, stop, and monitor game processes with proper lifecycle management
+- **PTY Management**: Pseudo-terminal allocation and I/O handling for interactive games
+- **Game Adapters**: Extensible adapter system for different game types (NetHack, DCSS, etc.)
+- **Session Persistence**: Games survive client disconnections and support reconnection
+- **gRPC API**: High-performance service integration with Session Service
+- **Configuration Management**: Per-game configuration with environment setup
+- **Process Monitoring**: Health checks and process state tracking
+
+## 🏗️ Architecture
+
+### Game Service Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                Game Service Cluster                        │
+│                    Game Service                             │
 ├─────────────────────────────────────────────────────────────┤
-│  ┌───────────────┐ ┌───────────────┐ ┌───────────────┐    │
-│  │  Game Pod 1   │ │  Game Pod 2   │ │  Game Pod N   │    │
-│  │               │ │               │ │               │    │
-│  │ ┌───────────┐ │ │ ┌───────────┐ │ │ ┌───────────┐ │    │
-│  │ │ NetHack   │ │ │ │ DCSS      │ │ │ │ Multiple  │ │    │
-│  │ │ Game 1    │ │ │ │ Game 1    │ │ │ │ Games     │ │    │
-│  │ └───────────┘ │ │ └───────────┘ │ │ └───────────┘ │    │
-│  │ ┌───────────┐ │ │ ┌───────────┐ │ │ ┌───────────┐ │    │
-│  │ │ DCSS      │ │ │ │ NetHack   │ │ │ │ Save Mgmt │ │    │
-│  │ │ Game 2    │ │ │ │ Game 2    │ │ │ │ World     │ │    │
-│  │ └───────────┘ │ │ └───────────┘ │ │ │ Sync      │ │    │
-│  └───────────────┘ └───────────────┘ └───────────────┘    │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐  │
+│  │ gRPC Server │  │ Session     │  │ Game Adapters       │  │
+│  │             │  │ Manager     │  │                     │  │
+│  │ • StartGame │  │ • Lifecycle │  │ • NetHack Adapter   │  │
+│  │ • StopGame  │  │ • Tracking  │  │ • Default Adapter   │  │
+│  │ • Streaming │  │ • Cleanup   │  │ • Custom Adapters   │  │
+│  └─────────────┘  └─────────────┘  └─────────────────────┘  │
 └─────────────────────────────────────────────────────────────┘
-│                           │                               │
+│                                                             │
 ├─────────────────────────────────────────────────────────────┤
-│                  Shared World State                        │
-│  ├── NetHack Bones Files (synchronized across pods)       │
-│  ├── User Save Data (accessible from any pod)             │
-│  ├── Shared Dungeon Levels                                │
-│  └── Cross-pod Event Synchronization                      │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐  │
+│  │ PTY Manager │  │ Streaming   │  │ Configuration       │  │
+│  │             │  │ Handler     │  │ Management          │  │
+│  │ • Process   │  │ • I/O       │  │ • Game Configs      │  │
+│  │ • Terminal  │  │ • Bridging  │  │ • Environments      │  │
+│  │ • Lifecycle │  │ • Events    │  │ • Path Management   │  │
+│  └─────────────┘  └─────────────┘  └─────────────────────┘  │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-## Core Components
+### Process Flow
 
-### 1. Game Service (`internal/games/games.go`)
-
-The main service implementation providing:
-
-- **Game Process Management**: Start, stop, and monitor multiple game processes per pod
-- **World State Synchronization**: Sync NetHack bones files and shared world state across pods
-- **User Data Management**: Handle save files accessible from any pod in the cluster
-- **Load Balancing**: Distribute games across available pods based on capacity
-- **Event Streaming**: Real-time game events and cross-pod state synchronization
-- **Health Monitoring**: Process health checks and pod capacity monitoring
-
-#### Key Methods
-
-```go
-func (s *Service) StartGame(ctx context.Context, req *StartGameRequest) (*GameSession, error)
-func (s *Service) StopGame(ctx context.Context, sessionID string) error
-func (s *Service) GetActiveGames(ctx context.Context) ([]*GameSession, error)
-func (s *Service) GetGameConfig(ctx context.Context, gameID string) (*Game, error)
+```
+Session Service → Game Service → PTY → NetHack Process
+       ↑               ↓           ↓           ↓
+   SSH Client      gRPC API    Terminal    Game Output
+                               I/O        (stdout/stderr)
 ```
 
-### 2. Application Layer (`internal/games/application/`)
+## 🔧 Core Components
 
-#### Game Service Application Layer (`game_service.go`)
-- High-level game operations
-- Business logic orchestration
-- Integration with external services
+### 1. gRPC Service (`internal/games/infrastructure/grpc/service.go`)
 
-#### Session Service Application Layer (`session_service.go`)
-- Session-specific game operations
-- Process lifecycle management
-- Resource allocation and cleanup
-
-### 3. gRPC Client (`internal/games/client/`)
-
-Provides client libraries for other services to interact with the Game Service:
+The main gRPC service implementation providing:
 
 ```go
-type GameServiceGRPCClient struct {
-    conn   *grpc.ClientConn
-    client GameServiceClient
+type GameService struct {
+    ptyManager      *pty.PTYManager
+    sessionManager  *session.SessionManager
+    logger          *slog.Logger
+    adapters        *adapters.GameAdapterRegistry
 }
 
-func (c *GameServiceGRPCClient) StartGame(ctx context.Context, req *StartGameRequest) (*StartGameResponse, error)
-func (c *GameServiceGRPCClient) StopGame(ctx context.Context, req *StopGameRequest) (*StopGameResponse, error)
-func (c *GameServiceGRPCClient) GetGameSession(ctx context.Context, sessionID string) (*GameSessionResponse, error)
+// Key gRPC Methods
+func (s *Service) StartGameSession(ctx context.Context, req *StartGameSessionRequest) (*StartGameSessionResponse, error)
+func (s *Service) StopGameSession(ctx context.Context, req *StopGameSessionRequest) (*StopGameSessionResponse, error)
+func (s *Service) StreamGameIO(stream GameService_StreamGameIOServer) error
 ```
 
-## Game Configuration
+**Recent Fix**: Uses `context.Background()` for PTY creation to prevent process termination when gRPC contexts are cancelled.
 
-Games are configured through the main configuration system with support for:
+### 2. PTY Manager (`internal/games/infrastructure/pty/manager.go`)
 
-### Game Definition
+Manages pseudo-terminals and game processes:
+
+```go
+type PTYManager struct {
+    sessions map[string]*PTYSession
+    logger   *slog.Logger
+    adapters *adapters.GameAdapterRegistry
+}
+
+type PTYSession struct {
+    SessionID  string
+    PTY        *os.File
+    Cmd        *exec.Cmd
+    Size       *pty.Winsize
+    inputChan  chan []byte
+    outputChan chan []byte
+    errorChan  chan error
+    closeChan  chan struct{}
+    adapter    adapters.GameAdapter
+    session    *domain.GameSession
+}
+```
+
+**Key Features**:
+- **Process Independence**: Games survive PTY session disconnections
+- **Graceful Cleanup**: Proper process termination only on explicit user quit
+- **Session Persistence**: Support for reconnection to ongoing games
+
+### 3. Game Adapters (`internal/games/adapters/`)
+
+Extensible adapter system for different game types:
+
+#### NetHack Adapter (`nethack_adapter.go`)
+- Environment setup with proper NetHack directories
+- Save file management and permissions
+- Terminal configuration for optimal NetHack experience
+- **Fixed**: Uses `exec.Command()` instead of `exec.CommandContext()` to prevent context-based termination
+
+#### Default Adapter (`default_adapter.go`)
+- Generic adapter for simple terminal applications
+- Basic environment and command setup
+- **Fixed**: Same context independence fix applied
+
+### 4. Session Manager (`internal/games/application/session_manager.go`)
+
+Manages game session lifecycle:
+
+```go
+type SessionManager struct {
+    sessions    map[string]*GameSession
+    mutex       sync.RWMutex
+    logger      *slog.Logger
+}
+
+func (sm *SessionManager) StartGameSession(ctx context.Context, req *StartGameSessionRequest) (*GameSession, error)
+func (sm *SessionManager) EndGameSession(ctx context.Context, sessionID string, reason string) error
+func (sm *SessionManager) GetActiveSessionsForUser(ctx context.Context, userID int64) ([]*GameSession, error)
+```
+
+### 5. Streaming Handler (`internal/games/infrastructure/grpc/streaming.go`)
+
+Handles bidirectional streaming for game I/O:
+
+```go
+type StreamHandler struct {
+    ptyManager *pty.PTYManager
+    sessions   map[string]*StreamSession
+    logger     *slog.Logger
+}
+
+func (h *StreamHandler) HandleStream(stream GameService_StreamGameIOServer) error
+```
+
+**Recent Fix**: Removed duplicate close calls that were interfering with session lifecycle.
+
+## 🎮 Game Configuration
+
+### Game Service Configuration
+
+Located at `configs/development/game-service.yaml`:
 
 ```yaml
+# HTTP/gRPC Server Configuration
+server:
+  port: 8085          # HTTP API port
+  grpc_port: 50051    # gRPC port for Session Service communication
+  host: "localhost"
+  timeout: "30s"
+  max_connections: 100
+
+# Database Configuration (shared with other services)
+database:
+  mode: "embedded"
+  type: "sqlite"
+  embedded:
+    path: "./data/sqlite/dungeongate-dev.db"
+    migration_path: "./migrations"
+
+# Game Configuration
 games:
   - id: "nethack"
     name: "NetHack"
-    short_name: "NH"
+    short_name: "nh"
+    version: "3.6.7"
     enabled: true
+    
+    # Binary Configuration
     binary:
-      path: "/usr/games/nethack"
-      args: ["-u"]
-      working_directory: "/tmp/nethack-saves"
+      path: "/opt/homebrew/bin/nethack"
+      args: ["-u", "${USERNAME}"]
+      working_directory: "/tmp"
+      permissions: "0755"
+      
+    # File and Directory Management
+    files:
+      log_directory: "/tmp/nethack-logs"
+      temp_directory: "/tmp/nethack-temp"
+      shared_files: ["nhdat", "license", "recover"]
+      user_files: ["${USERNAME}.nh", "${USERNAME}.0", "${USERNAME}.bak"]
+      
+    # Game-specific Settings
+    settings:
+      max_players: 50
+      max_session_duration: "4h"
+      idle_timeout: "30m"
+      save_interval: "5m"
+      auto_save: true
+      
+      # Spectating Configuration
+      spectating:
+        enabled: true
+        max_spectators_per_session: 5
+        spectator_timeout: "2h"
+        
+      # Recording Configuration
+      recording:
+        enabled: true
+        format: "ttyrec"
+        compression: "gzip"
+        max_file_size: "100MB"
+        retention_days: 30
+        
+    # Environment Variables
     environment:
       TERM: "xterm-256color"
-      HACKDIR: "/tmp/nethack-saves"
-      NETHACKDIR: "/tmp/nethack-saves"
+      USER: "${USERNAME}"
+      LOGNAME: "${USERNAME}"
+      
+    # Resource Limits
     resources:
-      cpu_limit: "1.0"
+      cpu_limit: "500m"
       memory_limit: "256Mi"
-    container:
-      image: "dungeongate/nethack"
-      tag: "latest"
-      security_context:
-        run_as_user: 1000
-        run_as_group: 1000
-        read_only_root_filesystem: true
+      disk_limit: "1Gi"
+      pids_limit: 50
 ```
 
-### Pod Deployment Configuration
+### NetHack-Specific Configuration
 
-The Game Service is deployed as scalable pods in a cluster:
+The NetHack adapter uses advanced configuration for proper game environment setup:
 
-#### Development Configuration
 ```yaml
-game_service:
-  deployment:
-    mode: "single-pod"
-    games_per_pod: 10
-    max_concurrent_games: 50
+# NetHack Adapter Configuration (in game config)
+nethack:
+  paths:
+    shared:
+      data_dir: "/opt/homebrew/Cellar/nethack/3.6.7/libexec"
+      hack_dir: "/opt/homebrew/Cellar/nethack/3.6.7/libexec"
+    user:
+      playground_dir: "games/nethack"
+      save_dir: "games/nethack/saves"
+      level_dir: "games/nethack/levels"
+      bones_dir: "games/nethack/bones"
+      lock_dir: "games/nethack/locks"
+      trouble_dir: "games/nethack/trouble"
+      config_dir: "games/nethack/config"
+      
+  environment:
+    NETHACKDIR: "${HACKDIR}"
+    HACKDIR: "${HACKDIR}"
+    NETHACK_PLAYGROUND: "${HOME}/${PLAYGROUND_DIR}"
+    NETHACK_SAVEDIR: "${HOME}/${SAVE_DIR}"
+    NETHACK_LEVELDIR: "${HOME}/${LEVEL_DIR}"
+    NETHACK_BONESDIR: "${HOME}/${BONES_DIR}"
+    NETHACK_LOCKDIR: "${HOME}/${LOCK_DIR}"
+    NETHACK_TROUBLEDIR: "${HOME}/${TROUBLE_DIR}"
+    NETHACK_CONFIGDIR: "${HOME}/${CONFIG_DIR}"
 ```
 
-#### Production Configuration
-```yaml
-game_service:
-  deployment:
-    mode: "cluster"
-    min_pods: 3
-    max_pods: 20
-    games_per_pod: 100
-    auto_scaling:
-      enabled: true
-      cpu_threshold: 70
-      memory_threshold: 80
-  
-  world_state:
-    bones_sync_interval: "30s"
-    save_sync_interval: "10s"
-    shared_storage_backend: "postgresql"
-```
+## 🔄 Process Management
 
-#### Kubernetes Deployment
-```yaml
-game_service:
-  kubernetes:
-    namespace: "dungeongate-games"
-    service_account: "game-service"
-    horizontal_pod_autoscaler:
-      min_replicas: 3
-      max_replicas: 20
-      target_cpu_utilization: 70
-```
+### Game Process Lifecycle
 
-## Game Process Management
+1. **Session Creation**: Session Service requests game start via gRPC
+2. **Environment Setup**: Game adapter prepares directories and environment
+3. **Process Start**: PTY manager creates pseudo-terminal and starts game
+4. **I/O Streaming**: Bidirectional streaming between Session Service and game
+5. **Session Persistence**: Game continues running even if streams disconnect
+6. **Clean Termination**: Process terminated only on explicit user quit
 
-### Multi-Game Pod Architecture
+### Process Independence (Key Fix)
 
-Each Game Service pod manages multiple concurrent game processes:
+**Previous Issue**: Games were terminated when gRPC contexts were cancelled or streams disconnected.
 
-- **Process Isolation**: Each game runs in separate process groups
-- **Resource Allocation**: CPU and memory limits per game process  
-- **Session Management**: Track active games and route player connections
-- **Cleanup**: Automatic cleanup when games exit or players disconnect
-
-### Resource Limits
-
+**Solution Implemented**:
 ```go
-type ResourcesConfig struct {
-    CPULimit      string `yaml:"cpu_limit"`
-    MemoryLimit   string `yaml:"memory_limit"`
-    DiskLimit     string `yaml:"disk_limit"`
-    NetworkLimit  string `yaml:"network_limit"`
-    ProcessLimit  int    `yaml:"process_limit"`
-}
+// Before (caused premature termination)
+cmd := exec.CommandContext(ctx, gamePath, args...)
+
+// After (process independence)
+cmd := exec.Command(gamePath, args...)
 ```
 
-### World State Synchronization
+This ensures NetHack processes run independently of:
+- gRPC request contexts
+- Stream connection states
+- Network interruptions
+- Service restarts (if process survives)
 
-```go
-type WorldStateSynchronizer struct {
-    SharedStorage    StorageBackend
-    EventBus        EventBus
-    SyncInterval    time.Duration
-    ConflictResolver ConflictResolver
-}
+### Session Persistence Features
 
-type BonesManager struct {
-    // NetHack bones files shared across all pods
-    StoreBones(gameType string, level int, bones *BonesData) error
-    LoadBones(gameType string, level int) (*BonesData, error)
-    SyncBones(sourcePod, targetPod string) error
-    CleanupOldBones(olderThan time.Duration) error
-}
+- **Reconnection Support**: Users can reconnect to ongoing NetHack games
+- **Save State Preservation**: Game saves are maintained across disconnections
+- **Process Monitoring**: Health checks without process interference
+- **Graceful Cleanup**: Proper cleanup only when games actually end
 
-type SaveManager struct {
-    // User save files accessible from any pod
-    SaveGame(userID int, gameType string, saveData []byte) error
-    LoadGame(userID int, gameType string) ([]byte, error)
-    MigrateSession(sessionID string, fromPod, toPod string) error
-}
-```
+## 📡 gRPC API
 
-## Event Streaming
-
-The Game Service provides real-time event streaming for:
-
-### Game Events
-
-```go
-type GameEvent struct {
-    EventID   string            `json:"event_id"`
-    SessionID string            `json:"session_id"`
-    EventType string            `json:"event_type"`
-    EventData []byte            `json:"event_data"`
-    Metadata  map[string]string `json:"metadata"`
-    Timestamp time.Time         `json:"timestamp"`
-}
-```
-
-### Event Types
-
-- `game.started` - Game process started
-- `game.stopped` - Game process stopped
-- `game.crashed` - Game process crashed (future)
-- `game.paused` - Game process paused
-- `game.resumed` - Game process resumed
-- `player.joined` - Player joined game
-- `player.left` - Player left game
-
-### Event Streaming API
-
-```go
-func (s *Service) PublishGameEvent(event *GameEvent)
-func (s *Service) AddEventStream(sessionID string, stream chan *GameEvent)
-func (s *Service) RemoveEventStream(sessionID string, stream chan *GameEvent)
-```
-
-## Integration with Session Service
-
-The Game Service integrates closely with the Session Service through:
-
-### Adapter Pattern
-
-The Session Service uses an adapter to communicate with the Game Service:
-
-```go
-type gameClientAdapter struct {
-    realClient *client.GameServiceGRPCClient
-}
-
-func NewGameServiceClient(address string) GameServiceClient {
-    realClient, err := client.NewGameServiceGRPCClient(address)
-    // ...
-    return &gameClientAdapter{realClient: realClient}
-}
-```
-
-### Service Communication
-
-```mermaid
-sequenceDiagram
-    participant U as User (SSH)
-    participant S as Session Service
-    participant G as Game Service
-    participant C as Container Runtime
-
-    U->>S: Connect via SSH
-    S->>S: Authenticate user
-    U->>S: Select game
-    S->>G: StartGame(userID, gameID)
-    G->>C: Create container/process
-    C->>G: Process started
-    G->>S: GameSession created
-    S->>U: Game interface
-    
-    loop Game Session
-        U->>S: Input
-        S->>G: Forward input
-        G->>C: Write to process
-        C->>G: Process output
-        G->>S: Stream output
-        S->>U: Display output
-    end
-    
-    U->>S: Quit game
-    S->>G: StopGame(sessionID)
-    G->>C: Terminate process
-    C->>G: Process stopped
-    G->>S: Session ended
-```
-
-## API Reference
-
-### gRPC Service Definition
+### Service Definition
 
 ```protobuf
 service GameService {
-    rpc StartGame(StartGameRequest) returns (StartGameResponse);
-    rpc StopGame(StopGameRequest) returns (StopGameResponse);
-    rpc GetGameSession(GetGameSessionRequest) returns (GetGameSessionResponse);
-    rpc ListActiveGames(ListActiveGamesRequest) returns (ListActiveGamesResponse);
-    rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
+    // Start a new game session
+    rpc StartGameSession(StartGameSessionRequest) returns (StartGameSessionResponse);
+    
+    // Stop an existing game session
+    rpc StopGameSession(StopGameSessionRequest) returns (StopGameSessionResponse);
+    
+    // Bidirectional streaming for game I/O
+    rpc StreamGameIO(stream GameIORequest) returns (stream GameIOResponse);
+    
+    // Health check
+    rpc HealthGRPC(HealthRequestGRPC) returns (HealthResponseGRPC);
 }
 ```
 
-### HTTP Endpoints
+### Message Types
 
-- `GET /health` - Health check
-- `GET /games` - List available games (future)
-- `GET /sessions` - List active sessions (future)
-- `POST /sessions` - Create new session (future)
-- `DELETE /sessions/:id` - Stop session (future)
+```protobuf
+message StartGameSessionRequest {
+    string user_id = 1;
+    string game_id = 2;
+    TerminalSize terminal_size = 3;
+    map<string, string> environment = 4;
+}
 
-## Deployment
+message StartGameSessionResponse {
+    string session_id = 1;
+    bool success = 2;
+    string error = 3;
+}
 
-### Development
+message GameIORequest {
+    oneof request {
+        ConnectPTYRequest connect = 1;
+        PTYInput input = 2;
+        DisconnectPTYRequest disconnect = 3;
+    }
+}
+
+message GameIOResponse {
+    oneof response {
+        ConnectPTYResponse connected = 1;
+        PTYOutput output = 2;
+        PTYEvent event = 3;
+        DisconnectPTYResponse disconnected = 4;
+    }
+}
+```
+
+### Error Handling
+
+The service provides comprehensive error handling:
+
+```go
+// Common error responses
+codes.InvalidArgument  // Invalid request parameters
+codes.NotFound        // Session or game not found
+codes.Internal        // Internal service errors
+codes.Unavailable     // Service temporarily unavailable
+codes.Cancelled       // Request cancelled (handled gracefully)
+```
+
+## 🔧 Game Adapters
+
+### Adapter Interface
+
+```go
+type GameAdapter interface {
+    SetupGameEnvironment(session *domain.GameSession) error
+    CleanupGameEnvironment(session *domain.GameSession) error
+    PrepareCommand(ctx context.Context, session *domain.GameSession, gamePath string, args []string, env []string) (*exec.Cmd, error)
+    ProcessOutput(data []byte) []byte
+    GetInitialInput() []byte
+}
+```
+
+### NetHack Adapter Implementation
+
+Key features of the NetHack adapter:
+
+- **Directory Management**: Creates proper NetHack directory structure
+- **Environment Setup**: Sets all required NetHack environment variables
+- **Save File Handling**: Manages user-specific save files and permissions
+- **Terminal Configuration**: Optimizes terminal settings for NetHack
+- **Process Independence**: Uses context-free process creation
+
+### Adding Custom Game Adapters
+
+To add a new game type:
+
+1. **Implement GameAdapter Interface**:
+```go
+type MyGameAdapter struct {
+    config *MyGameConfig
+}
+
+func (a *MyGameAdapter) SetupGameEnvironment(session *domain.GameSession) error {
+    // Setup game-specific directories and files
+}
+
+func (a *MyGameAdapter) PrepareCommand(ctx context.Context, session *domain.GameSession, gamePath string, args []string, env []string) (*exec.Cmd, error) {
+    // IMPORTANT: Use exec.Command() not exec.CommandContext()
+    cmd := exec.Command(gamePath, args...)
+    cmd.Env = env
+    // Additional setup...
+    return cmd, nil
+}
+```
+
+2. **Register Adapter**:
+```go
+registry := adapters.NewGameAdapterRegistry()
+registry.RegisterAdapter("mygame", &MyGameAdapter{})
+```
+
+3. **Add Configuration**:
+```yaml
+games:
+  - id: "mygame"
+    name: "My Game"
+    enabled: true
+    # ... configuration
+```
+
+## 🛠️ Development
+
+### Building and Running
 
 ```bash
 # Build the game service
-make build-game-service
+make build-game
 
-# Run with session and auth services
-make test-run-all
+# Run all services (recommended)
+make run-all
 
-# The game service will run on port 50051 (gRPC)
+# Run game service only (for debugging)
+make run-game
+
+# The game service runs on:
+# - HTTP: localhost:8085
+# - gRPC: localhost:50051
 ```
 
-### Docker Deployment
+### Testing
 
-```dockerfile
-FROM golang:1.21-alpine AS builder
-WORKDIR /app
-COPY . .
-RUN go build -o game-service ./cmd/game-service
+```bash
+# Run tests
+make test
 
-FROM alpine:latest
-RUN apk --no-cache add ca-certificates
-COPY --from=builder /app/game-service /usr/local/bin/
-ENTRYPOINT ["game-service"]
+# Test specific components
+make test-games
+
+# Health check
+curl http://localhost:8085/health
 ```
 
-### Kubernetes Deployment
+### Development Flow
 
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: dungeongate-game-service
-spec:
-  replicas: 3
-  selector:
-    matchLabels:
-      app: dungeongate-game-service
-  template:
-    metadata:
-      labels:
-        app: dungeongate-game-service
-    spec:
-      containers:
-      - name: game-service
-        image: dungeongate/game-service:latest
-        ports:
-        - containerPort: 50051
-        env:
-        - name: CONFIG_PATH
-          value: "/etc/dungeongate/config.yaml"
-        volumeMounts:
-        - name: config
-          mountPath: /etc/dungeongate
-      volumes:
-      - name: config
-        configMap:
-          name: dungeongate-config
-```
+1. **Start Services**: `make run-all`
+2. **Connect via SSH**: `ssh -p 2222 localhost`
+3. **Test Game Flow**: Login → Play → Select NetHack
+4. **Monitor Logs**: Check Game Service logs for process management
+5. **Verify Persistence**: Disconnect and reconnect to verify session survival
 
-## Security Considerations
-
-### Process Isolation
-
-1. **Namespace Isolation**: Each game runs in separate namespaces
-2. **Resource Limits**: CPU, memory, and process limits enforced
-3. **Filesystem Isolation**: Read-only root filesystem where possible
-4. **User Mapping**: Games run as non-root users
-
-### Container Security
-
-1. **Image Scanning**: Container images scanned for vulnerabilities
-2. **Security Policies**: Pod security policies enforced
-3. **Network Policies**: Restricted network access
-4. **Secret Management**: Secure handling of game credentials
-
-### Access Control
-
-1. **Service Authentication**: mTLS between services
-2. **User Authorization**: Game access based on user permissions
-3. **Resource Quotas**: Per-user resource limits
-4. **Audit Logging**: All game operations logged
-
-## Monitoring and Observability
-
-### Metrics
-
-- Game session count and duration
-- Resource utilization per game
-- Container startup and shutdown times
-- Error rates and crash frequency
-
-### Logging
-
-- Structured logging with correlation IDs
-- Game process stdout/stderr capture
-- Performance metrics and timing
-- Security events and access logs
+## 📊 Monitoring and Observability
 
 ### Health Checks
 
 ```go
 func (s *Service) HealthGRPC(ctx context.Context, req *HealthRequestGRPC) (*HealthResponseGRPC, error) {
+    activeSessions := s.sessionManager.GetActiveSessionCount()
+    
     return &HealthResponseGRPC{
         Status: "healthy",
         Details: map[string]string{
-            "active_sessions": fmt.Sprintf("%d", len(s.activeSessions)),
+            "active_sessions": fmt.Sprintf("%d", activeSessions),
             "timestamp":       time.Now().Format(time.RFC3339),
+            "version":         version,
         },
     }, nil
 }
 ```
 
-## Future Enhancements
+### Metrics (Future Implementation)
+
+Planned Prometheus metrics:
+
+- `game_sessions_total` - Total game sessions started
+- `game_sessions_active` - Currently active game sessions
+- `game_sessions_duration_seconds` - Session duration histogram
+- `game_process_starts_total` - Total game process starts
+- `game_process_failures_total` - Failed process starts
+- `pty_sessions_active` - Active PTY sessions
+
+### Logging
+
+Structured logging throughout the service:
+
+```json
+{
+  "timestamp": "2025-07-13T18:45:00Z",
+  "level": "info",
+  "message": "Game session started",
+  "session_id": "session_1752432358790097000",
+  "user_id": "user_1",
+  "game_id": "nethack",
+  "process_id": 90486
+}
+```
+
+## 🔒 Security Considerations
+
+### Process Security
+
+- **User Isolation**: Games run as specific users with limited permissions
+- **Resource Limits**: CPU, memory, and process limits enforced
+- **File System**: Controlled access to game directories and files
+- **Environment**: Sanitized environment variables
+
+### Service Security
+
+- **gRPC Security**: Service-to-service authentication (future)
+- **Input Validation**: All user inputs validated and sanitized
+- **Process Monitoring**: Detection of unusual process behavior
+- **Error Handling**: Secure error responses without information leakage
+
+### Configuration Security
+
+```yaml
+# Security settings in game config
+security:
+  process_limits:
+    max_processes: 50
+    max_memory: "256Mi"
+    max_cpu: "500m"
+    
+  file_permissions:
+    user_directories: "0755"
+    save_files: "0644"
+    executable_files: "0755"
+    
+  environment:
+    allowed_variables: ["TERM", "USER", "HOME", "NETHACK*"]
+    blocked_variables: ["PATH", "LD_*", "SHELL"]
+```
+
+## 🚀 Deployment
+
+### Development Deployment
+
+The Game Service is designed to run alongside Session and Auth services:
+
+```bash
+# Start all services
+make run-all
+
+# Services will be available at:
+# - Game Service gRPC: localhost:50051
+# - Game Service HTTP: localhost:8085
+# - Session Service SSH: localhost:2222
+# - Auth Service: localhost:8081/8082
+```
+
+### Production Deployment
+
+For production environments:
+
+1. **Configuration Updates**:
+```yaml
+server:
+  host: "0.0.0.0"
+  max_connections: 1000
+
+database:
+  mode: "external"
+  type: "postgresql"
+  # ... production database config
+
+games:
+  - id: "nethack"
+    settings:
+      max_players: 500
+      max_session_duration: "8h"
+```
+
+2. **Security Hardening**:
+```yaml
+security:
+  process_limits:
+    max_processes: 100
+    max_memory: "512Mi"
+    
+  file_permissions:
+    strict_mode: true
+    readonly_system: true
+```
+
+3. **Resource Management**:
+```yaml
+resources:
+  global_limits:
+    max_concurrent_games: 1000
+    memory_per_game: "128Mi"
+    cpu_per_game: "200m"
+```
+
+## 🔮 Future Enhancements
 
 ### Planned Features
 
-1. **Advanced Crash Detection**: Automatic crash analysis and recovery
-2. **Game Save Management**: Automated save/restore functionality
-3. **Spectator Support**: Multi-user spectating capabilities
-4. **Recording and Playback**: TTY recording for game sessions
-5. **Auto-scaling**: Dynamic scaling based on demand
-6. **Game Plugins**: Plugin system for custom games
+1. **Advanced Session Management**:
+   - Session migration between service instances
+   - Load balancing for game processes
+   - Automatic session cleanup and archival
 
-### Performance Improvements
+2. **Enhanced Game Support**:
+   - Dungeon Crawl Stone Soup adapter
+   - Custom game plugin system
+   - Game-specific optimization profiles
 
-1. **Connection Pooling**: Reuse of container resources
-2. **Caching**: Game configuration and state caching
-3. **Load Balancing**: Distribute games across nodes
-4. **Resource Optimization**: Smarter resource allocation
+3. **Monitoring and Analytics**:
+   - Real-time performance metrics
+   - Game session analytics
+   - Player behavior tracking
 
-## Troubleshooting
+4. **Scalability Features**:
+   - Horizontal scaling support
+   - Container orchestration integration
+   - Distributed session storage
+
+### Technical Improvements
+
+1. **Performance Optimization**:
+   - Process pooling for faster game starts
+   - Optimized I/O streaming
+   - Memory usage optimization
+
+2. **Reliability Features**:
+   - Automatic process recovery
+   - Health-based failover
+   - Graceful degradation
+
+3. **Developer Experience**:
+   - Hot-reload for game configurations
+   - Debugging tools and instrumentation
+   - Enhanced logging and tracing
+
+## 🔍 Troubleshooting
 
 ### Common Issues
 
-1. **Game Won't Start**
-   - Check game binary path and permissions
-   - Verify container image availability
-   - Review resource limits and quotas
+#### Game Process Won't Start
 
-2. **High Resource Usage**
-   - Monitor per-game resource consumption
-   - Adjust resource limits in configuration
-   - Consider container resource constraints
+```bash
+# Check game binary exists and is executable
+ls -la /opt/homebrew/bin/nethack
 
-3. **Network Connectivity**
-   - Verify gRPC service endpoints
-   - Check firewall and security group rules
-   - Test service-to-service communication
+# Check directory permissions
+ls -la /tmp/nethack-users/
+
+# Verify configuration
+curl http://localhost:8085/health
+
+# Check logs for specific errors
+tail -f game-service.log
+```
+
+#### Process Terminated Immediately (FIXED)
+
+**Previous Issue**: NetHack processes were killed after startup
+**Status**: RESOLVED
+**Verification**: 
+```bash
+# Logs should show:
+# "Process exited successfully" (only when user quits)
+# NOT "Process was killed by signal"
+```
+
+#### Session Won't Connect
+
+```bash
+# Check if Game Service is running
+curl http://localhost:8085/health
+
+# Verify gRPC connectivity
+grpcurl -plaintext localhost:50051 list
+
+# Check Session Service connectivity
+ssh -p 2222 localhost
+```
 
 ### Debug Commands
 
 ```bash
-# Check game service status
-curl http://localhost:8083/health
+# Check service status
+curl http://localhost:8085/health
 
-# View active sessions
-grpcurl -plaintext localhost:50051 dungeongate.GameService/ListActiveSessions
+# List active sessions (if endpoint exists)
+curl http://localhost:8085/sessions
 
-# Check resource usage
-docker stats dungeongate-nethack-session123
+# Check process list
+ps aux | grep nethack
 
-# View logs
-kubectl logs deployment/dungeongate-game-service
+# Monitor game service logs
+tail -f /path/to/game-service.log
+
+# Test gRPC connectivity
+grpcurl -plaintext localhost:50051 describe dungeongate.GameService
 ```
+
+### Performance Tuning
+
+For high-load scenarios:
+
+```yaml
+server:
+  max_connections: 5000
+  timeout: "300s"
+
+games:
+  - settings:
+      max_players: 1000
+      max_session_duration: "12h"
+      
+resources:
+  global_limits:
+    max_concurrent_games: 2000
+    memory_per_game: "64Mi"
+```
+
+## 📖 API Documentation
+
+### Complete gRPC Service Methods
+
+```go
+// Start a new game session
+StartGameSession(context.Context, *StartGameSessionRequest) (*StartGameSessionResponse, error)
+
+// Stop an existing game session  
+StopGameSession(context.Context, *StopGameSessionRequest) (*StopGameSessionResponse, error)
+
+// Bidirectional streaming for real-time game I/O
+StreamGameIO(GameService_StreamGameIOServer) error
+
+// Health check for service monitoring
+HealthGRPC(context.Context, *HealthRequestGRPC) (*HealthResponseGRPC, error)
+```
+
+### HTTP Endpoints (Current and Planned)
+
+```
+GET  /health              # Service health check
+GET  /games               # List available games (planned)
+GET  /sessions            # List active sessions (planned)
+POST /sessions            # Create session (planned)
+DELETE /sessions/{id}     # Stop session (planned)
+GET  /metrics             # Prometheus metrics (planned)
+```
+
+## 📄 License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## 🙏 Acknowledgments
+
+- NetHack development team for the amazing game
+- Go community for excellent libraries and tools
+- PTY and terminal emulation researchers
+- Open source game server projects for inspiration
+
+---
+
+**Built with ❤️ for terminal gaming excellence**
+
+For technical questions or contributions, please visit our GitHub repository or open an issue.

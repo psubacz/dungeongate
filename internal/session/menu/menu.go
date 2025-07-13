@@ -3,6 +3,7 @@ package menu
 import (
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"strings"
 	"time"
@@ -41,8 +42,13 @@ type MenuChoice struct {
 // ShowAnonymousMenu displays the main menu for anonymous users and handles input
 func (mh *MenuHandler) ShowAnonymousMenu(ctx context.Context, channel ssh.Channel, username string) (*MenuChoice, error) {
 	// Clear screen and position cursor at top
-	channel.Write([]byte("\033[2J\033[H"))
-	
+	if _, err := channel.Write([]byte("\033[2J\033[H")); err != nil {
+		if err == io.EOF {
+			return &MenuChoice{Action: "quit", Value: ""}, nil
+		}
+		// For other errors, continue - the banner write will catch it
+	}
+
 	// Render the anonymous banner
 	banner, err := mh.bannerManager.RenderMainAnon()
 	if err != nil {
@@ -54,12 +60,16 @@ func (mh *MenuHandler) ShowAnonymousMenu(ctx context.Context, channel ssh.Channe
 	// Display the banner
 	_, err = channel.Write([]byte(banner))
 	if err != nil {
+		if err == io.EOF {
+			// Client disconnected gracefully
+			return &MenuChoice{Action: "quit", Value: ""}, nil
+		}
 		return nil, fmt.Errorf("failed to write banner: %w", err)
 	}
 
 	// Create terminal input handler for proper keyboard support
 	inputHandler := terminal.NewInputHandler(channel)
-	
+
 	// Wait for user input
 	for {
 		event, err := inputHandler.ReadInput(ctx)
@@ -79,20 +89,27 @@ func (mh *MenuHandler) ShowAnonymousMenu(ctx context.Context, channel ssh.Channe
 				return &MenuChoice{Action: "login", Value: ""}, nil
 			case "r":
 				return &MenuChoice{Action: "register", Value: ""}, nil
-			case "w":
-				return &MenuChoice{Action: "watch", Value: ""}, nil
-			case "g":
-				return &MenuChoice{Action: "list_games", Value: ""}, nil
 			case "c":
 				return &MenuChoice{Action: "credit", Value: ""}, nil
 			case "q":
 				return &MenuChoice{Action: "quit", Value: ""}, nil
 			default:
-				// Invalid choice, show error and redisplay menu
-				errorMsg := fmt.Sprintf("\r\nInvalid choice '%s'. Please try again.\r\n\r\n", choice)
+				// Invalid choice, show error and continue waiting for input
+				errorMsg := fmt.Sprintf("\r\nInvalid choice '%s'. Please try again.\r\n", choice)
 				channel.Write([]byte(errorMsg))
-				// Redisplay the banner
-				channel.Write([]byte(banner))
+				// Brief pause to let user read the message
+				time.Sleep(1 * time.Second)
+				// Clear screen and redisplay the banner
+				if _, err := channel.Write([]byte("\033[2J\033[H")); err != nil {
+					if err == io.EOF {
+						return &MenuChoice{Action: "quit", Value: ""}, nil
+					}
+				}
+				if _, err := channel.Write([]byte(banner)); err != nil {
+					if err == io.EOF {
+						return &MenuChoice{Action: "quit", Value: ""}, nil
+					}
+				}
 			}
 		} else if event.Type == terminal.EventKey {
 			switch event.KeyCode {
@@ -106,8 +123,13 @@ func (mh *MenuHandler) ShowAnonymousMenu(ctx context.Context, channel ssh.Channe
 // ShowUserMenu displays the main menu for authenticated users and handles input
 func (mh *MenuHandler) ShowUserMenu(ctx context.Context, channel ssh.Channel, username string) (*MenuChoice, error) {
 	// Clear screen and position cursor at top
-	channel.Write([]byte("\033[2J\033[H"))
-	
+	if _, err := channel.Write([]byte("\033[2J\033[H")); err != nil {
+		if err == io.EOF {
+			return &MenuChoice{Action: "quit", Value: ""}, nil
+		}
+		// For other errors, continue - the banner write will catch it
+	}
+
 	// Render the user banner
 	banner, err := mh.bannerManager.RenderMainUser(username)
 	if err != nil {
@@ -119,12 +141,16 @@ func (mh *MenuHandler) ShowUserMenu(ctx context.Context, channel ssh.Channel, us
 	// Display the banner
 	_, err = channel.Write([]byte(banner))
 	if err != nil {
+		if err == io.EOF {
+			// Client disconnected gracefully
+			return &MenuChoice{Action: "quit", Value: ""}, nil
+		}
 		return nil, fmt.Errorf("failed to write banner: %w", err)
 	}
 
 	// Create terminal input handler for proper keyboard support
 	inputHandler := terminal.NewInputHandler(channel)
-	
+
 	// Wait for user input
 	for {
 		event, err := inputHandler.ReadInput(ctx)
@@ -157,11 +183,22 @@ func (mh *MenuHandler) ShowUserMenu(ctx context.Context, channel ssh.Channel, us
 			case "q":
 				return &MenuChoice{Action: "quit", Value: ""}, nil
 			default:
-				// Invalid choice, show error and redisplay menu
-				errorMsg := fmt.Sprintf("\r\nInvalid choice '%s'. Please try again.\r\n\r\n", choice)
+				// Invalid choice, show error and continue waiting for input
+				errorMsg := fmt.Sprintf("\r\nInvalid choice '%s'. Please try again.\r\n", choice)
 				channel.Write([]byte(errorMsg))
-				// Redisplay the banner
-				channel.Write([]byte(banner))
+				// Brief pause to let user read the message
+				time.Sleep(1 * time.Second)
+				// Clear screen and redisplay the banner
+				if _, err := channel.Write([]byte("\033[2J\033[H")); err != nil {
+					if err == io.EOF {
+						return &MenuChoice{Action: "quit", Value: ""}, nil
+					}
+				}
+				if _, err := channel.Write([]byte(banner)); err != nil {
+					if err == io.EOF {
+						return &MenuChoice{Action: "quit", Value: ""}, nil
+					}
+				}
 			}
 		} else if event.Type == terminal.EventKey {
 			switch event.KeyCode {
@@ -230,42 +267,80 @@ func (mh *MenuHandler) ShowGameSelectionMenu(ctx context.Context, channel ssh.Ch
 	banner := mh.buildGameSelectionBanner(games, username)
 	_, err = channel.Write([]byte(banner))
 	if err != nil {
+		if err == io.EOF {
+			// Client disconnected gracefully
+			return &MenuChoice{Action: "quit", Value: ""}, nil
+		}
 		return nil, fmt.Errorf("failed to write game selection banner: %w", err)
 	}
 
-	// Wait for user input
-	buffer := make([]byte, 10) // Allow for multi-digit selection
+	// Use proper input handler to avoid character echoing
+	inputHandler := terminal.NewInputHandler(channel)
+	var inputBuffer strings.Builder
+
 	for {
 		select {
 		case <-ctx.Done():
 			return nil, ctx.Err()
 		default:
-			n, err := channel.Read(buffer)
+			event, err := inputHandler.ReadInput(ctx)
 			if err != nil {
 				return nil, fmt.Errorf("failed to read user input: %w", err)
 			}
 
-			if n > 0 {
-				choice := strings.TrimSpace(string(buffer[:n]))
+			switch event.Type {
+			case terminal.EventCharacter:
+				char := event.Character
 
-				// Handle quit/back option
-				if choice == "q" || choice == "Q" || choice == "b" || choice == "B" {
+				// Handle immediate single-character commands
+				if char == 'q' || char == 'Q' || char == 'b' || char == 'B' {
 					return nil, nil // Return to main menu
 				}
 
-				// Try to parse game selection number
-				if gameIndex, parseErr := parseGameChoice(choice, len(games)); parseErr == nil {
-					selectedGame := games[gameIndex]
-					return &MenuChoice{
-						Action: "start_game",
-						Value:  selectedGame.Id,
-					}, nil
-				} else {
-					// Invalid choice, show error and redisplay menu
-					errorMsg := fmt.Sprintf("\r\nInvalid choice '%s'. Please enter a number from 1-%d, or 'q' to return.\r\n\r\n", choice, len(games))
-					channel.Write([]byte(errorMsg))
-					// Redisplay the banner
-					channel.Write([]byte(banner))
+				// For digits, accumulate input until Enter
+				if char >= '0' && char <= '9' {
+					inputBuffer.WriteRune(char)
+					// Echo the character for visual feedback
+					channel.Write([]byte(string(char)))
+				}
+
+			case terminal.EventKey:
+				key := event.KeyCode
+
+				if key == terminal.KeyEnter {
+					choice := strings.TrimSpace(inputBuffer.String())
+					inputBuffer.Reset()
+
+					if choice == "" {
+						continue // Ignore empty input
+					}
+
+					// Try to parse game selection number
+					if gameIndex, parseErr := parseGameChoice(choice, len(games)); parseErr == nil {
+						selectedGame := games[gameIndex]
+						// Clear the line to remove echoed input
+						channel.Write([]byte("\r\n"))
+						return &MenuChoice{
+							Action: "start_game",
+							Value:  selectedGame.Id,
+						}, nil
+					} else {
+						// Invalid choice, show error and redisplay menu
+						errorMsg := fmt.Sprintf("\r\nInvalid choice '%s'. Please enter a number from 1-%d, or 'q' to return.\r\n\r\n", choice, len(games))
+						channel.Write([]byte(errorMsg))
+						// Redisplay the banner
+						channel.Write([]byte(banner))
+					}
+				} else if key == terminal.KeyBackspace {
+					// Handle backspace for multi-digit input
+					if inputBuffer.Len() > 0 {
+						// Remove last character from buffer
+						str := inputBuffer.String()
+						inputBuffer.Reset()
+						inputBuffer.WriteString(str[:len(str)-1])
+						// Send backspace sequence to terminal
+						channel.Write([]byte("\b \b"))
+					}
 				}
 			}
 		}
