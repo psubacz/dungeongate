@@ -3,7 +3,7 @@ package application
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -21,7 +21,7 @@ type SessionManager struct {
 	saveRepo    domain.SaveRepository
 	gameRepo    domain.GameRepository
 	eventRepo   domain.EventRepository
-	logger      *log.Logger
+	logger      *slog.Logger
 	gameDataDir string
 }
 
@@ -32,7 +32,7 @@ func NewSessionManager(
 	gameRepo domain.GameRepository,
 	eventRepo domain.EventRepository,
 	gameDataDir string,
-	logger *log.Logger,
+	logger *slog.Logger,
 ) *SessionManager {
 	return &SessionManager{
 		sessionRepo: sessionRepo,
@@ -71,11 +71,11 @@ func (sm *SessionManager) StartGameSession(ctx context.Context, userID int, game
 	// Check for existing save
 	existingSave, err := sm.saveRepo.FindByUserAndGame(ctx, userIDDomain, gameIDDomain)
 	if err == nil && existingSave != nil {
-		sm.logger.Printf("Found existing save for user %d, game %s", userID, gameID)
+		sm.logger.Info("Found existing save for user", "user_id", userID, "game_id", gameID)
 		// Load save data into session working directory
 		err = sm.prepareSaveEnvironment(session, existingSave)
 		if err != nil {
-			sm.logger.Printf("Failed to prepare save environment: %v", err)
+			sm.logger.Error("Failed to prepare save environment", "error", err)
 		}
 	}
 
@@ -128,8 +128,11 @@ func (sm *SessionManager) StartGameSession(ctx context.Context, userID int, game
 	// Process exit handling will be coordinated through PTY manager callback
 	// to avoid race conditions with multiple Wait() calls
 
-	sm.logger.Printf("Started game session %s for user %d, game %s, PID %d",
-		sessionID.String(), userID, gameID, cmd.Process.Pid)
+	sm.logger.Info("Started game session",
+		"session_id", sessionID.String(),
+		"user_id", userID,
+		"game_id", gameID,
+		"pid", cmd.Process.Pid)
 
 	return session, nil
 }
@@ -157,7 +160,7 @@ func (sm *SessionManager) EndGameSession(ctx context.Context, sessionID string) 
 			// Send SIGTERM first, then SIGKILL if needed
 			err = process.Signal(syscall.SIGTERM)
 			if err != nil {
-				sm.logger.Printf("Failed to send SIGTERM to process %d: %v", processInfo.PID, err)
+				sm.logger.Error("Failed to send SIGTERM to process", "pid", processInfo.PID, "error", err)
 				// Try SIGKILL
 				process.Signal(syscall.SIGKILL)
 			}
@@ -167,7 +170,7 @@ func (sm *SessionManager) EndGameSession(ctx context.Context, sessionID string) 
 	// Create save from session data
 	err = sm.createSaveFromSession(ctx, session)
 	if err != nil {
-		sm.logger.Printf("Failed to create save from session %s: %v", sessionID, err)
+		sm.logger.Error("Failed to create save from session", "session_id", sessionID, "error", err)
 	}
 
 	// Mark session as ended
@@ -194,7 +197,7 @@ func (sm *SessionManager) EndGameSession(ctx context.Context, sessionID string) 
 	}
 	sm.eventRepo.SaveEvent(ctx, event)
 
-	sm.logger.Printf("Ended game session %s", sessionID)
+	sm.logger.Info("Ended game session", "session_id", sessionID)
 
 	return nil
 }
@@ -268,12 +271,12 @@ func (sm *SessionManager) handleGameProcessExit(ctx context.Context, session *do
 		}
 	}
 
-	sm.logger.Printf("Game process for session %s exited with code %v", session.ID().String(), exitCode)
+	sm.logger.Info("Game process exited", "session_id", session.ID().String(), "exit_code", exitCode)
 
 	// Create save from session data before marking as ended
 	err := sm.createSaveFromSession(ctx, session)
 	if err != nil {
-		sm.logger.Printf("Failed to create save from session %s: %v", session.ID().String(), err)
+		sm.logger.Error("Failed to create save from session", "session_id", session.ID().String(), "error", err)
 	}
 
 	// Mark session as ended
@@ -282,7 +285,7 @@ func (sm *SessionManager) handleGameProcessExit(ctx context.Context, session *do
 	// Update session in database
 	err = sm.sessionRepo.Save(ctx, session)
 	if err != nil {
-		sm.logger.Printf("Failed to update session after process exit: %v", err)
+		sm.logger.Error("Failed to update session after process exit", "error", err)
 	}
 
 	// Record process exit event
@@ -365,7 +368,7 @@ func (sm *SessionManager) createSaveFromSession(ctx context.Context, session *do
 		return fmt.Errorf("failed to save to database: %w", err)
 	}
 
-	sm.logger.Printf("Created save %s for session %s", saveID.String(), session.ID().String())
+	sm.logger.Info("Created save for session", "save_id", saveID.String(), "session_id", session.ID().String())
 
 	return nil
 }

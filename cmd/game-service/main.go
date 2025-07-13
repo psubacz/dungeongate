@@ -22,8 +22,7 @@ import (
 	games_pb "github.com/dungeongate/pkg/api/games/v2"
 	"github.com/dungeongate/pkg/config"
 	"github.com/dungeongate/pkg/database"
-	dungeongate_log "github.com/dungeongate/pkg/log"
-	"github.com/op/go-logging"
+	"github.com/dungeongate/pkg/logging"
 )
 
 var (
@@ -34,7 +33,7 @@ var (
 
 const serviceName = "game-service"
 
-var serviceLogger *logging.Logger
+var logger *slog.Logger
 
 func main() {
 	var (
@@ -51,20 +50,37 @@ func main() {
 		return
 	}
 
-	// Initialize basic logging first
-	serviceLogger = dungeongate_log.SetupLoggerLegacy()
-	serviceLogger.Infof("Starting %s version %s", serviceName, version)
-
-	// Load configuration
+	// Load configuration first to set up proper logging
 	cfg, err := loadConfig(*configFile)
 	if err != nil {
-		serviceLogger.Fatalf("Failed to load configuration: %v", err)
+		fmt.Fprintf(os.Stderr, "Failed to load configuration: %v\n", err)
+		os.Exit(1)
 	}
+
+	// Initialize logging with configuration
+	level := "info"
+	format := "text"
+	output := "stdout"
+	if cfg.Logging != nil {
+		if cfg.Logging.Level != "" {
+			level = cfg.Logging.Level
+		}
+		if cfg.Logging.Format != "" {
+			format = cfg.Logging.Format
+		}
+		if cfg.Logging.Output != "" {
+			output = cfg.Logging.Output
+		}
+	}
+	logger = logging.NewLoggerBasic(serviceName, level, format, output)
+	logger.Info("Starting Game Service", "version", version)
+
 
 	// Initialize database
 	db, err := initializeDatabase(cfg)
 	if err != nil {
-		serviceLogger.Fatalf("Failed to initialize database: %v", err)
+		logger.Error("Failed to initialize database", "error", err)
+		os.Exit(1)
 	}
 	defer db.Close()
 
@@ -84,14 +100,16 @@ func main() {
 	// Start gRPC server
 	go func() {
 		if err := startGRPCServer(ctx, cfg, grpcServer); err != nil {
-			serviceLogger.Fatalf("gRPC server failed: %v", err)
+			logger.Error("gRPC server failed", "error", err)
+			os.Exit(1)
 		}
 	}()
 
 	// Start HTTP server
 	go func() {
 		if err := startHTTPServer(ctx, cfg, httpServer); err != nil {
-			serviceLogger.Fatalf("HTTP server failed: %v", err)
+			logger.Error("HTTP server failed", "error", err)
+			os.Exit(1)
 		}
 	}()
 
@@ -120,7 +138,7 @@ func loadConfig(configFile string) (*config.GameServiceConfig, error) {
 	}
 
 	// Use default configuration if no file found
-	serviceLogger.Warning("No configuration file found, using defaults")
+	fmt.Fprintf(os.Stderr, "Warning: No configuration file found, using defaults\n")
 	cfg := &config.GameServiceConfig{}
 	return cfg, nil
 }
@@ -228,20 +246,7 @@ func initializeGRPCServer(cfg *config.GameServiceConfig, appServices *Applicatio
 	grpc_health_v1.RegisterHealthServer(server, healthServer)
 	healthServer.SetServingStatus("", grpc_health_v1.HealthCheckResponse_SERVING)
 
-	// Register game service with standardized logging
-	logConfig := dungeongate_log.Config{
-		Level:  "debug",
-		Format: "json",
-		Output: "stdout",
-	}
-	if cfg.Logging != nil {
-		logConfig.Level = cfg.Logging.Level
-		logConfig.Format = cfg.Logging.Format
-		logConfig.Output = cfg.Logging.Output
-	}
-	
-	_ = dungeongate_log.SetupLogger(serviceName, logConfig)
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	// Register game service with slog logger
 	gameServiceServer := grpc_service.NewGameServiceServer(cfg, appServices.GameService, appServices.SessionService, logger)
 	games_pb.RegisterGameServiceServer(server, gameServiceServer)
 
@@ -306,11 +311,11 @@ func startGRPCServer(ctx context.Context, cfg *config.GameServiceConfig, server 
 		return fmt.Errorf("failed to listen on %s: %w", addr, err)
 	}
 
-	serviceLogger.Infof("gRPC server starting on %s", addr)
+	logger.Info("gRPC server starting", "address", addr)
 
 	go func() {
 		<-ctx.Done()
-		serviceLogger.Info("Shutting down gRPC server...")
+		logger.Info("Shutting down gRPC server...")
 		server.GracefulStop()
 	}()
 
@@ -323,17 +328,17 @@ func startGRPCServer(ctx context.Context, cfg *config.GameServiceConfig, server 
 
 // startHTTPServer starts the HTTP server
 func startHTTPServer(ctx context.Context, cfg *config.GameServiceConfig, server *http.Server) error {
-	serviceLogger.Infof("HTTP server starting on %s", server.Addr)
+	logger.Info("HTTP server starting", "address", server.Addr)
 
 	go func() {
 		<-ctx.Done()
-		serviceLogger.Info("Shutting down HTTP server...")
+		logger.Info("Shutting down HTTP server...")
 
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 
 		if err := server.Shutdown(shutdownCtx); err != nil {
-			serviceLogger.Errorf("HTTP server shutdown error: %v", err)
+			logger.Error("HTTP server shutdown error", "error", err)
 		}
 	}()
 
@@ -350,13 +355,13 @@ func waitForShutdown(ctx context.Context, cancel context.CancelFunc, grpcServer 
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
 	<-sigChan
-	serviceLogger.Info("Shutdown signal received, starting graceful shutdown...")
+	logger.Info("Shutdown signal received, starting graceful shutdown...")
 
 	cancel()
 
 	// Wait a bit for servers to shut down gracefully
 	time.Sleep(2 * time.Second)
-	serviceLogger.Info("Game service shutdown complete")
+	logger.Info("Game service shutdown complete")
 }
 
 // HTTP API handlers

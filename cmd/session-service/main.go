@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"io"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -11,8 +10,7 @@ import (
 
 	"github.com/dungeongate/internal/session"
 	"github.com/dungeongate/pkg/config"
-	"github.com/dungeongate/pkg/log"
-	"github.com/op/go-logging"
+	"github.com/dungeongate/pkg/logging"
 )
 
 var (
@@ -21,47 +19,26 @@ var (
 	gitCommit string = "unknown"
 )
 
-// setupLogger creates a configured logger using the standard logging package
-func setupLogger(cfg *config.SessionServiceConfig) *logging.Logger {
-	// Create the go-logging logger (matches other services)
-	var logConfig log.Config
+// setupLogger creates a configured slog logger
+func setupLogger(cfg *config.SessionServiceConfig) *slog.Logger {
+	// Set defaults if values are empty
+	level := "info"
+	format := "text"
+	output := "stdout"
+	
 	if cfg.Logging != nil {
-		// Set defaults if values are empty
-		level := cfg.Logging.Level
-		if level == "" {
-			level = "info"
+		if cfg.Logging.Level != "" {
+			level = cfg.Logging.Level
 		}
-		format := cfg.Logging.Format
-		if format == "" {
-			format = "text"
+		if cfg.Logging.Format != "" {
+			format = cfg.Logging.Format
 		}
-		output := cfg.Logging.Output
-		if output == "" {
-			output = "stdout"
-		}
-		
-		logConfig = log.Config{
-			Level:  level,
-			Format: format,
-			Output: output,
-			File: &log.FileConfig{
-				Directory: "./logs",
-				Filename:  "session-service.log",
-				MaxSize:   "100MB",
-				MaxFiles:  10,
-				MaxAge:    "30d",
-				Compress:  true,
-			},
-		}
-	} else {
-		logConfig = log.Config{
-			Level:  "info",
-			Format: "text",
-			Output: "stdout",
+		if cfg.Logging.Output != "" {
+			output = cfg.Logging.Output
 		}
 	}
 	
-	return log.SetupLogger("session-service", logConfig)
+	return logging.NewLoggerBasic("session-service", level, format, output)
 }
 
 func main() {
@@ -82,20 +59,12 @@ func main() {
 	// Load configuration first to setup logging properly
 	cfg, err := config.LoadSessionServiceConfig(*configFile)
 	if err != nil {
-		// Use basic logger for config load errors
-		basicLogger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
-		basicLogger.Error("Failed to load configuration", "error", err)
+			fmt.Fprintf(os.Stderr, "Failed to load configuration: %v\n", err)
 		os.Exit(1)
 	}
 
 	// Setup structured logging based on configuration  
-	goLogger := setupLogger(cfg)
-	
-	// Create silent slog logger for internal components (we'll use go-logging for main messages)
-	// Set to a high level to suppress most internal logging
-	slogLogger := slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{
-		Level: slog.LevelError, // Only show errors from internal components
-	}))
+	logger := setupLogger(cfg)
 
 	// Convert to session config format
 	sessionConfig := &session.Config{
@@ -152,23 +121,23 @@ func main() {
 	}
 
 	// Create stateless session service
-	sessionService, err := session.New(sessionConfig, slogLogger)
+	sessionService, err := session.New(sessionConfig, logger)
 	if err != nil {
-		goLogger.Errorf("Failed to create session service: %v", err)
+		logger.Error("Failed to create session service", "error", err)
 		os.Exit(1)
 	}
 
 	// Start the service
 	if err := sessionService.Start(); err != nil {
-		goLogger.Errorf("Failed to start session service: %v", err)
+		logger.Error("Failed to start session service", "error", err)
 		os.Exit(1)
 	}
 
-	goLogger.Infof("Session Service started - SSH: %d, HTTP: %d, gRPC: %d, Max Connections: %d",
-		sessionConfig.SSH.Port,
-		sessionConfig.HTTP.Port,
-		sessionConfig.GRPC.Port,
-		sessionConfig.MaxConnections,
+	logger.Info("Session Service started",
+		"ssh_port", sessionConfig.SSH.Port,
+		"http_port", sessionConfig.HTTP.Port,
+		"grpc_port", sessionConfig.GRPC.Port,
+		"max_connections", sessionConfig.MaxConnections,
 	)
 
 	// Wait for interrupt signal
@@ -176,12 +145,12 @@ func main() {
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
 	<-sigChan
-	goLogger.Info("Shutting down gracefully...")
+	logger.Info("Shutting down gracefully...")
 
 	// Shutdown the service
 	if err := sessionService.Stop(); err != nil {
-		goLogger.Errorf("Error during shutdown: %v", err)
+		logger.Error("Error during shutdown", "error", err)
 	}
 
-	goLogger.Info("Session Service stopped")
+	logger.Info("Session Service stopped")
 }

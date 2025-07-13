@@ -3,6 +3,7 @@ package adapters
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -10,22 +11,22 @@ import (
 
 	"github.com/dungeongate/internal/games/domain"
 	"github.com/dungeongate/pkg/config"
-	"github.com/op/go-logging"
 )
 
 // NetHackAdapter handles NetHack-specific setup and configuration
 type NetHackAdapter struct {
 	config *config.GameConfig
-	logger *logging.Logger
+	logger *slog.Logger
 }
 
 // NewNetHackAdapter creates a new NetHack adapter
-func NewNetHackAdapter(logger *logging.Logger) *NetHackAdapter {
+func NewNetHackAdapter(logger *slog.Logger) *NetHackAdapter {
 	if logger == nil {
-		logger = logging.MustGetLogger("nethack-adapter")
+		// Create a default logger if none provided
+		logger = slog.Default().With("component", "nethack-adapter")
 	}
 	return &NetHackAdapter{
-		logger: logger,
+		logger: logger.With("adapter", "nethack"),
 	}
 }
 
@@ -100,11 +101,11 @@ func (a *NetHackAdapter) PrepareCommand(ctx context.Context, session *domain.Gam
 	}
 	// Note: SysProcAttr will be set by PTY manager using StartWithAttrs
 
-	a.logger.Debug("NetHack adapter prepared command")
-	a.logger.Debugf("  Path: %s", gamePath)
-	a.logger.Debugf("  Args: %v", args)
-	a.logger.Debugf("  Working Dir: %s", cmd.Dir)
-	a.logger.Debugf("  Env additions: TERM=xterm, USER=%s", username)
+	a.logger.Debug("NetHack adapter prepared command",
+		"path", gamePath,
+		"args", args,
+		"working_dir", cmd.Dir,
+		"username", username)
 
 	return cmd, nil
 }
@@ -126,7 +127,7 @@ func (a *NetHackAdapter) ProcessOutput(data []byte) []byte {
 
 	// Log all NetHack output for debugging
 	if len(output) > 2 || (len(output) <= 2 && output != "\r\n") {
-		a.logger.Debugf("NetHack output [%d bytes]: %q", len(data), output)
+		a.logger.Debug("NetHack output", "bytes", len(data), "content", output)
 	}
 
 	// Handle common NetHack startup messages
@@ -170,7 +171,7 @@ func (a *NetHackAdapter) IsGameReady(output []byte) bool {
 		len(outputStr) > 50 // Assume ready if we get substantial output
 
 	if ready {
-		a.logger.Debugf("NetHack appears ready, output: %q", outputStr)
+		a.logger.Debug("NetHack appears ready", "output", outputStr)
 	}
 
 	return ready
@@ -209,10 +210,11 @@ func (a *NetHackAdapter) SetupGameEnvironment(session *domain.GameSession) error
 		}
 	}
 
-	a.logger.Debugf("NetHack environment setup completed for user %s", username)
-	a.logger.Debugf("  Home: %s", homeDir)
-	a.logger.Debugf("  Game dir: %s/%s", homeDir, a.config.Paths.User.BaseDir)
-	a.logger.Debugf("  Created %d directories from configuration", len(directories))
+	a.logger.Debug("NetHack environment setup completed",
+		"username", username,
+		"home_dir", homeDir,
+		"game_dir", fmt.Sprintf("%s/%s", homeDir, a.config.Paths.User.BaseDir),
+		"directories_created", len(directories))
 	return nil
 }
 
@@ -220,6 +222,6 @@ func (a *NetHackAdapter) SetupGameEnvironment(session *domain.GameSession) error
 func (a *NetHackAdapter) CleanupGameEnvironment(session *domain.GameSession) error {
 	// For now, we don't need to clean up much
 	// In the future, we might want to backup saves, clean temp files, etc.
-	a.logger.Debugf("NetHack cleanup completed for session %s", session.ID().String())
+	a.logger.Debug("NetHack cleanup completed", "session_id", session.ID().String())
 	return nil
 }

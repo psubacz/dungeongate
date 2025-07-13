@@ -41,9 +41,27 @@ type EncryptionConfig struct {
 
 // LoggingConfig represents logging configuration
 type LoggingConfig struct {
-	Level  string `yaml:"level"`
-	Format string `yaml:"format"`
-	Output string `yaml:"output"`
+	Level    string           `yaml:"level"`
+	Format   string           `yaml:"format"`
+	Output   string           `yaml:"output"`
+	File     *FileConfig      `yaml:"file,omitempty"`
+	Journald *JournaldConfig  `yaml:"journald,omitempty"`
+}
+
+// FileConfig represents file logging configuration
+type FileConfig struct {
+	Directory string `yaml:"directory"`
+	Filename  string `yaml:"filename"`
+	MaxSize   string `yaml:"max_size"`
+	MaxFiles  int    `yaml:"max_files"`
+	MaxAge    string `yaml:"max_age"`
+	Compress  bool   `yaml:"compress"`
+}
+
+// JournaldConfig represents journald logging configuration
+type JournaldConfig struct {
+	Identifier string            `yaml:"identifier"`
+	Fields     map[string]string `yaml:"fields"`
 }
 
 // MonitoringConfig represents monitoring configuration

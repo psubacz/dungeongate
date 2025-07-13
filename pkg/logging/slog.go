@@ -13,17 +13,16 @@ import (
 )
 
 // Config represents slog-compatible logging configuration
-// This is compatible with the existing YAML configuration structure
 type Config struct {
-	Level    string           `yaml:"level"`    // debug, info, warn, error
-	Format   string           `yaml:"format"`   // json, text
-	Output   string           `yaml:"output"`   // stdout, stderr, file, journald
-	File     *FileConfig      `yaml:"file,omitempty"`
-	Journald *JournaldConfig  `yaml:"journald,omitempty"`
+	Level    string      `yaml:"level"`    // debug, info, warn, error
+	Format   string      `yaml:"format"`   // json, text
+	Output   string      `yaml:"output"`   // stdout, stderr, file, journald
+	File     *LogFile    `yaml:"file,omitempty"`
+	Journald *LogJournald `yaml:"journald,omitempty"`
 }
 
-// FileConfig represents file logging configuration
-type FileConfig struct {
+// LogFile represents file logging configuration
+type LogFile struct {
 	Directory string `yaml:"directory"`
 	Filename  string `yaml:"filename"`
 	MaxSize   string `yaml:"max_size"`
@@ -32,8 +31,8 @@ type FileConfig struct {
 	Compress  bool   `yaml:"compress"`
 }
 
-// JournaldConfig represents journald logging configuration
-type JournaldConfig struct {
+// LogJournald represents journald logging configuration
+type LogJournald struct {
 	Identifier string            `yaml:"identifier"`
 	Fields     map[string]string `yaml:"fields"`
 }
@@ -153,7 +152,7 @@ func createWriter(config Config) io.Writer {
 }
 
 // createFileWriter creates a rotating file writer
-func createFileWriter(config *FileConfig) (io.Writer, error) {
+func createFileWriter(config *LogFile) (io.Writer, error) {
 	// Ensure directory exists
 	if err := os.MkdirAll(config.Directory, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create log directory: %w", err)
@@ -183,7 +182,7 @@ func createFileWriter(config *FileConfig) (io.Writer, error) {
 }
 
 // createJournaldWriter creates a writer for journald
-func createJournaldWriter(config *JournaldConfig) io.Writer {
+func createJournaldWriter(config *LogJournald) io.Writer {
 	// For now, return stdout with identifier prefix since full journald integration
 	// requires systemd dependencies that may not be available in all environments
 	fmt.Fprintf(os.Stderr, "Info: Journald logging requested (identifier: %s), using stdout for compatibility\n", config.Identifier)
@@ -251,4 +250,14 @@ func LegacyConfig() Config {
 		Format: GetEnvOrDefault("LOG_FORMAT", "text"),
 		Output: GetEnvOrDefault("LOG_OUTPUT", "stdout"),
 	}
+}
+
+// NewLoggerBasic creates a logger with basic string parameters
+func NewLoggerBasic(serviceName, level, format, output string) *slog.Logger {
+	config := Config{
+		Level:  level,
+		Format: format,
+		Output: output,
+	}
+	return NewLogger(serviceName, config)
 }
