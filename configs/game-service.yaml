@@ -25,7 +25,7 @@ inherit_from: "common.yaml"
 # Controls the game service HTTP API and gRPC endpoints
 server:
   # HTTP API server port (REST endpoints for game management)
-  port: 8085          
+  port: 8086          
   
   # gRPC server port (game requests from session service)
   grpc_port: 50051    

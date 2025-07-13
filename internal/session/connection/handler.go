@@ -155,13 +155,18 @@ func (h *Handler) handleSessionChannel(ctx context.Context, newChannel ssh.NewCh
 				// Check if game service is available
 				if !h.gameClient.IsHealthy(ctx) {
 					h.logger.Info("Game service unavailable, entering idle mode", "username", sshConn.User())
-					h.handleIdleMode(ctx, channel, connID, sshConn.User())
-					// If idle mode returns, user either pressed 'r' to retry or 'q' to quit
-					// If context is done, user quit, so we return
-					if ctx.Err() != nil {
+					err := h.handleIdleMode(ctx, channel, connID, sshConn.User())
+					// If idle mode returns an error, check if user quit
+					if err != nil {
+						if err.Error() == "user quit" {
+							h.logger.Info("User quit from idle mode", "username", sshConn.User())
+							return
+						}
+						// For other errors (connection closed, context cancelled), also return
+						h.logger.Debug("Idle mode ended with error", "error", err, "username", sshConn.User())
 						return
 					}
-					// Otherwise, continue the loop to retry
+					// If no error, game service became available, continue the loop to retry
 					continue
 				}
 
@@ -516,11 +521,13 @@ func (a *AuthHandler) PublicKeyCallback(conn ssh.ConnMetadata, key ssh.PublicKey
 }
 
 // handleIdleMode handles the idle state when game service is unavailable
-func (h *Handler) handleIdleMode(ctx context.Context, channel ssh.Channel, connID, username string) {
+// Returns an error if user wants to quit
+func (h *Handler) handleIdleMode(ctx context.Context, channel ssh.Channel, connID, username string) error {
+	h.logger.Info("Entering idle mode", "username", username, "connection_id", connID)
 	// Clear screen and position cursor at top
 	if _, err := channel.Write([]byte("\033[2J\033[H")); err != nil {
 		if err == io.EOF {
-			return
+			return fmt.Errorf("connection closed")
 		}
 		// For other errors, continue - the banner write will catch it
 	}
@@ -529,72 +536,104 @@ func (h *Handler) handleIdleMode(ctx context.Context, channel ssh.Channel, connI
 	banner, err := h.menuHandler.RenderIdleMode(username, h.idleRetryInterval)
 	if err != nil {
 		h.logger.Error("Failed to render idle mode banner", "error", err, "username", username)
-		return
+		return fmt.Errorf("failed to render banner: %w", err)
 	}
 
 	// Display the banner
 	_, err = channel.Write([]byte(banner))
 	if err != nil {
 		if err == io.EOF {
-			return
+			return fmt.Errorf("connection closed")
 		}
 		h.logger.Error("Failed to write idle mode banner", "error", err, "username", username)
-		return
+		return fmt.Errorf("failed to write banner: %w", err)
 	}
 
-	// Set up auto-retry cycle - use configurable interval
-	ticker := time.NewTicker(h.idleRetryInterval)
-	defer ticker.Stop()
+	// Set up countdown timer - update every second
+	countdownTicker := time.NewTicker(1 * time.Second)
+	defer countdownTicker.Stop()
+
+	// Set up health check timer - check at configured interval
+	healthCheckTicker := time.NewTicker(h.idleRetryInterval)
+	defer healthCheckTicker.Stop()
 
 	// Handle auto-retry cycle and quit input
+	inputChan := make(chan byte, 1)
+	errorChan := make(chan error, 1)
+
+	// Start input reading goroutine
+	go func() {
+		buffer := make([]byte, 1)
+		for {
+			n, err := channel.Read(buffer)
+			if err != nil {
+				select {
+				case errorChan <- err:
+				default:
+				}
+				return
+			}
+			if n > 0 {
+				select {
+				case inputChan <- buffer[0]:
+				default:
+				}
+			}
+		}
+	}()
+
+	// Track time for countdown
+	startTime := time.Now()
+	lastUpdate := startTime
+
 	for {
 		select {
 		case <-ctx.Done():
-			return
-		case <-ticker.C:
+			return fmt.Errorf("context cancelled")
+		case err := <-errorChan:
+			if err == io.EOF {
+				return fmt.Errorf("connection closed")
+			}
+			h.logger.Debug("Error reading from channel in idle mode", "error", err, "username", username)
+			return fmt.Errorf("read error: %w", err)
+		case input := <-inputChan:
+			// Handle user input
+			if strings.ToLower(string(input)) == "q" {
+				h.logger.Info("User pressed 'q' to quit in idle mode", "username", username)
+				channel.Write([]byte("\r\n\r\nGoodbye!\r\n"))
+				return fmt.Errorf("user quit")
+			}
+			// Ignore all other input - only quit is allowed
+		case <-countdownTicker.C:
+			// Update countdown display every second
+			elapsed := time.Since(startTime)
+			remaining := h.idleRetryInterval - elapsed
+
+			if remaining <= 0 {
+				// Reset timer for next cycle
+				startTime = time.Now()
+				remaining = h.idleRetryInterval
+			}
+
+			// Only update display if at least 500ms have passed to avoid flicker
+			if time.Since(lastUpdate) >= 500*time.Millisecond {
+				remainingSeconds := int(remaining.Seconds())
+				banner, err := h.menuHandler.RenderIdleModeWithCountdown(username, h.idleRetryInterval, remainingSeconds)
+				if err == nil {
+					channel.Write([]byte("\033[2J\033[H" + banner))
+				}
+				lastUpdate = time.Now()
+			}
+		case <-healthCheckTicker.C:
 			// Auto-retry health check
 			if h.gameClient.IsHealthy(ctx) {
 				h.logger.Info("Game service became available, auto-retrying", "username", username)
 				channel.Write([]byte("\r\n\r\n✓ Game service is now available! Connecting...\r\n"))
 				// Return to main handler to retry game start
-				return
+				return nil
 			} else {
-				// Show retry progress
-				channel.Write([]byte("\r\nRetrying connection... (Press 'q' to quit)\r"))
-			}
-		default:
-			// Check only for quit input
-			buffer := make([]byte, 1)
-			readChan := make(chan struct{})
-			var n int
-			var err error
-
-			go func() {
-				n, err = channel.Read(buffer)
-				close(readChan)
-			}()
-
-			select {
-			case <-readChan:
-				if err != nil {
-					if err == io.EOF {
-						return // Connection closed
-					}
-					h.logger.Debug("Error reading from channel in idle mode", "error", err, "username", username)
-					return
-				}
-
-				if n > 0 {
-					input := string(buffer[:n])
-					if strings.ToLower(input) == "q" {
-						channel.Write([]byte("\r\n\r\nGoodbye!\r\n"))
-						return
-					}
-					// Ignore all other input - only quit is allowed
-				}
-			case <-time.After(50 * time.Millisecond):
-				// Short timeout, continue loop
-				continue
+				// Reset countdown for next cycle
+				startTime = time.Now()
 			}
 		}
 	}
@@ -734,7 +773,10 @@ func (h *Handler) startGameSession(ctx context.Context, channel ssh.Channel, use
 		// Check if the error is due to game service unavailability
 		if !h.gameClient.IsHealthy(ctx) {
 			h.logger.Info("Game service became unavailable, entering idle mode", "username", username)
-			h.handleIdleMode(ctx, channel, connID, username)
+			err := h.handleIdleMode(ctx, channel, connID, username)
+			if err != nil && err.Error() == "user quit" {
+				return fmt.Errorf("user quit")
+			}
 			return nil // Return to menu
 		}
 		channel.Write([]byte("Failed to start game session\r\n"))
@@ -969,7 +1011,10 @@ func (h *Handler) startSpecificGameSession(ctx context.Context, channel ssh.Chan
 		// Check if the error is due to game service unavailability
 		if !h.gameClient.IsHealthy(ctx) {
 			h.logger.Info("Game service became unavailable, entering idle mode", "username", username)
-			h.handleIdleMode(ctx, channel, connID, username)
+			err := h.handleIdleMode(ctx, channel, connID, username)
+			if err != nil && err.Error() == "user quit" {
+				return fmt.Errorf("user quit")
+			}
 			return nil // Return to menu
 		}
 		channel.Write([]byte("Failed to start game session\r\n"))

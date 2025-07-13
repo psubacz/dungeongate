@@ -213,6 +213,12 @@ func (mh *MenuHandler) RenderIdleMode(username string, retryInterval time.Durati
 	return mh.bannerManager.RenderIdleMode(username, retryInterval)
 }
 
+// RenderIdleModeWithCountdown renders the idle mode banner with countdown
+func (mh *MenuHandler) RenderIdleModeWithCountdown(username string, retryInterval time.Duration, remainingSeconds int) (string, error) {
+	// Render the idle mode banner with countdown
+	return mh.bannerManager.RenderIdleModeWithCountdown(username, retryInterval, remainingSeconds)
+}
+
 // ShowGameSelectionMenu displays the game selection menu and handles input
 func (mh *MenuHandler) ShowGameSelectionMenu(ctx context.Context, channel ssh.Channel, username string) (*MenuChoice, error) {
 	// Get list of available games from Game Service

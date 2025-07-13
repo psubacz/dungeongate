@@ -14,4 +14,4 @@ Status: Waiting for game service...
 │ Press [q] to quit                                   │
 └─────────────────────────────────────────────────────┘
 
-Auto-retry interval: $RETRY_INTERVAL
+Next retry in: $RETRY_INTERVAL

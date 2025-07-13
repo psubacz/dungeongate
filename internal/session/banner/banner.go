@@ -72,6 +72,17 @@ func (bm *BannerManager) RenderIdleMode(username string, retryInterval time.Dura
 	})
 }
 
+// RenderIdleModeWithCountdown renders the idle mode banner with countdown
+func (bm *BannerManager) RenderIdleModeWithCountdown(username string, retryInterval time.Duration, remainingSeconds int) (string, error) {
+	return bm.renderBanner(bm.config.IdleMode, map[string]string{
+		"$SERVERID":       "DungeonGate",
+		"$USERNAME":       username,
+		"$DATE":           time.Now().Format("2006-01-02"),
+		"$TIME":           time.Now().Format("15:04:05"),
+		"$RETRY_INTERVAL": fmt.Sprintf("%ds", remainingSeconds),
+	})
+}
+
 // renderBanner loads a banner file and substitutes template variables
 func (bm *BannerManager) renderBanner(filePath string, variables map[string]string) (string, error) {
 	// Check if filePath is empty
