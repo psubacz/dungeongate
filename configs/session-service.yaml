@@ -201,6 +201,9 @@ menu:
     # Banner for the game spectating menu
     watch_menu: "./assets/banners/watch_menu.txt"
     
+    # Banner shown when game service is unavailable
+    idle_mode: "./assets/banners/idle_mode.txt"
+    
   # Menu options configuration
   options:
     # Options available to anonymous users
