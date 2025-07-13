@@ -3,6 +3,8 @@ package grpc
 import (
 	"context"
 	"log/slog"
+	"os/exec"
+	"syscall"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -13,8 +15,8 @@ import (
 	"github.com/dungeongate/internal/games/application"
 	"github.com/dungeongate/internal/games/domain"
 	"github.com/dungeongate/internal/games/infrastructure/pty"
-	"github.com/dungeongate/pkg/config"
 	games_pb "github.com/dungeongate/pkg/api/games/v2"
+	"github.com/dungeongate/pkg/config"
 )
 
 // GameServiceServer implements the gRPC GameService interface
@@ -36,7 +38,7 @@ func NewGameServiceServer(cfg *config.GameServiceConfig, gameService *applicatio
 		logger.Error("Failed to create adapter registry with config, using default", "error", err)
 		adapterRegistry = adapters.NewGameAdapterRegistry()
 	}
-	
+
 	// Create PTY manager with configured adapters
 	ptyManager := pty.NewPTYManagerWithAdapters(logger, adapterRegistry)
 	streamHandler := NewStreamHandler(ptyManager, logger)
@@ -207,7 +209,29 @@ func (s *GameServiceServer) StartGameSession(ctx context.Context, req *games_pb.
 	gameArgs := []string{}
 	gameEnv := []string{}
 
-	_, err = s.ptyManager.CreatePTY(ctx, session, gamePath, gameArgs, gameEnv)
+	// Create callback to handle process exit
+	processExitCallback := func(exitSession *domain.GameSession, exitCode *int, processErr error) {
+		// Handle session cleanup when process exits
+		s.logger.Info("Game process exited", "session_id", exitSession.ID().String(), "exit_code", exitCode)
+
+		// Mark session as ended in the session service
+		// Note: This is a simplified approach. In a full implementation,
+		// we'd want to coordinate with the session manager for save creation
+		var signal *string
+		if processErr != nil {
+			if exitError, ok := processErr.(*exec.ExitError); ok {
+				if sys := exitError.Sys(); sys != nil {
+					if ws, ok := sys.(syscall.WaitStatus); ok && ws.Signaled() {
+						sig := ws.Signal().String()
+						signal = &sig
+					}
+				}
+			}
+		}
+		exitSession.End(exitCode, signal)
+	}
+
+	_, err = s.ptyManager.CreatePTYWithCallback(ctx, session, gamePath, gameArgs, gameEnv, processExitCallback)
 	if err != nil {
 		s.logger.Error("Failed to create PTY", "error", err, "session_id", session.ID().String())
 		// TODO: Clean up the session in the database
@@ -233,7 +257,23 @@ func (s *GameServiceServer) StopGameSession(ctx context.Context, req *games_pb.S
 		return nil, status.Error(codes.Unavailable, "session service not available")
 	}
 
-	return nil, status.Error(codes.Unimplemented, "method StopGameSession not implemented")
+	// Stop the session through the session service
+	err := s.sessionService.StopGameSession(ctx, req.SessionId, req.Reason)
+	if err != nil {
+		s.logger.Error("Failed to stop game session", "error", err, "session_id", req.SessionId)
+		return nil, status.Error(codes.Internal, "failed to stop session: "+err.Error())
+	}
+
+	// Stop the PTY if it exists
+	err = s.ptyManager.ClosePTY(req.SessionId)
+	if err != nil {
+		s.logger.Warn("Failed to close PTY", "error", err, "session_id", req.SessionId)
+		// Don't return error for PTY cleanup failure, session is already stopped
+	}
+
+	return &games_pb.StopGameSessionResponse{
+		Success: true,
+	}, nil
 }
 
 // GetGameSession gets a specific game session

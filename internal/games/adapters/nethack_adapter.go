@@ -13,7 +13,7 @@ import (
 )
 
 // NetHackAdapter handles NetHack-specific setup and configuration
-type NetHackAdapter struct{
+type NetHackAdapter struct {
 	config *config.GameConfig
 }
 
@@ -54,13 +54,13 @@ func (a *NetHackAdapter) PrepareCommand(ctx context.Context, session *domain.Gam
 	// Enhanced environment for NetHack with configuration-driven paths
 	homeDir := fmt.Sprintf("/tmp/nethack-users/%s", username)
 	userGameDir := fmt.Sprintf("%s/%s", homeDir, a.config.Paths.User.BaseDir)
-	
+
 	// Get system path from configuration
 	systemPath := "/opt/homebrew/Cellar/nethack/3.6.7/libexec" // Default fallback
 	if a.config.Paths != nil && a.config.Paths.System != nil && a.config.Paths.System.SysConfFile != "" {
 		systemPath = filepath.Dir(a.config.Paths.System.SysConfFile)
 	}
-	
+
 	env := append(os.Environ(),
 		// Terminal configuration - use basic xterm for better compatibility
 		fmt.Sprintf("TERM=%s", "xterm"),
@@ -69,7 +69,7 @@ func (a *NetHackAdapter) PrepareCommand(ctx context.Context, session *domain.Gam
 		fmt.Sprintf("HOME=%s", homeDir),
 		fmt.Sprintf("COLUMNS=%d", session.TerminalSize().Width),
 		fmt.Sprintf("LINES=%d", session.TerminalSize().Height),
-		
+
 		// NetHack path configuration from game-service.yaml
 		fmt.Sprintf("NETHACKDIR=%s", systemPath),
 		fmt.Sprintf("HACKDIR=%s", systemPath),
@@ -85,7 +85,7 @@ func (a *NetHackAdapter) PrepareCommand(ctx context.Context, session *domain.Gam
 	// Create the command
 	cmd := exec.CommandContext(ctx, gamePath, args...)
 	cmd.Env = env
-	
+
 	// Set working directory from configuration
 	if a.config.Binary != nil && a.config.Binary.WorkingDirectory != "" {
 		cmd.Dir = a.config.Binary.WorkingDirectory
@@ -182,7 +182,7 @@ func (a *NetHackAdapter) SetupGameEnvironment(session *domain.GameSession) error
 
 	username := fmt.Sprintf("user_%d", session.UserID().Int())
 	homeDir := fmt.Sprintf("/tmp/nethack-users/%s", username)
-	
+
 	// Create all required NetHack directories using configuration
 	directories := []string{
 		homeDir,
@@ -194,13 +194,13 @@ func (a *NetHackAdapter) SetupGameEnvironment(session *domain.GameSession) error
 		fmt.Sprintf("%s/%s", homeDir, a.config.Paths.User.TroubleDir),
 		fmt.Sprintf("%s/%s", homeDir, a.config.Paths.User.ConfigDir),
 	}
-	
+
 	for _, dir := range directories {
 		if err := os.MkdirAll(dir, 0755); err != nil {
 			return fmt.Errorf("failed to create NetHack directory %s: %w", dir, err)
 		}
 	}
-	
+
 	fmt.Printf("DEBUG: NetHack environment setup completed for user %s\n", username)
 	fmt.Printf("  Home: %s\n", homeDir)
 	fmt.Printf("  Game dir: %s/%s\n", homeDir, a.config.Paths.User.BaseDir)

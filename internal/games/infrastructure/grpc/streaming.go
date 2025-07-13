@@ -124,7 +124,7 @@ func (h *StreamHandler) HandleStream(stream games_pb.GameService_StreamGameIOSer
 
 	// Wait for either goroutine to finish
 	err = <-errChan
-	streamSession.Close()
+	// Note: streamSession.Close() is already called in defer above - no need to call again
 
 	// Send disconnect response if possible
 	stream.Send(&games_pb.GameIOResponse{

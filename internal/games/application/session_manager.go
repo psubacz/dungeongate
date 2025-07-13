@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/dungeongate/internal/games/domain"
+	"github.com/dungeongate/internal/games/infrastructure/pty"
 	"github.com/google/uuid"
 )
 
@@ -124,8 +125,8 @@ func (sm *SessionManager) StartGameSession(ctx context.Context, userID int, game
 	}
 	sm.eventRepo.SaveEvent(ctx, event)
 
-	// Start monitoring the process in background
-	go sm.monitorGameProcess(ctx, session, cmd, sessionDir)
+	// Process exit handling will be coordinated through PTY manager callback
+	// to avoid race conditions with multiple Wait() calls
 
 	sm.logger.Printf("Started game session %s for user %d, game %s, PID %d",
 		sessionID.String(), userID, gameID, cmd.Process.Pid)
@@ -250,28 +251,27 @@ func (sm *SessionManager) startGameProcess(game *domain.Game, session *domain.Ga
 	return cmd, nil
 }
 
-// monitorGameProcess monitors the game process and handles cleanup when it exits
-func (sm *SessionManager) monitorGameProcess(ctx context.Context, session *domain.GameSession, cmd *exec.Cmd, sessionDir string) {
-	// Wait for process to exit
-	err := cmd.Wait()
-
-	var exitCode *int
+// handleGameProcessExit handles cleanup when a game process exits (called via PTY manager callback)
+func (sm *SessionManager) handleGameProcessExit(ctx context.Context, session *domain.GameSession, exitCode *int, processErr error) {
 	var signal *string
 
-	if err != nil {
-		if exitError, ok := err.(*exec.ExitError); ok {
-			code := exitError.ExitCode()
-			exitCode = &code
+	// Extract signal information if available
+	if processErr != nil {
+		if exitError, ok := processErr.(*exec.ExitError); ok {
+			if sys := exitError.Sys(); sys != nil {
+				// On Unix systems, extract signal information
+				if ws, ok := sys.(syscall.WaitStatus); ok && ws.Signaled() {
+					sig := ws.Signal().String()
+					signal = &sig
+				}
+			}
 		}
-	} else {
-		code := 0
-		exitCode = &code
 	}
 
-	sm.logger.Printf("Game process %d exited with code %v", cmd.Process.Pid, exitCode)
+	sm.logger.Printf("Game process for session %s exited with code %v", session.ID().String(), exitCode)
 
 	// Create save from session data before marking as ended
-	err = sm.createSaveFromSession(ctx, session)
+	err := sm.createSaveFromSession(ctx, session)
 	if err != nil {
 		sm.logger.Printf("Failed to create save from session %s: %v", session.ID().String(), err)
 	}
@@ -299,6 +299,13 @@ func (sm *SessionManager) monitorGameProcess(ctx context.Context, session *domai
 		Timestamp: time.Now(),
 	}
 	sm.eventRepo.SaveEvent(ctx, event)
+}
+
+// GetProcessExitCallback returns a callback function for handling process exit
+func (sm *SessionManager) GetProcessExitCallback(ctx context.Context) pty.ProcessExitCallback {
+	return func(session *domain.GameSession, exitCode *int, err error) {
+		sm.handleGameProcessExit(ctx, session, exitCode, err)
+	}
 }
 
 // createSaveFromSession creates a save file from session data

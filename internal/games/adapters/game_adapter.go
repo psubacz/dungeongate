@@ -13,7 +13,7 @@ import (
 type GameAdapter interface {
 	// GetGameID returns the game ID this adapter handles
 	GetGameID() string
-	
+
 	// Configure sets up the adapter with game-specific configuration
 	Configure(config *config.GameConfig) error
 

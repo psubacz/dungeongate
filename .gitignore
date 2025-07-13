@@ -73,6 +73,7 @@ ssh_host_*
 tmp/
 temp/
 .tmp/
+logs/
 
 # Legacy files (keep tracked but ignore changes)
 configs/legacy/

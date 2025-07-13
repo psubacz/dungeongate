@@ -39,6 +39,7 @@ type PTYSession struct {
 	mu         sync.Mutex
 	adapter    adapters.GameAdapter
 	session    *domain.GameSession
+	onExit     ProcessExitCallback
 }
 
 // NewPTYManager creates a new PTY manager
@@ -59,8 +60,16 @@ func NewPTYManagerWithAdapters(logger *slog.Logger, adapterRegistry *adapters.Ga
 	}
 }
 
+// ProcessExitCallback is called when a game process exits
+type ProcessExitCallback func(session *domain.GameSession, exitCode *int, err error)
+
 // CreatePTY creates a new PTY for a game session
 func (m *PTYManager) CreatePTY(ctx context.Context, session *domain.GameSession, gamePath string, args []string, env []string) (*PTYSession, error) {
+	return m.CreatePTYWithCallback(ctx, session, gamePath, args, env, nil)
+}
+
+// CreatePTYWithCallback creates a new PTY for a game session with a callback for process exit
+func (m *PTYManager) CreatePTYWithCallback(ctx context.Context, session *domain.GameSession, gamePath string, args []string, env []string, onExit ProcessExitCallback) (*PTYSession, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -93,31 +102,31 @@ func (m *PTYManager) CreatePTY(ctx context.Context, session *domain.GameSession,
 		Rows: uint16(session.TerminalSize().Height),
 		Cols: uint16(session.TerminalSize().Width),
 	}
-	
+
 	// Note: Using standard pty.Start instead of StartWithAttrs
 	// as it works better with NetHack on macOS
-	
+
 	fmt.Printf("DEBUG: Starting PTY with command: %s %v\n", cmd.Path, cmd.Args)
 	fmt.Printf("DEBUG: Working directory: %s\n", cmd.Dir)
-	
+
 	// Look for NetHack-specific environment variables
 	fmt.Printf("DEBUG: Total environment variables: %d\n", len(cmd.Env))
 	for _, env := range cmd.Env {
-		if strings.HasPrefix(env, "TERM=") || 
-		   strings.HasPrefix(env, "USER=") || 
-		   strings.HasPrefix(env, "HOME=") ||
-		   strings.HasPrefix(env, "NETHACK") ||
-		   strings.HasPrefix(env, "HACKDIR") {
+		if strings.HasPrefix(env, "TERM=") ||
+			strings.HasPrefix(env, "USER=") ||
+			strings.HasPrefix(env, "HOME=") ||
+			strings.HasPrefix(env, "NETHACK") ||
+			strings.HasPrefix(env, "HACKDIR") {
 			fmt.Printf("DEBUG: NetHack env: %s\n", env)
 		}
 	}
-	
+
 	// Check if the binary exists
 	if _, err := os.Stat(cmd.Path); err != nil {
 		fmt.Printf("DEBUG: Binary not found at path %s: %v\n", cmd.Path, err)
 		return nil, fmt.Errorf("game binary not found at %s: %w", cmd.Path, err)
 	}
-	
+
 	// Try standard pty.Start first, which might work better on macOS
 	startTime := time.Now()
 	ptmx, err := pty.Start(cmd)
@@ -126,14 +135,14 @@ func (m *PTYManager) CreatePTY(ctx context.Context, session *domain.GameSession,
 		return nil, fmt.Errorf("failed to start PTY: %w", err)
 	}
 	fmt.Printf("DEBUG: PTY.Start took %v\n", time.Since(startTime))
-	
+
 	// Set the window size after starting
 	if err := pty.Setsize(ptmx, size); err != nil {
 		fmt.Printf("DEBUG: Warning: Failed to set initial PTY size: %v\n", err)
 	}
-	
+
 	fmt.Printf("DEBUG: PTY started successfully, PID: %d\n", cmd.Process.Pid)
-	
+
 	// Check if process is still alive immediately after starting
 	time.Sleep(100 * time.Millisecond)
 	// Send signal 0 to check if process exists without affecting it
@@ -146,16 +155,17 @@ func (m *PTYManager) CreatePTY(ctx context.Context, session *domain.GameSession,
 
 	// Create PTY session
 	ptySession := &PTYSession{
-		SessionID: sessionID,
-		PTY:       ptmx,
-		Cmd:       cmd,
-		Size:      size, // Use the size we already created
+		SessionID:  sessionID,
+		PTY:        ptmx,
+		Cmd:        cmd,
+		Size:       size, // Use the size we already created
 		inputChan:  make(chan []byte, 100),
 		outputChan: make(chan []byte, 100),
 		errorChan:  make(chan error, 1),
 		closeChan:  make(chan struct{}),
 		adapter:    adapter,
 		session:    session,
+		onExit:     onExit,
 	}
 
 	// Set initial terminal size
@@ -283,8 +293,21 @@ func (s *PTYSession) handleOutput() {
 
 // waitForExit waits for the command to exit
 func (s *PTYSession) waitForExit() {
-	fmt.Printf("DEBUG: Waiting for process to exit for session %s, PID: %d\n", s.SessionID, s.Cmd.Process.Pid)
-	err := s.Cmd.Wait()
+	fmt.Printf("DEBUG: Starting waitForExit for session %s, PID: %d\n", s.SessionID, s.Cmd.Process.Pid)
+	
+	// Check process status before waiting
+	err := s.Cmd.Process.Signal(syscall.Signal(0))
+	if err != nil {
+		fmt.Printf("DEBUG: Process %d already dead before Wait(): %v\n", s.Cmd.Process.Pid, err)
+	} else {
+		fmt.Printf("DEBUG: Process %d confirmed alive before Wait()\n", s.Cmd.Process.Pid)
+	}
+	
+	fmt.Printf("DEBUG: About to call Cmd.Wait() for session %s, PID: %d\n", s.SessionID, s.Cmd.Process.Pid)
+	err = s.Cmd.Wait()
+	fmt.Printf("DEBUG: Cmd.Wait() returned for session %s, PID: %d, error: %v\n", s.SessionID, s.Cmd.Process.Pid, err)
+
+	var exitCode *int
 	if err != nil {
 		fmt.Printf("DEBUG: Process exited with error for session %s: %v\n", s.SessionID, err)
 		// Check if it's an exec.ExitError to get more details
@@ -293,6 +316,8 @@ func (s *PTYSession) waitForExit() {
 			if exitErr.ExitCode() == -1 {
 				fmt.Printf("DEBUG: Process was killed by signal\n")
 			}
+			code := exitErr.ExitCode()
+			exitCode = &code
 		}
 		select {
 		case s.errorChan <- err:
@@ -300,8 +325,20 @@ func (s *PTYSession) waitForExit() {
 		}
 	} else {
 		fmt.Printf("DEBUG: Process exited successfully for session %s\n", s.SessionID)
+		code := 0
+		exitCode = &code
 	}
-	s.Close()
+
+	// Call the exit callback if provided
+	if s.onExit != nil {
+		fmt.Printf("DEBUG: Calling onExit callback for session %s\n", s.SessionID)
+		s.onExit(s.session, exitCode, err)
+	}
+
+	// IMPORTANT: Only close if the process actually exited
+	// For interactive games like NetHack, we should NOT close on normal exit
+	// The streaming handler should manage session lifecycle
+	fmt.Printf("DEBUG: waitForExit completed for session %s, process state: %v\n", s.SessionID, s.Cmd.ProcessState)
 }
 
 // SendInput sends input to the PTY
@@ -336,7 +373,10 @@ func (s *PTYSession) Resize(rows, cols uint16) error {
 
 // Close closes the PTY session
 func (s *PTYSession) Close() {
+	fmt.Printf("DEBUG: Close() called for session %s\n", s.SessionID)
+	
 	s.closeOnce.Do(func() {
+		fmt.Printf("DEBUG: Executing Close() for session %s (first time)\n", s.SessionID)
 		close(s.closeChan)
 
 		// Gracefully terminate the process if it's still running
@@ -345,22 +385,18 @@ func (s *PTYSession) Close() {
 			fmt.Printf("DEBUG: Attempting graceful termination of process %d for session %s\n", s.Cmd.Process.Pid, s.SessionID)
 			// First try SIGTERM with a grace period
 			s.Cmd.Process.Signal(syscall.SIGTERM)
-			
-			// Give the process 3 seconds to terminate gracefully
-			done := make(chan struct{})
-			go func() {
-				s.Cmd.Wait()
-				close(done)
-			}()
-			
-			select {
-			case <-done:
-				// Process terminated gracefully
-				fmt.Printf("DEBUG: Process %d terminated gracefully for session %s\n", s.Cmd.Process.Pid, s.SessionID)
-			case <-time.After(3 * time.Second):
+
+			// Give the process 5 seconds to terminate gracefully
+			// Don't call Wait() here as waitForExit() is already handling it
+			time.Sleep(5 * time.Second)
+
+			// Check if process is still running after grace period
+			if s.Cmd.ProcessState == nil {
 				// Process didn't terminate, force kill
-				fmt.Printf("DEBUG: Force killing process %d for session %s\n", s.Cmd.Process.Pid, s.SessionID)
+				fmt.Printf("DEBUG: Force killing process %d for session %s after 5s grace period\n", s.Cmd.Process.Pid, s.SessionID)
 				s.Cmd.Process.Signal(syscall.SIGKILL)
+			} else {
+				fmt.Printf("DEBUG: Process %d terminated gracefully during grace period for session %s\n", s.Cmd.Process.Pid, s.SessionID)
 			}
 		} else if s.Cmd != nil && s.Cmd.ProcessState != nil {
 			fmt.Printf("DEBUG: Process already exited for session %s with state: %v\n", s.SessionID, s.Cmd.ProcessState)
@@ -375,6 +411,8 @@ func (s *PTYSession) Close() {
 		close(s.inputChan)
 		close(s.outputChan)
 		close(s.errorChan)
+		
+		fmt.Printf("DEBUG: Close() completed for session %s\n", s.SessionID)
 	})
 }
 

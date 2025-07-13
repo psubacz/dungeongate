@@ -277,7 +277,7 @@ func (mh *MenuHandler) ShowGameSelectionMenu(ctx context.Context, channel ssh.Ch
 	// Use proper input handler to avoid character echoing
 	inputHandler := terminal.NewInputHandler(channel)
 	var inputBuffer strings.Builder
-	
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -291,30 +291,30 @@ func (mh *MenuHandler) ShowGameSelectionMenu(ctx context.Context, channel ssh.Ch
 			switch event.Type {
 			case terminal.EventCharacter:
 				char := event.Character
-				
+
 				// Handle immediate single-character commands
 				if char == 'q' || char == 'Q' || char == 'b' || char == 'B' {
 					return nil, nil // Return to main menu
 				}
-				
+
 				// For digits, accumulate input until Enter
 				if char >= '0' && char <= '9' {
 					inputBuffer.WriteRune(char)
 					// Echo the character for visual feedback
 					channel.Write([]byte(string(char)))
 				}
-				
+
 			case terminal.EventKey:
 				key := event.KeyCode
-				
+
 				if key == terminal.KeyEnter {
 					choice := strings.TrimSpace(inputBuffer.String())
 					inputBuffer.Reset()
-					
+
 					if choice == "" {
 						continue // Ignore empty input
 					}
-					
+
 					// Try to parse game selection number
 					if gameIndex, parseErr := parseGameChoice(choice, len(games)); parseErr == nil {
 						selectedGame := games[gameIndex]

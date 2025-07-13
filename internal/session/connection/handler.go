@@ -228,12 +228,12 @@ func (h *Handler) handleSessionChannel(ctx context.Context, newChannel ssh.NewCh
 		}
 	}
 
-	// Clean up session when channel closes
+	// DON'T automatically stop game sessions when channels close
+	// This allows users to reconnect to ongoing NetHack sessions after temporary disconnections
+	// Game sessions should only be stopped on explicit user quit or timeout
 	if sessionID != "" {
-		err := h.gameClient.StopGameSession(ctx, sessionID, "connection_closed")
-		if err != nil {
-			h.logger.Error("Failed to stop game session", "error", err, "session_id", sessionID)
-		}
+		h.logger.Info("SSH channel closed but keeping game session alive for reconnection", "session_id", sessionID)
+		// Future: Implement session timeout/cleanup after extended inactivity
 	}
 }
 
@@ -270,6 +270,13 @@ func (h *Handler) handleGameIO(ctx context.Context, channel ssh.Channel, session
 		return
 	}
 	defer stream.CloseSend()
+
+	h.handleGameIOWithStream(ctx, channel, sessionID, connID, stream)
+}
+
+// handleGameIOWithStream handles I/O using a pre-established gRPC stream
+func (h *Handler) handleGameIOWithStream(ctx context.Context, channel ssh.Channel, sessionID, connID string, stream gamev2.GameService_StreamGameIOClient) {
+	h.logger.Info("Starting game I/O handling with pre-established stream", "session_id", sessionID, "connection_id", connID)
 
 	// Send connect request
 	connectReq := &gamev2.GameIORequest{
@@ -813,7 +820,7 @@ func (h *Handler) handleLogin(ctx context.Context, channel ssh.Channel, connID, 
 	sshConn.Permissions.Extensions["access_token"] = resp.AccessToken
 
 	h.logger.Info("User logged in successfully", "username", username, "user_id", resp.User.Id)
-	channel.Write([]byte("\r\nLogin successful! Welcome back, " + resp.User.Username + "!\r\n"))
+	channel.Write([]byte("\r\nLogin successful! Welcome back to the gate, " + resp.User.Username + "\r\n"))
 
 	// Update connection state
 	h.manager.UpdateConnectionState(connID, types.ConnectionStateAuthenticated, resp.User.Id)
@@ -949,6 +956,16 @@ func (h *Handler) startSpecificGameSession(ctx context.Context, channel ssh.Chan
 		return nil
 	}
 
+	// Create gRPC stream FIRST to avoid race condition
+	stream, err := h.gameClient.StreamGameIO(ctx)
+	if err != nil {
+		h.logger.Error("Failed to create game I/O stream", "error", err, "username", username)
+		channel.Write([]byte("Failed to connect to game session\r\n"))
+		return nil
+	}
+	defer stream.CloseSend()
+
+	// Now start the game session with PTY
 	sessionInfo, err := h.gameClient.StartGameSession(ctx, int32(userID), username, gameID, terminalCols, terminalRows)
 	if err != nil {
 		h.logger.Error("Failed to start game session", "error", err, "username", username, "game_id", gameID)
@@ -969,9 +986,8 @@ func (h *Handler) startSpecificGameSession(ctx context.Context, channel ssh.Chan
 	// Update connection state
 	h.manager.UpdateConnectionState(connID, types.ConnectionStateActive, username)
 
-	// Handle I/O - since Game Service doesn't have direct I/O methods,
-	// we'll need to implement this differently in a real implementation
-	h.handleGameIO(ctx, channel, sessionID, connID)
+	// Handle I/O using the pre-established stream
+	h.handleGameIOWithStream(ctx, channel, sessionID, connID, stream)
 
 	return nil
 }
