@@ -319,9 +319,9 @@ func applyDefaults(cfg *SessionServiceConfig) {
 	if cfg.Menu == nil {
 		cfg.Menu = &MenuConfig{
 			Banners: &BannersConfig{
-				MainAnon:  "/etc/dungeongate/banners/main_anon.txt",
-				MainUser:  "/etc/dungeongate/banners/main_user.txt",
-				WatchMenu: "/etc/dungeongate/banners/watch_menu.txt",
+				MainAnon:  "./assets/banners/main_anon.txt",
+				MainUser:  "./assets/banners/main_user.txt",
+				WatchMenu: "./assets/banners/watch_menu.txt",
 			},
 			Options: &MenuOptions{
 				Anonymous: []*MenuOption{
@@ -442,9 +442,9 @@ func (c *SessionServiceConfig) GetMenu() *MenuConfig {
 	if c.Menu == nil {
 		return &MenuConfig{
 			Banners: &BannersConfig{
-				MainAnon:  "/etc/dungeongate/banners/main_anon.txt",
-				MainUser:  "/etc/dungeongate/banners/main_user.txt",
-				WatchMenu: "/etc/dungeongate/banners/watch_menu.txt",
+				MainAnon:  "./assets/banners/main_anon.txt",
+				MainUser:  "./assets/banners/main_user.txt",
+				WatchMenu: "./assets/banners/watch_menu.txt",
 			},
 			Options: &MenuOptions{
 				Anonymous: []*MenuOption{

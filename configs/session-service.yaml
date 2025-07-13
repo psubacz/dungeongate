@@ -193,13 +193,13 @@ menu:
   # Banner file paths (text files with template variables)
   banners:
     # Banner shown to anonymous (not logged in) users
-    main_anon: "./configs/banners/main_anon.txt"
+    main_anon: "./assets/banners/main_anon.txt"
     
     # Banner shown to authenticated users
-    main_user: "./configs/banners/main_user.txt"
+    main_user: "./assets/banners/main_user.txt"
     
     # Banner for the game spectating menu
-    watch_menu: "./configs/banners/watch_menu.txt"
+    watch_menu: "./assets/banners/watch_menu.txt"
     
   # Menu options configuration
   options:
