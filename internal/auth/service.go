@@ -416,12 +416,12 @@ func (s *Service) Register(ctx context.Context, req *proto.RegisterRequest) (*pr
 		// Map validation errors to registration error codes
 		var errorCode string = "registration_failed"
 		var errorMessage string = regResp.Message
-		
+
 		if len(regResp.Errors) > 0 {
 			// Use the first error for the main response
 			firstError := regResp.Errors[0]
 			errorMessage = firstError.Message
-			
+
 			switch firstError.Code {
 			case "USERNAME_EXISTS":
 				errorCode = "username_taken"

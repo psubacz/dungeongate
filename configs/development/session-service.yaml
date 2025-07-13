@@ -496,22 +496,22 @@ games:
       # Command line arguments (${USERNAME} is replaced with actual username)
       args: ["-u", "${USERNAME}"]
       
-      # Working directory for game execution
-      working_directory: "/opt/homebrew/Cellar/nethack/3.6.7/libexec"
+      # Working directory for game execution (empty means use default)
+      working_directory: ""
       
       # File permissions for game executable
       permissions: "0755"
       
     # File and directory configuration
     files:
-      # Directory containing game data files
-      data_directory: "/opt/homebrew/Cellar/nethack/3.6.7/libexec"
+      # Directory containing game data files (empty means use default)
+      data_directory: ""
       
-      # Directory for save files
-      save_directory: "/opt/homebrew/Cellar/nethack/3.6.7/libexec/save"
+      # Directory for save files (empty means use default)
+      save_directory: ""
       
-      # Directory for configuration files
-      config_directory: "/opt/homebrew/Cellar/nethack/3.6.7/libexec"
+      # Directory for configuration files (empty means use default)
+      config_directory: ""
       
       # Directory for game logs
       log_directory: "/tmp/nethack-logs"
@@ -586,25 +586,17 @@ games:
         SEDLEVEL: "5"                     # Security level
         DUMPLOG: "1"                      # Enable dump logs
         LIVELOG: "1"                      # Enable live logging
-        XLOGFILE: "/opt/homebrew/Cellar/nethack/3.6.7/libexec/xlogfile"
-        LIVELOGFILE: "/opt/homebrew/Cellar/nethack/3.6.7/libexec/livelog"
+        XLOGFILE: ""
+        LIVELOGFILE: ""
         
     # Environment variables set when running the game
     environment:
-      # NetHack options file path
-      NETHACKOPTIONS: "@/opt/homebrew/Cellar/nethack/3.6.7/libexec/${USERNAME}.nethackrc"
-      
-      # NetHack data directory
-      HACKDIR: "/opt/homebrew/Cellar/nethack/3.6.7/libexec"
-      NETHACKDIR: "/opt/homebrew/Cellar/nethack/3.6.7/libexec"
-      
       # Terminal type for game display
       TERM: "xterm-256color"
       
       # User information
       USER: "${USERNAME}"
-      HOME: "/opt/homebrew/Cellar/nethack/3.6.7/libexec/${USERNAME}"
-      SHELL: "/bin/sh"
+      LOGNAME: "${USERNAME}"
       
     # Resource limits for game processes
     resources:

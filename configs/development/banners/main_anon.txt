@@ -6,9 +6,7 @@ Date: $DATE | Time: $TIME
 Menu Options:
   [l] Login
   [r] Register
-  [w] Watch games
-  [g] List games
-  [c] Credit
+  [c] Credits
   [q] Quit
 
 Choice: 

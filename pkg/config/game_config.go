@@ -928,7 +928,7 @@ func GetDefaultNetHackConfig() *GameConfig {
 		Version:   "3.7.0",
 		Enabled:   true,
 		Binary: &BinaryConfig{
-			Path:             "/usr/games/nethack",
+			Path:             "/opt/homebrew/bin/nethack",
 			Args:             []string{"-u", "${USERNAME}"},
 			WorkingDirectory: "/var/games/nethack",
 			User:             "games",

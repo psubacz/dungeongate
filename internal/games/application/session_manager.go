@@ -226,10 +226,10 @@ func (sm *SessionManager) startGameProcess(game *domain.Game, session *domain.Ga
 	// This is a simplified implementation
 	// In reality, you'd use the game's binary path, args, working directory, etc.
 
-	gameExecutable := "/usr/games/nethack" // Default for now
+	gameExecutable := "/opt/homebrew/bin/nethack" // Default for now
 	if game != nil {
 		// Use game-specific executable path from game domain model
-		gameExecutable = "/usr/games/nethack" // Would come from game.BinaryPath()
+		gameExecutable = "/opt/homebrew/bin/nethack" // Would come from game.BinaryPath()
 	}
 
 	cmd := exec.Command(gameExecutable)

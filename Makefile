@@ -291,10 +291,16 @@ run-all: build-all setup-test-env ## Build and run all services
 	@echo "$(YELLOW)Game service will run on port 8085/50051$(NC)"
 	@echo "$(YELLOW)Session service will run on port 8083/2222$(NC)"
 	@echo "$(YELLOW)Use Ctrl+C to stop all services$(NC)"
-	@(./$(BUILD_DIR)/$(AUTH_BINARY_NAME) -config=$(AUTH_CONFIG) &) && \
-	 sleep 2 && \
-	 (./$(BUILD_DIR)/$(GAME_BINARY_NAME) -config=$(GAME_CONFIG) &) && \
-	 sleep 2 && \
+	@./$(BUILD_DIR)/$(AUTH_BINARY_NAME) -config=$(AUTH_CONFIG) > auth.log 2>&1 & \
+	 AUTH_PID=$$!; \
+	 echo "Auth service started (PID: $$AUTH_PID)"; \
+	 sleep 3 && \
+	 ./$(BUILD_DIR)/$(GAME_BINARY_NAME) -config=$(GAME_CONFIG) > game.log 2>&1 & \
+	 GAME_PID=$$!; \
+	 echo "Game service started (PID: $$GAME_PID)"; \
+	 sleep 3 && \
+	 echo "Starting session service (will run in foreground)..." && \
+	 trap 'echo "Stopping services..."; kill $$AUTH_PID $$GAME_PID 2>/dev/null; exit' INT TERM && \
 	 ./$(BUILD_DIR)/$(SESSION_BINARY_NAME) -config=$(SESSION_CONFIG)
 
 .PHONY: run-debug

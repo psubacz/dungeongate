@@ -147,9 +147,11 @@ func (h *StreamHandler) handlePTYOutput(session *StreamSession) error {
 		select {
 		case data, ok := <-outputChan:
 			if !ok {
+				fmt.Printf("DEBUG: Output channel closed for session %s\n", session.sessionID)
 				return io.EOF
 			}
 
+			fmt.Printf("DEBUG: Sending %d bytes to stream for session %s: %q\n", len(data), session.sessionID, string(data))
 			// Send output to stream
 			if err := session.stream.Send(&games_pb.GameIOResponse{
 				Response: &games_pb.GameIOResponse_Output{
@@ -159,9 +161,11 @@ func (h *StreamHandler) handlePTYOutput(session *StreamSession) error {
 					},
 				},
 			}); err != nil {
+				fmt.Printf("DEBUG: Failed to send to stream for session %s: %v\n", session.sessionID, err)
 				h.logger.Error("Failed to send PTY output", "error", err, "session_id", session.sessionID)
 				return err
 			}
+			fmt.Printf("DEBUG: Successfully sent to stream for session %s\n", session.sessionID)
 
 		case err := <-errorChan:
 			// Get exit code if available

@@ -112,8 +112,8 @@ func (h *Handler) handleSessionChannel(ctx context.Context, newChannel ssh.NewCh
 	}
 	defer func() {
 		// Clear screen on exit
-		channel.Write([]byte("\033[2J"))     // Clear screen
-		channel.Write([]byte("\033[H"))      // Move cursor to home
+		channel.Write([]byte("\033[2J")) // Clear screen
+		channel.Write([]byte("\033[H"))  // Move cursor to home
 		channel.Close()
 	}()
 
@@ -136,8 +136,8 @@ func (h *Handler) handleSessionChannel(ctx context.Context, newChannel ssh.NewCh
 
 			// Clear the terminal
 			// Send ANSI escape sequences to clear screen and position cursor
-			channel.Write([]byte("\033[2J"))     // Clear entire screen
-			channel.Write([]byte("\033[H"))      // Move cursor to home position (1,1)
+			channel.Write([]byte("\033[2J")) // Clear entire screen
+			channel.Write([]byte("\033[H"))  // Move cursor to home position (1,1)
 
 			// Get user info from auth service
 			// For anonymous connections (no password auth), userInfo will be nil
@@ -176,10 +176,14 @@ func (h *Handler) handleSessionChannel(ctx context.Context, newChannel ssh.NewCh
 					menuChoice, err = h.menuHandler.ShowAnonymousMenu(ctx, channel, sshConn.User())
 				} else {
 					// Show authenticated user menu
-					menuChoice, err = h.menuHandler.ShowUserMenu(ctx, channel, sshConn.User())
+					menuChoice, err = h.menuHandler.ShowUserMenu(ctx, channel, userInfo.Username)
 				}
 
 				if err != nil {
+					// Check if this is a graceful disconnection (EOF) or user quit
+					if strings.Contains(err.Error(), "EOF") || err.Error() == "user quit" {
+						return // Normal disconnect, don't log as error
+					}
 					h.logger.Error("Error in menu handler", "error", err, "username", sshConn.User())
 					if ctx.Err() != nil {
 						return // Context cancelled
@@ -349,11 +353,16 @@ func (h *Handler) handleGameIO(ctx context.Context, channel ssh.Channel, session
 			// Handle different response types
 			switch respType := resp.Response.(type) {
 			case *gamev2.GameIOResponse_Output:
+				fmt.Printf("DEBUG: Received %d bytes from game for session %s: %q\n", len(respType.Output.Data), sessionID, string(respType.Output.Data))
 				// Forward output to SSH channel
-				if _, err := channel.Write(respType.Output.Data); err != nil {
+				n, err := channel.Write(respType.Output.Data)
+				if err != nil {
+					fmt.Printf("DEBUG: Failed to write %d bytes to SSH channel for session %s: %v\n", len(respType.Output.Data), sessionID, err)
 					h.logger.Error("Failed to write to SSH channel", "error", err, "session_id", sessionID)
 					done <- err
 					return
+				} else {
+					fmt.Printf("DEBUG: Successfully wrote %d bytes to SSH channel for session %s\n", n, sessionID)
 				}
 
 			case *gamev2.GameIOResponse_Event:
@@ -637,10 +646,14 @@ func (h *Handler) handleMenuChoice(ctx context.Context, channel ssh.Channel, cho
 		return nil
 
 	case "list_games":
-		channel.Write([]byte("Game listing functionality not yet implemented.\r\n"))
-		// Brief pause to let user read the message
-		time.Sleep(2 * time.Second)
-		return nil
+		if userInfo != nil {
+			return h.handleGameSelection(ctx, channel, userInfo, connID, username, terminalCols, terminalRows, sshConn)
+		} else {
+			channel.Write([]byte("Please login first to view available games.\r\n"))
+			// Brief pause to let user read the message
+			time.Sleep(2 * time.Second)
+			return nil
+		}
 
 	case "edit_profile":
 		channel.Write([]byte("Profile editing functionality not yet implemented.\r\n"))
@@ -664,7 +677,7 @@ func (h *Handler) handleMenuChoice(ctx context.Context, channel ssh.Channel, cho
 		// Clear screen and show credits with ASCII art
 		channel.Write([]byte("\033[2J\033[H"))
 		channel.Write([]byte("\r\n"))
-		
+
 		// DungeonGate ASCII Art
 		channel.Write([]byte(" ____\r\n"))
 		channel.Write([]byte("|  _ \\ _   _ _ __   __ _  ___  ___  _ __\r\n"))
@@ -677,13 +690,14 @@ func (h *Handler) handleMenuChoice(ctx context.Context, channel ssh.Channel, cho
 		channel.Write([]byte("      | |__ | (_| |  ||  _/\r\n"))
 		channel.Write([]byte("      |____/ \\__,_|\\__\\___|\r\n"))
 		channel.Write([]byte("\r\n"))
-		
+
 		// Credits information
 		channel.Write([]byte("=== Credits ===\r\n\r\n"))
 		channel.Write([]byte("DungeonGate - Terminal Game Platform\r\n"))
-		channel.Write([]byte("Developed with ❤️  and Claude Code\r\n\r\n"))
+		channel.Write([]byte("Developed with <3 and Claude Code\r\n\r\n"))
+		channel.Write([]byte("Directed by Peter Subacz \r\n\r\n"))
 		channel.Write([]byte("Press any key to return to menu...\r\n"))
-		
+
 		// Wait for any key press to return
 		buffer := make([]byte, 1)
 		channel.Read(buffer)
@@ -830,7 +844,7 @@ func (h *Handler) handleRegister(ctx context.Context, channel ssh.Channel, connI
 		}
 		return err
 	}
-	
+
 	// Get password
 	channel.Write([]byte("Choose a password: "))
 	password, err := h.readPasswordWithTerminal(ctx, channel)
@@ -878,7 +892,7 @@ func (h *Handler) handleRegister(ctx context.Context, channel ssh.Channel, connI
 
 	if !resp.Success {
 		h.logger.Warn("Registration rejected", "username", username, "error", resp.Error, "error_code", resp.ErrorCode)
-		
+
 		// Show detailed validation message
 		detailedMessage := h.getDetailedValidationMessage(resp.ErrorCode, resp.Error)
 		channel.Write([]byte("\r\nRegistration failed:\r\n" + detailedMessage))
@@ -909,7 +923,7 @@ func (h *Handler) handleRegister(ctx context.Context, channel ssh.Channel, connI
 
 // handleGameSelection shows the game selection menu and handles the choice
 func (h *Handler) handleGameSelection(ctx context.Context, channel ssh.Channel, userInfo *authv1.User, connID, username string, terminalCols, terminalRows int, sshConn *ssh.ServerConn) error {
-	choice, err := h.menuHandler.ShowGameSelectionMenu(ctx, channel, username)
+	choice, err := h.menuHandler.ShowGameSelectionMenu(ctx, channel, userInfo.Username)
 	if err != nil {
 		h.logger.Error("Game selection menu failed", "error", err, "username", username)
 		channel.Write([]byte("Failed to display game selection menu.\r\n"))
@@ -966,7 +980,7 @@ func (h *Handler) startSpecificGameSession(ctx context.Context, channel ssh.Chan
 func (h *Handler) getDetailedValidationMessage(errorCode, errorMessage string) string {
 	// For debugging: log the actual error code and message
 	h.logger.Debug("Registration validation error", "error_code", errorCode, "error_message", errorMessage)
-	
+
 	switch errorCode {
 	case "invalid_password":
 		return "Password validation failed:\r\n" +
@@ -1020,7 +1034,7 @@ func (h *Handler) handleRegistrationRetry(ctx context.Context, channel ssh.Chann
 			return ctx.Err()
 		default:
 		}
-		
+
 		n, err := channel.Read(buffer)
 		if err != nil {
 			return err
@@ -1085,7 +1099,7 @@ func (h *Handler) readLine(ctx context.Context, channel ssh.Channel) (string, er
 			return "", ctx.Err()
 		default:
 		}
-		
+
 		var line []byte
 		buffer := make([]byte, 1)
 
@@ -1096,7 +1110,7 @@ func (h *Handler) readLine(ctx context.Context, channel ssh.Channel) (string, er
 				return "", ctx.Err()
 			default:
 			}
-			
+
 			n, err := channel.Read(buffer)
 			if err != nil {
 				return "", err
@@ -1138,7 +1152,7 @@ func (h *Handler) readOptionalLine(ctx context.Context, channel ssh.Channel) (st
 		return "", ctx.Err()
 	default:
 	}
-	
+
 	var line []byte
 	buffer := make([]byte, 1)
 
@@ -1149,7 +1163,7 @@ func (h *Handler) readOptionalLine(ctx context.Context, channel ssh.Channel) (st
 			return "", ctx.Err()
 		default:
 		}
-		
+
 		n, err := channel.Read(buffer)
 		if err != nil {
 			return "", err
@@ -1186,7 +1200,7 @@ func (h *Handler) readPassword(ctx context.Context, channel ssh.Channel) (string
 			return "", ctx.Err()
 		default:
 		}
-		
+
 		var line []byte
 		buffer := make([]byte, 1)
 
@@ -1197,7 +1211,7 @@ func (h *Handler) readPassword(ctx context.Context, channel ssh.Channel) (string
 				return "", ctx.Err()
 			default:
 			}
-			
+
 			n, err := channel.Read(buffer)
 			if err != nil {
 				return "", err

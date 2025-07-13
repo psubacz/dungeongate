@@ -268,6 +268,9 @@ When a player dies in NetHack:
 - **Code Conventions**: 
   - Functions prefixed with `_` are unused/stubbed
   - Functions prefixed with `__` are deprecated
+  - **NEVER hardcode paths in the code** - all paths must come from configuration files or environment variables
+  - Game adapters should read configuration from `configs/development/game-service.yaml` 
+  - Use configuration injection rather than hardcoded values
 - **Security**: JWT tokens, rate limiting, input validation
 - **Terminal Recording**: TTY recording for session playback and spectating
 
