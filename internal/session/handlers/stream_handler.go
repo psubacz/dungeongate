@@ -66,7 +66,7 @@ func (sh *StreamHandler) initializeMetrics(registry *resources.MetricsRegistry) 
 	sh.bandwidthUsage = registry.RegisterHistogram(
 		"session_streaming_bandwidth_bytes_per_second",
 		"Bandwidth usage for streaming sessions",
-		nil,
+		[]float64{1000, 5000, 10000, 50000, 100000, 500000, 1000000, 5000000, 10000000},
 		map[string]string{"handler": "stream"})
 }
 

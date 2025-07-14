@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/dungeongate/internal/session/pools"
@@ -12,6 +13,40 @@ import (
 	"github.com/dungeongate/internal/session/menu"
 	"golang.org/x/crypto/ssh"
 )
+
+// ServerConfig holds configuration for all servers
+type ServerConfig struct {
+	SSH  SSHServerConfig  `yaml:"ssh"`
+	HTTP HTTPServerConfig `yaml:"http"`
+	GRPC GRPCServerConfig `yaml:"grpc"`
+}
+
+// SSHServerConfig holds SSH server configuration
+type SSHServerConfig struct {
+	Address     string `yaml:"address"`
+	Port        int    `yaml:"port"`
+	HostKeyPath string `yaml:"host_key_path"`
+	Banner      string `yaml:"banner"`
+}
+
+// HTTPServerConfig holds HTTP server configuration  
+type HTTPServerConfig struct {
+	Address string `yaml:"address"`
+	Port    int    `yaml:"port"`
+}
+
+// GRPCServerConfig holds gRPC server configuration
+type GRPCServerConfig struct {
+	Address string `yaml:"address"`
+	Port    int    `yaml:"port"`
+}
+
+// PoolBasedServer interface for servers managed by pool infrastructure
+type PoolBasedServer interface {
+	Start(ctx context.Context) error
+	Stop(ctx context.Context) error
+	Name() string
+}
 
 // SessionHandler coordinates all session activities using pool infrastructure
 type SessionHandler struct {
@@ -31,6 +66,15 @@ type SessionHandler struct {
 
 	logger *slog.Logger
 
+	// Server configuration for pool-based architecture
+	serverConfig *ServerConfig
+	
+	// Server management
+	servers      map[string]PoolBasedServer
+	serverWg     sync.WaitGroup
+	shutdownCtx  context.Context
+	shutdownFunc context.CancelFunc
+
 	// Metrics
 	connectionsTotal     *resources.CounterMetric
 	connectionsActive    *resources.GaugeMetric
@@ -38,7 +82,7 @@ type SessionHandler struct {
 	handlerErrors        *resources.CounterMetric
 }
 
-// NewSessionHandler creates a new session handler
+// NewSessionHandler creates a new session handler with server management
 func NewSessionHandler(
 	connectionPool *pools.ConnectionPool,
 	workerPool *pools.WorkerPool,
@@ -51,8 +95,12 @@ func NewSessionHandler(
 	gameHandler *GameHandler,
 	streamHandler *StreamHandler,
 	menuHandler *menu.MenuHandler,
+	serverConfig *ServerConfig,
 	logger *slog.Logger,
 ) *SessionHandler {
+	// Create shutdown context
+	shutdownCtx, shutdownFunc := context.WithCancel(context.Background())
+	
 	sh := &SessionHandler{
 		connectionPool:  connectionPool,
 		workerPool:      workerPool,
@@ -65,10 +113,15 @@ func NewSessionHandler(
 		gameHandler:     gameHandler,
 		streamHandler:   streamHandler,
 		menuHandler:     menuHandler,
+		serverConfig:    serverConfig,
+		servers:         make(map[string]PoolBasedServer),
+		shutdownCtx:     shutdownCtx,
+		shutdownFunc:    shutdownFunc,
 		logger:          logger,
 	}
 
 	sh.initializeMetrics()
+	sh.initializeServers()
 	return sh
 }
 
@@ -87,13 +140,86 @@ func (sh *SessionHandler) initializeMetrics() {
 	sh.connectionDuration = sh.metricsRegistry.RegisterHistogram(
 		"session_connection_duration_seconds",
 		"Time spent handling connections",
-		nil,
+		[]float64{0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10},
 		map[string]string{"handler": "session"})
 
 	sh.handlerErrors = sh.metricsRegistry.RegisterCounter(
 		"session_handler_errors_total",
 		"Total number of handler errors",
 		map[string]string{"handler": "session"})
+}
+
+// initializeServers creates and configures pool-based servers
+func (sh *SessionHandler) initializeServers() {
+	if sh.serverConfig == nil {
+		sh.logger.Warn("No server configuration provided, servers will not be created")
+		return
+	}
+
+	// Create pool-based SSH server
+	sshServer := NewPoolBasedSSHServer(sh.serverConfig.SSH, sh, sh.logger)
+	sh.servers["ssh"] = sshServer
+
+	// Create pool-based HTTP server  
+	httpServer := NewPoolBasedHTTPServer(sh.serverConfig.HTTP, sh, sh.logger)
+	sh.servers["http"] = httpServer
+
+	// Create pool-based gRPC server
+	grpcServer := NewPoolBasedGRPCServer(sh.serverConfig.GRPC, sh, sh.logger)
+	sh.servers["grpc"] = grpcServer
+
+	sh.logger.Info("Pool-based servers initialized", 
+		"ssh_port", sh.serverConfig.SSH.Port,
+		"http_port", sh.serverConfig.HTTP.Port,
+		"grpc_port", sh.serverConfig.GRPC.Port)
+}
+
+// StartServers starts all pool-based servers
+func (sh *SessionHandler) StartServers(ctx context.Context) error {
+	sh.logger.Info("Starting pool-based servers")
+	
+	for name, server := range sh.servers {
+		sh.serverWg.Add(1)
+		go func(serverName string, srv PoolBasedServer) {
+			defer sh.serverWg.Done()
+			if err := srv.Start(ctx); err != nil {
+				sh.logger.Error("Pool-based server error", "server", serverName, "error", err)
+			}
+		}(name, server)
+		
+		sh.logger.Info("Started pool-based server", "server", name)
+	}
+	
+	return nil
+}
+
+// StopServers stops all pool-based servers gracefully
+func (sh *SessionHandler) StopServers(ctx context.Context) error {
+	sh.logger.Info("Stopping pool-based servers")
+	
+	for name, server := range sh.servers {
+		if err := server.Stop(ctx); err != nil {
+			sh.logger.Error("Error stopping pool-based server", "server", name, "error", err)
+		} else {
+			sh.logger.Info("Stopped pool-based server", "server", name)
+		}
+	}
+	
+	// Wait for all servers to stop
+	done := make(chan struct{})
+	go func() {
+		sh.serverWg.Wait()
+		close(done)
+	}()
+	
+	select {
+	case <-done:
+		sh.logger.Info("All pool-based servers stopped")
+	case <-ctx.Done():
+		sh.logger.Warn("Timeout waiting for pool-based servers to stop")
+	}
+	
+	return nil
 }
 
 // HandleNewConnection is the main entry point that replaces the old HandleConnection

@@ -873,3 +873,22 @@ advanced_pool_config:
       high_queue_time: "2s"
       high_error_rate: 0.05
       high_resource_usage: 0.9
+
+# ============================================================================
+# Migration Configuration
+# ============================================================================
+# Feature flags for migrating to pool-based architecture
+migration:
+  # Enable pool-based handlers instead of legacy handlers
+  use_pool_based_handlers: false
+  
+  # Fallback to legacy handlers if pool-based handlers fail
+  fallback_to_legacy: true
+  
+  # Individual handler migration flags
+  handlers:
+    session_handler: true
+    auth_handler: true 
+    game_handler: true
+    stream_handler: true
+    menu_handler: true

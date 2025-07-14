@@ -66,7 +66,7 @@ func (gh *GameHandler) initializeMetrics(registry *resources.MetricsRegistry) {
 	gh.gameSessionDuration = registry.RegisterHistogram(
 		"session_game_session_duration_seconds",
 		"Time spent in game sessions",
-		nil,
+		[]float64{1, 5, 10, 30, 60, 300, 600, 1800, 3600, 7200, 14400},
 		map[string]string{"handler": "game"})
 
 	gh.gameErrors = registry.RegisterCounter(

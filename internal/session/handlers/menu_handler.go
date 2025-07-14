@@ -350,7 +350,7 @@ func (pmh *PoolAwareMenuHandler) initializeMetrics(registry *resources.MetricsRe
 	pmh.menuDuration = registry.RegisterHistogram(
 		"session_menu_action_duration_seconds",
 		"Time spent processing menu actions",
-		nil,
+		[]float64{0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5},
 		map[string]string{"handler": "menu"})
 
 	pmh.menuErrors = registry.RegisterCounter(

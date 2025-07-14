@@ -71,7 +71,7 @@ func (ah *AuthHandler) initializeMetrics(registry *resources.MetricsRegistry) {
 	ah.loginDuration = registry.RegisterHistogram(
 		"session_auth_login_duration_seconds",
 		"Time spent processing login requests",
-		nil,
+		[]float64{0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10},
 		map[string]string{"handler": "auth"})
 
 	ah.registerAttempts = registry.RegisterCounter(

@@ -39,7 +39,7 @@ type ServiceConfig struct {
 }
 
 // InitializePoolBasedService initializes the session service with pool-based architecture
-func InitializePoolBasedService(config *ServiceConfig, authClient *client.AuthClient, gameClient *client.GameClient, menuHandler *menu.MenuHandler, logger *slog.Logger) (*SessionHandler, error) {
+func InitializePoolBasedService(config *ServiceConfig, authClient *client.AuthClient, gameClient *client.GameClient, menuHandler *menu.MenuHandler, serverConfig *ServerConfig, logger *slog.Logger) (*SessionHandler, error) {
 	// Check if pool-based handlers are enabled
 	if !config.Migration.UsePoolBasedHandlers {
 		return nil, fmt.Errorf("pool-based handlers not enabled in configuration")
@@ -88,13 +88,13 @@ func InitializePoolBasedService(config *ServiceConfig, authClient *client.AuthCl
 		connectionPool, workerPool, ptyPool, backpressure,
 		resourceLimiter, resourceTracker, metricsRegistry,
 		authHandler, gameHandler, streamHandler, menuHandler,
-		logger)
+		serverConfig, logger)
 
 	logger.Info("Pool-based session service initialized successfully")
 	return sessionHandler, nil
 }
 
-// StartPoolBasedService starts all pool components
+// StartPoolBasedService starts all pool components and servers
 func StartPoolBasedService(ctx context.Context, sessionHandler *SessionHandler) error {
 	// Start all pools in order
 	if err := sessionHandler.connectionPool.Start(ctx); err != nil {
@@ -115,6 +115,11 @@ func StartPoolBasedService(ctx context.Context, sessionHandler *SessionHandler) 
 
 	if err := sessionHandler.resourceTracker.Start(ctx); err != nil {
 		return fmt.Errorf("failed to start resource tracker: %w", err)
+	}
+
+	// Start pool-based servers
+	if err := sessionHandler.StartServers(ctx); err != nil {
+		return fmt.Errorf("failed to start pool-based servers: %w", err)
 	}
 
 	return nil

@@ -15,6 +15,8 @@ import (
 )
 
 // Service represents the stateless Session Service
+// DEPRECATED: This service will be replaced by pool-based architecture.
+// Use pool-based handlers from internal/session/handlers for new implementations.
 type Service struct {
 	config *Config
 	logger *slog.Logger
