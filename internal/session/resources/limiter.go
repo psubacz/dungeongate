@@ -235,6 +235,12 @@ func (rl *ResourceLimiter) CanExecute(userID string, action string) bool {
 		rl.logger.Debug("Using default quota for user", "user_id", userID)
 	}
 
+	// If no quota is set, allow execution (temporary fix for pool architecture)
+	if quota == nil {
+		rl.logger.Debug("No quota configured for user, allowing execution", "user_id", userID)
+		return true
+	}
+
 	// Check if quota is expired
 	if quota.ExpiresAt.Before(time.Now()) {
 		rl.logger.Debug("User quota expired", "user_id", userID, "expired_at", quota.ExpiresAt)

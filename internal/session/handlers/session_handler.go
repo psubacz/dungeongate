@@ -340,7 +340,13 @@ func (sh *SessionHandler) handleSSHChannels(ctx context.Context, chans <-chan ss
 
 // handleSessionChannelWork processes session channels using specialized handlers
 func (sh *SessionHandler) handleSessionChannelWork(ctx context.Context, conn *pools.Connection) error {
-	newChannel, ok := conn.Context.Value("work_data").(ssh.NewChannel)
+	// Get the SSH new channel from the context value that was set during work submission
+	workData := ctx.Value("work_data")
+	if workData == nil {
+		return fmt.Errorf("no work data in context")
+	}
+	
+	newChannel, ok := workData.(ssh.NewChannel)
 	if !ok {
 		return fmt.Errorf("invalid session channel data")
 	}
@@ -361,17 +367,21 @@ func (sh *SessionHandler) handleSessionChannelWork(ctx context.Context, conn *po
 	// Update connection with channel
 	conn.SSHChannel = channel
 
-	// Check resource limits for this user
-	if !sh.resourceLimiter.CanExecute(conn.UserID, "session") {
+	// Check resource limits for this user (use username if UserID is not set)
+	userForLimiting := conn.UserID
+	if userForLimiting == "" {
+		userForLimiting = conn.Username
+	}
+	if !sh.resourceLimiter.CanExecute(userForLimiting, "session") {
 		sh.logger.Warn("Session blocked by resource limiter",
-			"user_id", conn.UserID,
+			"user_id", userForLimiting,
 			"connection_id", conn.ID)
 		channel.Write([]byte("Resource limit exceeded. Please try again later.\r\n"))
 		return fmt.Errorf("resource limit exceeded")
 	}
 
 	// Track this session
-	sh.resourceTracker.TrackConnection(conn.ID, conn.UserID, "unknown")
+	sh.resourceTracker.TrackConnection(conn.ID, userForLimiting, "unknown")
 	defer sh.resourceTracker.UntrackConnection(conn.ID)
 
 	// Handle session requests and start main session loop

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/dungeongate/internal/session"
+	"github.com/dungeongate/internal/session/banner"
 	"github.com/dungeongate/internal/session/handlers"
 	"github.com/dungeongate/internal/session/pools"
 	"github.com/dungeongate/internal/session/resources"
@@ -253,9 +254,17 @@ func main() {
 		}
 		
 		// Create menu handler - need to create banner manager first
-		// For now, use a basic approach
-		logger.Warn("Menu handler creation simplified for initial pool-based implementation")
-		var menuHandler *menu.MenuHandler // Set to nil for now
+		bannerConfig := &banner.BannerConfig{
+			MainAnon:           cfg.Menu.Banners.MainAnon,
+			MainUser:           cfg.Menu.Banners.MainUser,
+			WatchMenu:          cfg.Menu.Banners.WatchMenu,
+			IdleMode:           cfg.Menu.Banners.IdleMode,
+			ServiceUnavailable: "", // Use default
+		}
+		bannerManager := banner.NewBannerManager(bannerConfig)
+		
+		// Create menu handler
+		menuHandler := menu.NewMenuHandler(bannerManager, gameClient, authClient, logger)
 		
 		// Create server configuration for pool-based architecture
 		serverConfig := &handlers.ServerConfig{

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"reflect"
 	"strings"
 	"time"
 
@@ -86,7 +87,7 @@ func (pmh *PoolAwareMenuHandler) HandleMenuLoop(ctx context.Context, conn *pools
 
 		// Show appropriate menu based on authentication status
 		var menuChoice *menu.MenuChoice
-		if userInfo == nil {
+		if userInfo == nil || (userInfo != nil && reflect.ValueOf(userInfo).IsNil()) {
 			// Show anonymous menu
 			menuChoice, err = pmh.MenuHandler.ShowAnonymousMenu(ctx, channel, conn.Username)
 		} else {

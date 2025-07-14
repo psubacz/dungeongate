@@ -175,7 +175,7 @@ func NewConnectionPool(config *Config, logger *slog.Logger) (*ConnectionPool, er
 	backpressureConfig := &BackpressureConfig{
 		Enabled:          true,
 		CircuitBreaker:   true,
-		LoadShedding:     true,
+		LoadShedding:     false, // Temporarily disabled for menu testing
 		FailureThreshold: 10,
 		RecoveryTimeout:  60 * time.Second,
 	}

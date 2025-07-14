@@ -394,6 +394,11 @@ func (w *Worker) processWork(ctx context.Context, work WorkItem) {
 	workCtx, cancel := context.WithTimeout(work.Context, w.pool.workerTimeout)
 	defer cancel()
 
+	// Add work data to context if present
+	if work.Data != nil {
+		workCtx = context.WithValue(workCtx, "work_data", work.Data)
+	}
+
 	// Execute the work
 	var err error
 	if work.Handler != nil {
