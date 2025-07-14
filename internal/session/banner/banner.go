@@ -20,10 +20,10 @@ type BannerManager struct {
 
 // BannerCache holds cached rendered banners
 type BannerCache struct {
-	banners   map[string]*CachedBanner
-	ttl       time.Duration
-	maxSize   int
-	mu        sync.RWMutex
+	banners map[string]*CachedBanner
+	ttl     time.Duration
+	maxSize int
+	mu      sync.RWMutex
 }
 
 // CachedBanner represents a cached banner with metadata
@@ -64,7 +64,7 @@ func NewUnicodeSupport(utf8Enabled bool) *UnicodeSupport {
 		"┬": "+",
 		"┴": "+",
 		"┼": "+",
-		
+
 		// Special characters -> ASCII equivalents
 		"•": "*",
 		"◦": "-",
@@ -74,23 +74,23 @@ func NewUnicodeSupport(utf8Enabled bool) *UnicodeSupport {
 		"←": "<-",
 		"↑": "^",
 		"↓": "v",
-		
+
 		// Typography -> ASCII equivalents
-		"\u201c": "\"", // Left double quotation mark
-		"\u201d": "\"", // Right double quotation mark
-		"\u2018": "'",  // Left single quotation mark
-		"\u2019": "'",  // Right single quotation mark
+		"\u201c": "\"",  // Left double quotation mark
+		"\u201d": "\"",  // Right double quotation mark
+		"\u2018": "'",   // Left single quotation mark
+		"\u2019": "'",   // Right single quotation mark
 		"\u2026": "...", // Horizontal ellipsis
-		"\u2013": "-",  // En dash
-		"\u2014": "--", // Em dash
-		
+		"\u2013": "-",   // En dash
+		"\u2014": "--",  // Em dash
+
 		// Emoji fallbacks (minimal set)
-		"\U0001f4e2": "[!]",     // 📢 Loudspeaker
-		"\U0001f552": "[TIME]",  // 🕒 Clock
-		"\U0001f3ae": "[GAME]",  // 🎮 Video game
-		"\U0001f4a1": "[TIP]",   // 💡 Light bulb
+		"\U0001f4e2": "[!]",    // 📢 Loudspeaker
+		"\U0001f552": "[TIME]", // 🕒 Clock
+		"\U0001f3ae": "[GAME]", // 🎮 Video game
+		"\U0001f4a1": "[TIP]",  // 💡 Light bulb
 	}
-	
+
 	return &UnicodeSupport{
 		UTF8Enabled:  utf8Enabled,
 		CharMappings: charMappings,
@@ -102,13 +102,13 @@ func (us *UnicodeSupport) ConvertText(text string) string {
 	if us.UTF8Enabled {
 		return text
 	}
-	
+
 	// Replace Unicode characters with ASCII equivalents
 	result := text
 	for unicode, ascii := range us.CharMappings {
 		result = strings.ReplaceAll(result, unicode, ascii)
 	}
-	
+
 	return result
 }
 
@@ -137,7 +137,7 @@ type BannerConfig struct {
 	WatchMenu          string
 	IdleMode           string
 	ServiceUnavailable string
-	
+
 	// Header and footer configuration
 	Headers HeaderFooterConfig `yaml:"headers"`
 	Footers HeaderFooterConfig `yaml:"footers"`
@@ -145,10 +145,10 @@ type BannerConfig struct {
 
 // HeaderFooterConfig defines configurable headers and footers for different menu types
 type HeaderFooterConfig struct {
-	Anonymous    string `yaml:"anonymous"`
-	User         string `yaml:"user"`
+	Anonymous     string `yaml:"anonymous"`
+	User          string `yaml:"user"`
 	GameSelection string `yaml:"game_selection"`
-	Global       string `yaml:"global"`
+	Global        string `yaml:"global"`
 }
 
 // NewBannerManager creates a new banner manager with caching and Unicode support
@@ -158,10 +158,10 @@ func NewBannerManager(config *BannerConfig) *BannerManager {
 		ttl:     5 * time.Minute, // Cache for 5 minutes
 		maxSize: 50,              // Maximum 50 cached banners
 	}
-	
+
 	// Default to UTF-8 enabled, can be overridden later
 	unicode := NewUnicodeSupport(true)
-	
+
 	return &BannerManager{
 		config:        config,
 		cache:         cache,
@@ -186,19 +186,19 @@ func (bm *BannerManager) RenderMainAnon() (string, error) {
 	}
 
 	variables := bm.GetTemplateVariables("")
-	
+
 	// Get header
 	header := bm.RenderHeader("anonymous", variables)
-	
+
 	// Get main banner content
 	banner, err := bm.renderBanner(bm.config.MainAnon, variables)
 	if err != nil {
 		return "", err
 	}
-	
+
 	// Get footer
 	footer := bm.RenderFooter("anonymous", variables)
-	
+
 	// Combine header + banner + footer
 	result := header + banner + footer
 	return result, nil
@@ -211,19 +211,19 @@ func (bm *BannerManager) RenderMainUser(username string) (string, error) {
 	}
 
 	variables := bm.GetTemplateVariables(username)
-	
+
 	// Get header
 	header := bm.RenderHeader("user", variables)
-	
+
 	// Get main banner content
 	banner, err := bm.renderBanner(bm.config.MainUser, variables)
 	if err != nil {
 		return "", err
 	}
-	
+
 	// Get footer
 	footer := bm.RenderFooter("user", variables)
-	
+
 	// Combine header + banner + footer
 	result := header + banner + footer
 	return result, nil
@@ -238,7 +238,6 @@ func (bm *BannerManager) RenderWatchMenu() (string, error) {
 	})
 }
 
-
 // RenderServiceUnavailable renders the service unavailable banner with countdown and service status
 func (bm *BannerManager) RenderServiceUnavailable(username string, remainingMinutes, remainingSeconds int, serviceStatus string) (string, error) {
 	var countdown string
@@ -247,13 +246,13 @@ func (bm *BannerManager) RenderServiceUnavailable(username string, remainingMinu
 	} else {
 		countdown = fmt.Sprintf("%ds", remainingSeconds)
 	}
-	
+
 	// Use fallback path if ServiceUnavailable is empty
 	filePath := bm.config.ServiceUnavailable
 	if filePath == "" {
 		filePath = "./assets/banners/service_unavailable.txt"
 	}
-	
+
 	return bm.renderBanner(filePath, map[string]string{
 		"$SERVERID":       "DungeonGate",
 		"$USERNAME":       username,
@@ -305,7 +304,7 @@ func (bm *BannerManager) renderBanner(filePath string, variables map[string]stri
 // RenderHeader renders a header for the specified menu type
 func (bm *BannerManager) RenderHeader(menuType string, variables map[string]string) string {
 	var headerText string
-	
+
 	// Get menu-specific header first, fall back to global
 	switch menuType {
 	case "anonymous":
@@ -317,38 +316,38 @@ func (bm *BannerManager) RenderHeader(menuType string, variables map[string]stri
 	default:
 		headerText = bm.config.Headers.Global
 	}
-	
+
 	// If no specific header, use global
 	if headerText == "" {
 		headerText = bm.config.Headers.Global
 	}
-	
+
 	// If still no header, return empty
 	if headerText == "" {
 		return ""
 	}
-	
+
 	// Substitute template variables
 	for variable, value := range variables {
 		headerText = strings.ReplaceAll(headerText, variable, value)
 	}
-	
+
 	// Apply Unicode conversion if needed
 	headerText = bm.unicode.ConvertText(headerText)
-	
+
 	// Ensure proper line endings and spacing
 	headerText = strings.ReplaceAll(headerText, "\n", "\r\n")
 	if !strings.HasSuffix(headerText, "\r\n") {
 		headerText += "\r\n"
 	}
-	
+
 	return headerText
 }
 
 // RenderFooter renders a footer for the specified menu type
 func (bm *BannerManager) RenderFooter(menuType string, variables map[string]string) string {
 	var footerText string
-	
+
 	// Get menu-specific footer first, fall back to global
 	switch menuType {
 	case "anonymous":
@@ -360,31 +359,31 @@ func (bm *BannerManager) RenderFooter(menuType string, variables map[string]stri
 	default:
 		footerText = bm.config.Footers.Global
 	}
-	
+
 	// If no specific footer, use global
 	if footerText == "" {
 		footerText = bm.config.Footers.Global
 	}
-	
+
 	// If still no footer, return empty
 	if footerText == "" {
 		return ""
 	}
-	
+
 	// Substitute template variables
 	for variable, value := range variables {
 		footerText = strings.ReplaceAll(footerText, variable, value)
 	}
-	
+
 	// Apply Unicode conversion if needed
 	footerText = bm.unicode.ConvertText(footerText)
-	
+
 	// Ensure proper line endings and spacing
 	footerText = strings.ReplaceAll(footerText, "\n", "\r\n")
 	if !strings.HasPrefix(footerText, "\r\n") {
 		footerText = "\r\n" + footerText
 	}
-	
+
 	return footerText
 }
 
@@ -392,17 +391,17 @@ func (bm *BannerManager) RenderFooter(menuType string, variables map[string]stri
 func (bm *BannerManager) GetTemplateVariables(username string) map[string]string {
 	now := time.Now()
 	uptime := now.Sub(bm.serverStarted)
-	
+
 	variables := map[string]string{
-		"$SERVERID":    "DungeonGate",
-		"$DATE":        now.Format("2006-01-02"),
-		"$TIME":        now.Format("15:04:05"),
-		"$USERNAME":    username,
-		"$UPTIME":      formatUptime(uptime),
-		"$VERSION":     "v1.0.0", // TODO: Get from build info
-		"$TIMEZONE":    now.Format("MST"),
+		"$SERVERID": "DungeonGate",
+		"$DATE":     now.Format("2006-01-02"),
+		"$TIME":     now.Format("15:04:05"),
+		"$USERNAME": username,
+		"$UPTIME":   formatUptime(uptime),
+		"$VERSION":  "v1.0.0", // TODO: Get from build info
+		"$TIMEZONE": now.Format("MST"),
 	}
-	
+
 	return variables
 }
 
@@ -411,7 +410,7 @@ func formatUptime(d time.Duration) string {
 	days := int(d.Hours()) / 24
 	hours := int(d.Hours()) % 24
 	minutes := int(d.Minutes()) % 60
-	
+
 	if days > 0 {
 		return fmt.Sprintf("%dd %dh %dm", days, hours, minutes)
 	} else if hours > 0 {

@@ -106,20 +106,20 @@ func (c *AuthClient) IsHealthy(ctx context.Context) bool {
 	// Use a simple ping mechanism - try to call an endpoint that should always be available
 	// We'll use ValidateToken with an empty token which should return an error but indicates service is up
 	_, err := c.ValidateToken(ctx, "")
-	
+
 	// Service is healthy if we get any response (even an error response means the service is up)
 	// Only connection-level errors indicate the service is down
 	if err != nil {
 		// Check if this is a gRPC connection error
 		errStr := err.Error()
-		if containsSubstring(errStr, "connection refused") || 
-		   containsSubstring(errStr, "no such host") ||
-		   containsSubstring(errStr, "connection error") ||
-		   containsSubstring(errStr, "transport") {
+		if containsSubstring(errStr, "connection refused") ||
+			containsSubstring(errStr, "no such host") ||
+			containsSubstring(errStr, "connection error") ||
+			containsSubstring(errStr, "transport") {
 			return false
 		}
 	}
-	
+
 	return true
 }
 

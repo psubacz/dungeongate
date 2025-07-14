@@ -14,10 +14,10 @@ type AuthServiceMetrics struct {
 	LockoutsTotal      *prometheus.CounterVec
 
 	// Token Metrics
-	TokenGenerationsTotal  *prometheus.CounterVec
-	TokenValidationsTotal  *prometheus.CounterVec
-	TokenExpiredTotal      *prometheus.CounterVec
-	TokenRefreshTotal      *prometheus.CounterVec
+	TokenGenerationsTotal *prometheus.CounterVec
+	TokenValidationsTotal *prometheus.CounterVec
+	TokenExpiredTotal     *prometheus.CounterVec
+	TokenRefreshTotal     *prometheus.CounterVec
 
 	// User Management Metrics
 	UsersRegisteredTotal *prometheus.CounterVec

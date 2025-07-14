@@ -30,16 +30,16 @@ type SessionServiceConfig struct {
 
 // SSHConfig represents SSH server configuration
 type SSHConfig struct {
-	Enabled        bool               `yaml:"enabled"`
-	Port           int                `yaml:"port"`
-	Host           string             `yaml:"host"`
-	HostKeyPath    string             `yaml:"host_key_path"`
-	Banner         string             `yaml:"banner"`
-	MaxSessions    int                `yaml:"max_sessions"`
-	SessionTimeout string             `yaml:"session_timeout"`
-	IdleTimeout    string             `yaml:"idle_timeout"`
-	Auth           *SSHAuthConfig     `yaml:"auth"`
-	Terminal       *SSHTerminalConfig `yaml:"terminal"`
+	Enabled        bool                `yaml:"enabled"`
+	Port           int                 `yaml:"port"`
+	Host           string              `yaml:"host"`
+	HostKeyPath    string              `yaml:"host_key_path"`
+	Banner         string              `yaml:"banner"`
+	MaxSessions    int                 `yaml:"max_sessions"`
+	SessionTimeout string              `yaml:"session_timeout"`
+	IdleTimeout    string              `yaml:"idle_timeout"`
+	Auth           *SSHAuthConfig      `yaml:"auth"`
+	Terminal       *SSHTerminalConfig  `yaml:"terminal"`
 	Keepalive      *SSHKeepaliveConfig `yaml:"keepalive"`
 }
 
@@ -297,12 +297,12 @@ func applyDefaults(cfg *SessionServiceConfig) {
 	}
 	if cfg.SessionManagement.Heartbeat == nil {
 		cfg.SessionManagement.Heartbeat = &HeartbeatConfig{
-			Enabled:               true,
-			Interval:              "60s",
+			Enabled:                true,
+			Interval:               "60s",
 			IdleDetectionThreshold: "2m",
-			IdleRetryInterval:     "5s",
+			IdleRetryInterval:      "5s",
 			GRPCStream: &GRPCStreamConfig{
-				Enabled:     true,
+				Enabled:      true,
 				PingInterval: "45s",
 				PongTimeout:  "10s",
 			},
@@ -687,12 +687,12 @@ func GetDefaultDevelopmentConfig() *SessionServiceConfig {
 				SpectatorTimeout:        "30m",
 			},
 			Heartbeat: &HeartbeatConfig{
-				Enabled:               true,
-				Interval:              "60s",
+				Enabled:                true,
+				Interval:               "60s",
 				IdleDetectionThreshold: "2m",
-				IdleRetryInterval:     "5s",
+				IdleRetryInterval:      "5s",
 				GRPCStream: &GRPCStreamConfig{
-					Enabled:     true,
+					Enabled:      true,
 					PingInterval: "45s",
 					PongTimeout:  "10s",
 				},

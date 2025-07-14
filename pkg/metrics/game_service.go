@@ -8,10 +8,10 @@ import (
 // GameServiceMetrics contains all Game Service related Prometheus metrics
 type GameServiceMetrics struct {
 	// Game Instance Metrics
-	GameInstancesTotal    *prometheus.CounterVec
-	GameInstancesActive   *prometheus.GaugeVec
-	GameInstanceDuration  *prometheus.HistogramVec
-	GameInstanceFailures  *prometheus.CounterVec
+	GameInstancesTotal   *prometheus.CounterVec
+	GameInstancesActive  *prometheus.GaugeVec
+	GameInstanceDuration *prometheus.HistogramVec
+	GameInstanceFailures *prometheus.CounterVec
 
 	// Session Metrics
 	SessionsStartedTotal *prometheus.CounterVec
@@ -21,10 +21,10 @@ type GameServiceMetrics struct {
 	SessionCrashes       *prometheus.CounterVec
 
 	// Save Operations Metrics
-	SaveOperationsTotal    *prometheus.CounterVec
-	SaveOperationDuration  *prometheus.HistogramVec
-	SaveFileSizeBytes      *prometheus.HistogramVec
-	SaveOperationFailures  *prometheus.CounterVec
+	SaveOperationsTotal   *prometheus.CounterVec
+	SaveOperationDuration *prometheus.HistogramVec
+	SaveFileSizeBytes     *prometheus.HistogramVec
+	SaveOperationFailures *prometheus.CounterVec
 
 	// Resource Usage Metrics
 	GameProcessMemoryBytes *prometheus.GaugeVec
@@ -32,10 +32,10 @@ type GameServiceMetrics struct {
 	GameProcessCount       *prometheus.GaugeVec
 
 	// Game Management Metrics
-	GamesTotal           *prometheus.GaugeVec
-	GamesEnabled         *prometheus.GaugeVec
-	GameConfigReloads    *prometheus.CounterVec
-	GameSetupOperations  *prometheus.CounterVec
+	GamesTotal            *prometheus.GaugeVec
+	GamesEnabled          *prometheus.GaugeVec
+	GameConfigReloads     *prometheus.CounterVec
+	GameSetupOperations   *prometheus.CounterVec
 	GameCleanupOperations *prometheus.CounterVec
 }
 

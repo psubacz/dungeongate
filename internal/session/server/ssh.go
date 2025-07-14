@@ -34,20 +34,20 @@ type SSHServer struct {
 
 // SSHConfig holds SSH server configuration
 type SSHConfig struct {
-	Address               string
-	Port                  int
-	HostKey               string
-	MaxConns              int
-	IdleTimeout           string
-	PasswordAuth          bool
-	PublicKeyAuth         bool
-	AllowAnonymous        bool
-	BannerMainAnon        string
-	BannerMainUser        string
-	BannerWatchMenu       string
-	BannerIdleMode        string
+	Address                  string
+	Port                     int
+	HostKey                  string
+	MaxConns                 int
+	IdleTimeout              string
+	PasswordAuth             bool
+	PublicKeyAuth            bool
+	AllowAnonymous           bool
+	BannerMainAnon           string
+	BannerMainUser           string
+	BannerWatchMenu          string
+	BannerIdleMode           string
 	BannerServiceUnavailable string
-	IdleRetryInterval     time.Duration
+	IdleRetryInterval        time.Duration
 }
 
 // NewSSHServer creates a new SSH server

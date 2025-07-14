@@ -10,13 +10,13 @@ import (
 
 // CommonConfig represents shared configuration across all services
 type CommonConfig struct {
-	Version     string                  `yaml:"version"`
-	Database    *DatabaseConfig         `yaml:"database"`
-	Logging     *LoggingConfig          `yaml:"logging"`
-	HealthCheck *HealthConfig           `yaml:"health_check"`
-	Security    *CommonSecurityConfig   `yaml:"security"`
-	Server      *CommonServerConfig     `yaml:"server"`
-	Environment *EnvironmentConfig      `yaml:"environment"`
+	Version     string                `yaml:"version"`
+	Database    *DatabaseConfig       `yaml:"database"`
+	Logging     *LoggingConfig        `yaml:"logging"`
+	HealthCheck *HealthConfig         `yaml:"health_check"`
+	Security    *CommonSecurityConfig `yaml:"security"`
+	Server      *CommonServerConfig   `yaml:"server"`
+	Environment *EnvironmentConfig    `yaml:"environment"`
 }
 
 // CommonSecurityConfig represents shared security configuration
@@ -27,13 +27,13 @@ type CommonSecurityConfig struct {
 
 // CommonServerConfig represents shared server configuration
 type CommonServerConfig struct {
-	Host              string `yaml:"host"`
-	Timeout           string `yaml:"timeout"`
-	ReadTimeout       string `yaml:"read_timeout"`
-	WriteTimeout      string `yaml:"write_timeout"`
-	IdleTimeout       string `yaml:"idle_timeout"`
-	GracefulShutdown  bool   `yaml:"graceful_shutdown"`
-	ShutdownTimeout   string `yaml:"shutdown_timeout"`
+	Host             string `yaml:"host"`
+	Timeout          string `yaml:"timeout"`
+	ReadTimeout      string `yaml:"read_timeout"`
+	WriteTimeout     string `yaml:"write_timeout"`
+	IdleTimeout      string `yaml:"idle_timeout"`
+	GracefulShutdown bool   `yaml:"graceful_shutdown"`
+	ShutdownTimeout  string `yaml:"shutdown_timeout"`
 }
 
 // CommonRateLimitingConfig represents rate limiting configuration
@@ -46,19 +46,19 @@ type CommonRateLimitingConfig struct {
 
 // BruteForceProtectionConfig represents brute force protection configuration
 type BruteForceProtectionConfig struct {
-	Enabled        bool   `yaml:"enabled"`
-	MaxAttempts    int    `yaml:"max_attempts"`
+	Enabled         bool   `yaml:"enabled"`
+	MaxAttempts     int    `yaml:"max_attempts"`
 	LockoutDuration string `yaml:"lockout_duration"`
-	ResetAfter     string `yaml:"reset_after"`
+	ResetAfter      string `yaml:"reset_after"`
 }
 
 // EnvironmentConfig represents environment metadata
 type EnvironmentConfig struct {
-	Name        string             `yaml:"name"`
-	Description string             `yaml:"description"`
-	Debug       bool               `yaml:"debug"`
-	Monitoring  *MonitoringConfig  `yaml:"monitoring"`
-	Metrics     *MetricsConfig     `yaml:"metrics"`
+	Name        string            `yaml:"name"`
+	Description string            `yaml:"description"`
+	Debug       bool              `yaml:"debug"`
+	Monitoring  *MonitoringConfig `yaml:"monitoring"`
+	Metrics     *MetricsConfig    `yaml:"metrics"`
 }
 
 // LoadCommonConfig loads the common configuration file

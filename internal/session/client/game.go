@@ -4,14 +4,26 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/types/known/emptypb"
 
-	"github.com/dungeongate/internal/session/types"
 	gamev2 "github.com/dungeongate/pkg/api/games/v2"
 )
+
+// SessionInfo represents basic session information
+type SessionInfo struct {
+	ID           string                 `json:"id"`
+	UserID       string                 `json:"user_id"`
+	Username     string                 `json:"username"`
+	GameID       string                 `json:"game_id"`
+	State        string                 `json:"state"`
+	CreatedAt    time.Time              `json:"created_at"`
+	LastActivity time.Time              `json:"last_activity"`
+	Metadata     map[string]interface{} `json:"metadata,omitempty"`
+}
 
 // GameClient provides stateless access to Game Service
 type GameClient struct {
@@ -45,7 +57,7 @@ func (c *GameClient) Close() error {
 }
 
 // StartGameSession starts a new game session
-func (c *GameClient) StartGameSession(ctx context.Context, userID int32, username, gameID string, terminalCols, terminalRows int) (*types.SessionInfo, error) {
+func (c *GameClient) StartGameSession(ctx context.Context, userID int32, username, gameID string, terminalCols, terminalRows int) (*SessionInfo, error) {
 	req := &gamev2.StartGameSessionRequest{
 		UserId:   userID,
 		Username: username,
@@ -64,7 +76,7 @@ func (c *GameClient) StartGameSession(ctx context.Context, userID int32, usernam
 		return nil, fmt.Errorf("failed to start game session: %w", err)
 	}
 
-	return &types.SessionInfo{
+	return &SessionInfo{
 		ID:           resp.Session.Id,
 		UserID:       fmt.Sprintf("%d", userID),
 		GameID:       gameID,
@@ -76,7 +88,7 @@ func (c *GameClient) StartGameSession(ctx context.Context, userID int32, usernam
 }
 
 // GetGameSession retrieves session information
-func (c *GameClient) GetGameSession(ctx context.Context, sessionID string) (*types.SessionInfo, error) {
+func (c *GameClient) GetGameSession(ctx context.Context, sessionID string) (*SessionInfo, error) {
 	req := &gamev2.GetGameSessionRequest{
 		SessionId: sessionID,
 	}
@@ -86,7 +98,7 @@ func (c *GameClient) GetGameSession(ctx context.Context, sessionID string) (*typ
 		return nil, fmt.Errorf("failed to get game session: %w", err)
 	}
 
-	return &types.SessionInfo{
+	return &SessionInfo{
 		ID:           resp.Session.Id,
 		UserID:       fmt.Sprintf("%d", resp.Session.UserId),
 		GameID:       resp.Session.GameId,
@@ -114,7 +126,7 @@ func (c *GameClient) StopGameSession(ctx context.Context, sessionID, reason stri
 }
 
 // ListGameSessions lists sessions for a user
-func (c *GameClient) ListGameSessions(ctx context.Context, userID int32) ([]*types.SessionInfo, error) {
+func (c *GameClient) ListGameSessions(ctx context.Context, userID int32) ([]*SessionInfo, error) {
 	req := &gamev2.ListGameSessionsRequest{
 		UserId: userID,
 		Limit:  100,
@@ -126,9 +138,9 @@ func (c *GameClient) ListGameSessions(ctx context.Context, userID int32) ([]*typ
 		return nil, fmt.Errorf("failed to list game sessions: %w", err)
 	}
 
-	sessions := make([]*types.SessionInfo, len(resp.Sessions))
+	sessions := make([]*SessionInfo, len(resp.Sessions))
 	for i, session := range resp.Sessions {
-		sessions[i] = &types.SessionInfo{
+		sessions[i] = &SessionInfo{
 			ID:           session.Id,
 			UserID:       fmt.Sprintf("%d", session.UserId),
 			GameID:       session.GameId,
@@ -210,20 +222,20 @@ func (c *GameClient) ResizeTerminal(ctx context.Context, sessionID string, width
 	return nil
 }
 
-// convertSessionState converts protobuf session state to internal type
-func convertSessionState(state gamev2.SessionStatus) types.SessionState {
+// convertSessionState converts protobuf session state to string
+func convertSessionState(state gamev2.SessionStatus) string {
 	switch state {
 	case gamev2.SessionStatus_SESSION_STATUS_STARTING:
-		return types.SessionStateStarting
+		return "starting"
 	case gamev2.SessionStatus_SESSION_STATUS_ACTIVE:
-		return types.SessionStateActive
+		return "active"
 	case gamev2.SessionStatus_SESSION_STATUS_PAUSED:
-		return types.SessionStatePaused
+		return "paused"
 	case gamev2.SessionStatus_SESSION_STATUS_ENDING:
-		return types.SessionStateEnding
+		return "ending"
 	case gamev2.SessionStatus_SESSION_STATUS_ENDED:
-		return types.SessionStateEnded
+		return "ended"
 	default:
-		return types.SessionStateCreated
+		return "created"
 	}
 }

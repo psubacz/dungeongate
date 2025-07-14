@@ -301,7 +301,7 @@ func (s *PTYSession) handleOutput() {
 // waitForExit waits for the command to exit
 func (s *PTYSession) waitForExit() {
 	s.logger.Debug("STARTING waitForExit for session", "session_id", s.SessionID, "pid", s.Cmd.Process.Pid)
-	
+
 	// Check process status before waiting
 	err := s.Cmd.Process.Signal(syscall.Signal(0))
 	if err != nil {
@@ -309,11 +309,11 @@ func (s *PTYSession) waitForExit() {
 	} else {
 		s.logger.Debug("Process confirmed alive and healthy before Wait()", "pid", s.Cmd.Process.Pid)
 	}
-	
+
 	// Add a small delay to see if the process gets killed immediately
 	s.logger.Debug("Waiting 1 second to see if process stays alive...")
 	time.Sleep(1 * time.Second)
-	
+
 	// Check again after delay
 	err = s.Cmd.Process.Signal(syscall.Signal(0))
 	if err != nil {
@@ -321,7 +321,7 @@ func (s *PTYSession) waitForExit() {
 	} else {
 		s.logger.Debug("Process still alive after 1-second delay", "pid", s.Cmd.Process.Pid)
 	}
-	
+
 	s.logger.Debug("About to call Cmd.Wait() for session", "session_id", s.SessionID, "pid", s.Cmd.Process.Pid)
 	err = s.Cmd.Wait()
 	s.logger.Debug("Cmd.Wait() returned for session", "session_id", s.SessionID, "pid", s.Cmd.Process.Pid, "error", err)
@@ -391,7 +391,7 @@ func (s *PTYSession) Resize(rows, cols uint16) error {
 // This allows games like NetHack to keep running for reconnection
 func (s *PTYSession) Close() {
 	s.logger.Debug("Close() called for session", "session_id", s.SessionID)
-	
+
 	s.closeOnce.Do(func() {
 		s.logger.Debug("Executing Close() for session (first time)", "session_id", s.SessionID)
 		close(s.closeChan)
@@ -411,7 +411,7 @@ func (s *PTYSession) Close() {
 		close(s.inputChan)
 		close(s.outputChan)
 		close(s.errorChan)
-		
+
 		s.logger.Debug("Close() completed for session - process and PTY kept alive", "session_id", s.SessionID)
 	})
 }
@@ -419,23 +419,23 @@ func (s *PTYSession) Close() {
 // ForceTerminate forcefully terminates the game process (for explicit user quit)
 func (s *PTYSession) ForceTerminate() {
 	s.logger.Debug("ForceTerminate() called for session", "session_id", s.SessionID)
-	
+
 	if s.Cmd != nil && s.Cmd.Process != nil && s.Cmd.ProcessState == nil {
 		s.logger.Debug("Force terminating process for session", "pid", s.Cmd.Process.Pid, "session_id", s.SessionID)
-		
+
 		// Send SIGTERM first
 		s.Cmd.Process.Signal(syscall.SIGTERM)
-		
+
 		// Give it 5 seconds to exit gracefully
 		time.Sleep(5 * time.Second)
-		
+
 		// Force kill if still running
 		if s.Cmd.ProcessState == nil {
 			s.logger.Debug("Sending SIGKILL to process for session", "pid", s.Cmd.Process.Pid, "session_id", s.SessionID)
 			s.Cmd.Process.Signal(syscall.SIGKILL)
 		}
 	}
-	
+
 	// Now close the PTY
 	if s.PTY != nil {
 		s.PTY.Close()

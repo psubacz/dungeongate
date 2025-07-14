@@ -48,13 +48,13 @@ type InputValidator struct {
 // ValidateInput checks if input is valid and returns appropriate error message
 func (iv *InputValidator) ValidateInput(input string) (bool, string) {
 	inputLower := strings.ToLower(input)
-	
+
 	for _, option := range iv.ValidOptions {
 		if inputLower == strings.ToLower(option) {
 			return true, ""
 		}
 	}
-	
+
 	// Create helpful error message
 	optionsList := strings.Join(iv.ValidOptions, ", ")
 	errorMsg := fmt.Sprintf("Invalid choice '%s'. Valid options: %s\r\n", input, optionsList)
@@ -75,24 +75,24 @@ func (mh *MenuHandler) handleInvalidInput(channel ssh.Channel, errorMsg, banner 
 		}
 		return fmt.Errorf("failed to write error message: %w", err)
 	}
-	
+
 	// Brief pause for user to read
 	time.Sleep(1 * time.Second)
-	
+
 	// Clear screen and redisplay menu
 	if _, err := channel.Write([]byte("\033[2J\033[H")); err != nil {
 		if err == io.EOF {
 			return err
 		}
 	}
-	
+
 	if _, err := channel.Write([]byte(banner)); err != nil {
 		if err == io.EOF {
 			return err
 		}
 		return fmt.Errorf("failed to redisplay banner: %w", err)
 	}
-	
+
 	return nil
 }
 
@@ -254,7 +254,6 @@ func (mh *MenuHandler) ShowUserMenu(ctx context.Context, channel ssh.Channel, us
 	}
 }
 
-
 // RenderServiceUnavailable renders the service unavailable banner with countdown and service status
 func (mh *MenuHandler) RenderServiceUnavailable(username string, remainingMinutes, remainingSeconds int, serviceStatus string) (string, error) {
 	// Render the service unavailable banner with countdown and service status
@@ -374,10 +373,10 @@ func (mh *MenuHandler) ShowGameSelectionMenu(ctx context.Context, channel ssh.Ch
 func (mh *MenuHandler) buildGameSelectionBanner(games []*gamev2.Game, username string) string {
 	// Get template variables for header/footer
 	variables := mh.bannerManager.GetTemplateVariables(username)
-	
+
 	// Get header
 	header := mh.bannerManager.RenderHeader("game_selection", variables)
-	
+
 	// Build main content
 	banner := fmt.Sprintf("=== DungeonGate - Game Selection ===\r\n\r\n")
 	banner += fmt.Sprintf("Welcome, %s! Choose a game to play:\r\n\r\n", username)
@@ -401,10 +400,10 @@ func (mh *MenuHandler) buildGameSelectionBanner(games []*gamev2.Game, username s
 
 	banner += "  [q] Return to main menu\r\n\r\n"
 	banner += "Enter your choice: "
-	
+
 	// Get footer
 	footer := mh.bannerManager.RenderFooter("game_selection", variables)
-	
+
 	// Combine header + banner + footer
 	result := header + banner + footer
 	return result

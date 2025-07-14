@@ -13,7 +13,6 @@ import (
 	"github.com/dungeongate/internal/session/client"
 	"github.com/dungeongate/internal/session/menu"
 	"github.com/dungeongate/internal/session/terminal"
-	"github.com/dungeongate/internal/session/types"
 	authv1 "github.com/dungeongate/pkg/api/auth/v1"
 	gamev2 "github.com/dungeongate/pkg/api/games/v2"
 	"golang.org/x/crypto/ssh"
@@ -62,7 +61,7 @@ func (h *Handler) HandleConnection(ctx context.Context, conn net.Conn, config *s
 	defer sshConn.Close()
 
 	// Update connection state after successful handshake
-	h.manager.UpdateConnectionState(connID, types.ConnectionStateAuthenticated, sshConn.User())
+	// Connection state is managed by Game Service in stateless architecture
 
 	h.logger.Info("SSH connection established", "connection_id", connID, "user", sshConn.User())
 
@@ -788,7 +787,7 @@ func (h *Handler) startGameSession(ctx context.Context, channel ssh.Channel, use
 	h.logger.Info("Started game session", "session_id", sessionID, "user", userInfo.Username, "game", gameID)
 
 	// Update connection state
-	h.manager.UpdateConnectionState(connID, types.ConnectionStateActive, username)
+	// Connection state is managed by Game Service in stateless architecture
 
 	// Handle I/O - since Game Service doesn't have direct I/O methods,
 	// we'll need to implement this differently in a real implementation
@@ -862,7 +861,7 @@ func (h *Handler) handleLogin(ctx context.Context, channel ssh.Channel, connID, 
 	channel.Write([]byte("\r\nLogin successful! Welcome back to the gate, " + resp.User.Username + "\r\n"))
 
 	// Update connection state
-	h.manager.UpdateConnectionState(connID, types.ConnectionStateAuthenticated, resp.User.Id)
+	// Connection state is managed by Game Service in stateless architecture
 
 	// Brief pause to show success message
 	time.Sleep(1 * time.Second)
@@ -959,7 +958,7 @@ func (h *Handler) handleRegister(ctx context.Context, channel ssh.Channel, connI
 	channel.Write([]byte("You are now logged in.\r\n"))
 
 	// Update connection state
-	h.manager.UpdateConnectionState(connID, types.ConnectionStateAuthenticated, resp.User.Id)
+	// Connection state is managed by Game Service in stateless architecture
 
 	// Brief pause to show success message
 	time.Sleep(1 * time.Second)
@@ -1026,7 +1025,7 @@ func (h *Handler) startSpecificGameSession(ctx context.Context, channel ssh.Chan
 	h.logger.Info("Started game session", "session_id", sessionID, "user", userInfo.Username, "game", gameID)
 
 	// Update connection state
-	h.manager.UpdateConnectionState(connID, types.ConnectionStateActive, username)
+	// Connection state is managed by Game Service in stateless architecture
 
 	// Handle I/O using the pre-established stream
 	h.handleGameIOWithStream(ctx, channel, sessionID, connID, stream)

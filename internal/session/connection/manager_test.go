@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dungeongate/internal/session/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -196,7 +195,7 @@ func TestUpdateConnectionState(t *testing.T) {
 	require.NotEmpty(t, connID)
 
 	// Update state (no-op in stateless mode)
-	manager.UpdateConnectionState(connID, types.ConnectionStateAuthenticated, "user123")
+	// UpdateConnectionState removed - no longer needed in stateless architecture
 
 	// In stateless mode, state updates are delegated to Game Service
 	// This test just ensures the method doesn't panic
@@ -214,7 +213,7 @@ func TestUpdateConnectionStateNonExistent(t *testing.T) {
 	require.NoError(t, err)
 
 	// Should not panic with non-existent connection
-	manager.UpdateConnectionState("non-existent", types.ConnectionStateAuthenticated, "user123")
+	// UpdateConnectionState removed - no longer needed in stateless architecture
 
 	manager.Stop(ctx)
 }
@@ -233,14 +232,12 @@ func TestGetStats(t *testing.T) {
 	conn2 := &mockConn{remoteAddr: &net.TCPAddr{IP: net.ParseIP("192.168.1.1"), Port: 12345}}
 	conn3 := &mockConn{remoteAddr: &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 12346}}
 
-	connID1 := manager.RegisterConnection(conn1)
-	connID2 := manager.RegisterConnection(conn2)
-	connID3 := manager.RegisterConnection(conn3)
+	manager.RegisterConnection(conn1)
+	manager.RegisterConnection(conn2)
+	manager.RegisterConnection(conn3)
 
 	// Update states (no-op in stateless mode)
-	manager.UpdateConnectionState(connID1, types.ConnectionStateAuthenticated, "user1")
-	manager.UpdateConnectionState(connID2, types.ConnectionStateActive, "user2")
-	manager.UpdateConnectionState(connID3, types.ConnectionStateConnected, "")
+	// UpdateConnectionState removed - no longer needed in stateless architecture
 
 	// Get stats (only basic counters in stateless mode)
 	stats := manager.GetStats()
@@ -249,9 +246,6 @@ func TestGetStats(t *testing.T) {
 
 	// Detailed stats not available in stateless mode
 	// These would be queried from Game Service in a real implementation
-	assert.Equal(t, 0, len(stats.ByState))
-	assert.Equal(t, 0, len(stats.ByUserID))
-	assert.Equal(t, 0, len(stats.ByRemoteIP))
 
 	manager.Stop(ctx)
 }

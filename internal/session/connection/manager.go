@@ -9,7 +9,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/dungeongate/internal/session/types"
 	"github.com/google/uuid"
 )
 
@@ -126,42 +125,19 @@ func (m *Manager) UnregisterConnection(connID string, remoteAddr net.Addr) {
 		"active_count", atomic.LoadInt64(&m.activeConnections))
 }
 
-// UpdateConnectionState is no longer needed in stateless architecture
-// Connection state is managed by Game Service
-// This method is kept for compatibility but does nothing
-func (m *Manager) UpdateConnectionState(connID string, state types.ConnectionState, userID string) {
-	// No-op in stateless architecture
-	// Connection state is managed by Game Service
-	m.logger.Debug("Connection state update delegated to Game Service",
-		"connection_id", connID,
-		"state", state,
-		"user_id", userID)
-}
-
-// GetConnection is no longer available in stateless architecture
-// Connection state should be queried from Game Service instead
-func (m *Manager) GetConnection(connID string) (*types.Connection, bool) {
-	// No longer available - connection state is in Game Service
-	m.logger.Debug("Connection state query should use Game Service", "connection_id", connID)
-	return nil, false
+// ConnectionStats represents basic connection statistics for stateless mode
+type ConnectionStats struct {
+	Active int `json:"active"`
+	Total  int `json:"total"`
 }
 
 // GetStats returns basic connection statistics (counters only)
 // Detailed stats should be queried from Game Service
-func (m *Manager) GetStats() *types.ConnectionStats {
-	stats := &types.ConnectionStats{
-		Active:     int(atomic.LoadInt64(&m.activeConnections)),
-		Total:      int(atomic.LoadInt64(&m.totalConnections)),
-		ByState:    make(map[types.ConnectionState]int),
-		ByUserID:   make(map[string]int),
-		ByRemoteIP: make(map[string]int),
+func (m *Manager) GetStats() *ConnectionStats {
+	return &ConnectionStats{
+		Active: int(atomic.LoadInt64(&m.activeConnections)),
+		Total:  int(atomic.LoadInt64(&m.totalConnections)),
 	}
-
-	// Only basic counters available in stateless mode
-	// Detailed stats should be queried from Game Service
-	m.logger.Debug("Returning basic stats only - detailed stats available from Game Service")
-
-	return stats
 }
 
 // checkRateLimit checks if connection is allowed based on rate limiting

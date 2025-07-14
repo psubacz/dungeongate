@@ -3,8 +3,6 @@ package streaming
 import (
 	"context"
 	"log/slog"
-
-	"github.com/dungeongate/internal/session/types"
 )
 
 // Manager manages streaming in a stateless manner
@@ -135,22 +133,26 @@ func (m *Manager) GetStreamSpectators(streamID string) []*Spectator {
 	return []*Spectator{}
 }
 
+// StreamingStats represents basic streaming statistics for stateless mode
+type StreamingStats struct {
+	ActiveStreams    int `json:"active_streams"`
+	TotalStreams     int `json:"total_streams"`
+	ActiveSpectators int `json:"active_spectators"`
+	TotalSpectators  int `json:"total_spectators"`
+}
+
 // GetStats should query Game Service for streaming statistics
-func (m *Manager) GetStats() *types.StreamingStats {
-	// TODO: Query Game Service for streaming stats
+func (m *Manager) GetStats() *StreamingStats {
+	// In stateless mode, return basic counters only
+	// Real stats should come from Game Service
 	m.logger.Debug("Streaming stats query should use Game Service")
 
-	// Return empty stats - real stats should come from Game Service
-	stats := &types.StreamingStats{
+	return &StreamingStats{
 		ActiveStreams:    0,
 		TotalStreams:     0,
 		ActiveSpectators: 0,
 		TotalSpectators:  0,
-		Streams:          make(map[string]*types.StreamInfo),
-		Spectators:       make(map[string]*types.SpectatorInfo),
 	}
-
-	return stats
 }
 
 // Close closes the stream

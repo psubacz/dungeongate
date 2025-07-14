@@ -31,7 +31,6 @@ var (
 	gitCommit string = "unknown"
 )
 
-
 func main() {
 	var (
 		configFile  = flag.String("config", "configs/auth-service.yaml", "Path to configuration file")
@@ -109,7 +108,6 @@ func main() {
 		}
 		jwtSecret = hex.EncodeToString(secretBytes)
 	}
-
 
 	// Setup auth service
 	authConfig := &auth.Config{

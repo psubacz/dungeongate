@@ -14,10 +14,10 @@ import (
 
 // Config represents slog-compatible logging configuration
 type Config struct {
-	Level    string      `yaml:"level"`    // debug, info, warn, error
-	Format   string      `yaml:"format"`   // json, text
-	Output   string      `yaml:"output"`   // stdout, stderr, file, journald
-	File     *LogFile    `yaml:"file,omitempty"`
+	Level    string       `yaml:"level"`  // debug, info, warn, error
+	Format   string       `yaml:"format"` // json, text
+	Output   string       `yaml:"output"` // stdout, stderr, file, journald
+	File     *LogFile     `yaml:"file,omitempty"`
 	Journald *LogJournald `yaml:"journald,omitempty"`
 }
 
@@ -41,15 +41,15 @@ type LogJournald struct {
 func NewLogger(serviceName string, config Config) *slog.Logger {
 	// Parse log level
 	level := parseLogLevel(config.Level)
-	
+
 	// Create handler options
 	opts := &slog.HandlerOptions{
 		Level: level,
 	}
-	
+
 	// Create writer based on output configuration
 	writer := createWriter(config)
-	
+
 	// Create handler based on format
 	var handler slog.Handler
 	if strings.ToLower(config.Format) == "json" {
@@ -57,7 +57,7 @@ func NewLogger(serviceName string, config Config) *slog.Logger {
 	} else {
 		handler = slog.NewTextHandler(writer, opts)
 	}
-	
+
 	// Create logger with service context
 	logger := slog.New(handler)
 	return logger.With("service", serviceName)
@@ -66,7 +66,7 @@ func NewLogger(serviceName string, config Config) *slog.Logger {
 // NewLoggerWithContext creates logger with default context fields
 func NewLoggerWithContext(serviceName string, config Config, fields map[string]any) *slog.Logger {
 	logger := NewLogger(serviceName, config)
-	
+
 	// Add context fields
 	if len(fields) > 0 {
 		var args []any
@@ -75,7 +75,7 @@ func NewLoggerWithContext(serviceName string, config Config, fields map[string]a
 		}
 		return logger.With(args...)
 	}
-	
+
 	return logger
 }
 
@@ -94,7 +94,7 @@ func ContextLogger(ctx context.Context, logger *slog.Logger) *slog.Logger {
 	if gameID := ctx.Value("game_id"); gameID != nil {
 		logger = logger.With("game_id", gameID)
 	}
-	
+
 	return logger
 }
 
@@ -192,21 +192,21 @@ func createJournaldWriter(config *LogJournald) io.Writer {
 // parseSize converts size string to megabytes
 func parseSize(sizeStr string) (int, error) {
 	sizeStr = strings.ToUpper(strings.TrimSpace(sizeStr))
-	
+
 	if strings.HasSuffix(sizeStr, "MB") {
 		sizeStr = strings.TrimSuffix(sizeStr, "MB")
 		var size int
 		_, err := fmt.Sscanf(sizeStr, "%d", &size)
 		return size, err
 	}
-	
+
 	if strings.HasSuffix(sizeStr, "GB") {
 		sizeStr = strings.TrimSuffix(sizeStr, "GB")
 		var size int
 		_, err := fmt.Sscanf(sizeStr, "%d", &size)
 		return size * 1024, err
 	}
-	
+
 	var size int
 	_, err := fmt.Sscanf(sizeStr, "%d", &size)
 	return size, err
@@ -215,21 +215,21 @@ func parseSize(sizeStr string) (int, error) {
 // parseAge converts age string to days
 func parseAge(ageStr string) (int, error) {
 	ageStr = strings.ToLower(strings.TrimSpace(ageStr))
-	
+
 	if strings.HasSuffix(ageStr, "d") {
 		ageStr = strings.TrimSuffix(ageStr, "d")
 		var age int
 		_, err := fmt.Sscanf(ageStr, "%d", &age)
 		return age, err
 	}
-	
+
 	if strings.HasSuffix(ageStr, "days") {
 		ageStr = strings.TrimSuffix(ageStr, "days")
 		var age int
 		_, err := fmt.Sscanf(ageStr, "%d", &age)
 		return age, err
 	}
-	
+
 	var age int
 	_, err := fmt.Sscanf(ageStr, "%d", &age)
 	return age, err

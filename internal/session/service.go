@@ -66,14 +66,14 @@ func New(cfg *Config, logger *slog.Logger, metricsRegistry *metrics.Registry) (*
 
 	// Initialize servers
 	sshConfig := &server.SSHConfig{
-		Address:         cfg.SSH.Address,
-		Port:            cfg.SSH.Port,
-		MaxConns:        cfg.MaxConnections,
-		IdleTimeout:     cfg.SSH.IdleTimeout,
-		HostKey:         cfg.SSH.HostKey,
-		PasswordAuth:    cfg.SSH.PasswordAuth,
-		PublicKeyAuth:   cfg.SSH.PublicKeyAuth,
-		AllowAnonymous:  cfg.SSH.AllowAnonymous,
+		Address:                  cfg.SSH.Address,
+		Port:                     cfg.SSH.Port,
+		MaxConns:                 cfg.MaxConnections,
+		IdleTimeout:              cfg.SSH.IdleTimeout,
+		HostKey:                  cfg.SSH.HostKey,
+		PasswordAuth:             cfg.SSH.PasswordAuth,
+		PublicKeyAuth:            cfg.SSH.PublicKeyAuth,
+		AllowAnonymous:           cfg.SSH.AllowAnonymous,
 		BannerMainAnon:           cfg.Menu.Banners.MainAnon,
 		BannerMainUser:           cfg.Menu.Banners.MainUser,
 		BannerWatchMenu:          cfg.Menu.Banners.WatchMenu,
