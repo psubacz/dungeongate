@@ -278,7 +278,7 @@ func (wp *WorkerPool) dispatch(ctx context.Context) {
 
 // assignWork assigns work to an available worker
 func (wp *WorkerPool) assignWork(work WorkItem) error {
-	// Try to find an available worker
+	// Try to find an available worker (non-blocking first pass)
 	for _, worker := range wp.workers {
 		select {
 		case worker.workQueue <- work:
@@ -289,8 +289,21 @@ func (wp *WorkerPool) assignWork(work WorkItem) error {
 		}
 	}
 
-	// No available workers, work will be retried
-	return fmt.Errorf("no available workers")
+	// All workers busy, use blocking assignment with timeout
+	// This ensures work doesn't get dropped under load
+	for _, worker := range wp.workers {
+		select {
+		case worker.workQueue <- work:
+			return nil
+		case <-time.After(10 * time.Millisecond): // Small timeout per worker
+			continue
+		case <-work.Context.Done():
+			return work.Context.Err()
+		}
+	}
+
+	// Still no workers available after timeout - this shouldn't happen often
+	return fmt.Errorf("no available workers after timeout")
 }
 
 // collectMetrics periodically collects worker pool metrics

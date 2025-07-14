@@ -2,9 +2,12 @@ package handlers
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
 	"fmt"
 	"log/slog"
 	"net"
+	"os"
 	"sync"
 
 	"golang.org/x/crypto/ssh"
@@ -169,10 +172,59 @@ func (s *PoolBasedSSHServer) createSSHConfig() error {
 		}
 	}
 
-	// TODO: Add host key loading from s.config.HostKeyPath
-	// For now, generate a temporary key or use a default
-	// This should be implemented properly in production
+	// Load or generate host key
+	hostKey, err := s.loadOrGenerateHostKey(s.config.HostKeyPath)
+	if err != nil {
+		return fmt.Errorf("failed to load host key: %w", err)
+	}
+	config.AddHostKey(hostKey)
 
 	s.sshConfig = config
 	return nil
+}
+
+// generateHostKey generates a new RSA host key
+func (s *PoolBasedSSHServer) generateHostKey() (ssh.Signer, error) {
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		return nil, err
+	}
+
+	signer, err := ssh.NewSignerFromKey(key)
+	if err != nil {
+		return nil, err
+	}
+
+	return signer, nil
+}
+
+// loadOrGenerateHostKey loads an existing host key or generates a new one
+func (s *PoolBasedSSHServer) loadOrGenerateHostKey(hostKeyPath string) (ssh.Signer, error) {
+	// If no path is specified, generate a new key
+	if hostKeyPath == "" {
+		s.logger.Info("No host key path specified, generating temporary key")
+		return s.generateHostKey()
+	}
+
+	// Try to load existing key
+	if _, err := os.Stat(hostKeyPath); err == nil {
+		// Key file exists, try to load it
+		keyBytes, err := os.ReadFile(hostKeyPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read host key file: %w", err)
+		}
+
+		// Parse the private key
+		signer, err := ssh.ParsePrivateKey(keyBytes)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse host key: %w", err)
+		}
+
+		s.logger.Info("Loaded host key from file", "path", hostKeyPath)
+		return signer, nil
+	}
+
+	// Key file doesn't exist, generate a new key
+	s.logger.Info("Host key file not found, generating temporary key", "path", hostKeyPath)
+	return s.generateHostKey()
 }

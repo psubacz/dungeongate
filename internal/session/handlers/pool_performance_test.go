@@ -123,8 +123,10 @@ func BenchmarkConnectionPool_RequestRelease(b *testing.B) {
 	b.ResetTimer()
 	
 	// Target: < 5ms average connection establishment
+	// NOTE: This test measures pool allocation performance, not actual SSH connections
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
+			// Use nil for testing - the pool now handles this gracefully
 			conn, err := sessionHandler.connectionPool.RequestConnection(ctx, nil, nil, pools.PriorityNormal)
 			if err != nil {
 				b.Error(err)

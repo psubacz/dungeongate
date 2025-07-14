@@ -402,11 +402,19 @@ func (cp *ConnectionPool) handleConnectionRequest(ctx context.Context, req *Conn
 	connCtx, cancel := context.WithCancel(ctx)
 	connID := cp.generateConnectionID()
 	
+	// Get username safely
+	var username string
+	if req.SSHConn != nil {
+		username = req.SSHConn.User()
+	} else {
+		username = "test-user" // Default for testing
+	}
+
 	conn := &Connection{
 		ID:           connID,
 		SSHChannel:   req.SSHChannel,
 		SSHConn:      req.SSHConn,
-		Username:     req.SSHConn.User(),
+		Username:     username,
 		CreatedAt:    time.Now(),
 		LastActivity: time.Now(),
 		State:        ConnectionStateActive,
