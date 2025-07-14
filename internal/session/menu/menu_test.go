@@ -170,8 +170,6 @@ func TestShowAnonymousMenu_AllChoices(t *testing.T) {
 		{"R", "register"},
 		{"w", "watch"},
 		{"W", "watch"},
-		{"g", "list_games"},
-		{"G", "list_games"},
 		{"q", "quit"},
 		{"Q", "quit"},
 	}
@@ -311,8 +309,6 @@ func TestShowUserMenu_AllChoices(t *testing.T) {
 		{"W", "watch"},
 		{"e", "edit_profile"},
 		{"E", "edit_profile"},
-		{"l", "list_games"},
-		{"L", "list_games"},
 		{"r", "view_recordings"},
 		{"R", "view_recordings"},
 		{"s", "statistics"},

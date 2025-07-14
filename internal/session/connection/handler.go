@@ -698,16 +698,6 @@ func (h *Handler) handleMenuChoice(ctx context.Context, channel ssh.Channel, cho
 		time.Sleep(2 * time.Second)
 		return nil
 
-	case "list_games":
-		if userInfo != nil {
-			return h.handleGameSelection(ctx, channel, userInfo, connID, username, terminalCols, terminalRows, sshConn)
-		} else {
-			channel.Write([]byte("Please login first to view available games.\r\n"))
-			// Brief pause to let user read the message
-			time.Sleep(2 * time.Second)
-			return nil
-		}
-
 	case "edit_profile":
 		channel.Write([]byte("Profile editing functionality not yet implemented.\r\n"))
 		// Brief pause to let user read the message
@@ -777,13 +767,13 @@ func (h *Handler) startGameSession(ctx context.Context, channel ssh.Channel, use
 		channel.Write([]byte("Invalid user ID. Please contact administrator.\r\n"))
 		return nil
 	}
-	sessionInfo, err := h.gameClient.StartGameSession(ctx, int32(userID), username, gameID, terminalCols, terminalRows)
+	sessionInfo, err := h.gameClient.StartGameSession(ctx, int32(userID), userInfo.Username, gameID, terminalCols, terminalRows)
 	if err != nil {
-		h.logger.Error("Failed to start game session", "error", err, "username", username)
+		h.logger.Error("Failed to start game session", "error", err, "username", userInfo.Username)
 		// Check if the error is due to game service unavailability
 		if !h.gameClient.IsHealthy(ctx) {
-			h.logger.Info("Game service became unavailable, entering idle mode", "username", username)
-			err := h.handleServiceUnavailable(ctx, channel, connID, username)
+			h.logger.Info("Game service became unavailable, entering idle mode", "username", userInfo.Username)
+			err := h.handleServiceUnavailable(ctx, channel, connID, userInfo.Username)
 			if err != nil && err.Error() == "user quit" {
 				return fmt.Errorf("user quit")
 			}
@@ -795,7 +785,7 @@ func (h *Handler) startGameSession(ctx context.Context, channel ssh.Channel, use
 
 	// Successfully started game session
 	sessionID := sessionInfo.ID
-	h.logger.Info("Started game session", "session_id", sessionID, "user", username, "game", gameID)
+	h.logger.Info("Started game session", "session_id", sessionID, "user", userInfo.Username, "game", gameID)
 
 	// Update connection state
 	h.manager.UpdateConnectionState(connID, types.ConnectionStateActive, username)
@@ -1015,13 +1005,13 @@ func (h *Handler) startSpecificGameSession(ctx context.Context, channel ssh.Chan
 	defer stream.CloseSend()
 
 	// Now start the game session with PTY
-	sessionInfo, err := h.gameClient.StartGameSession(ctx, int32(userID), username, gameID, terminalCols, terminalRows)
+	sessionInfo, err := h.gameClient.StartGameSession(ctx, int32(userID), userInfo.Username, gameID, terminalCols, terminalRows)
 	if err != nil {
-		h.logger.Error("Failed to start game session", "error", err, "username", username, "game_id", gameID)
+		h.logger.Error("Failed to start game session", "error", err, "username", userInfo.Username, "game_id", gameID)
 		// Check if the error is due to game service unavailability
 		if !h.gameClient.IsHealthy(ctx) {
-			h.logger.Info("Game service became unavailable, entering idle mode", "username", username)
-			err := h.handleServiceUnavailable(ctx, channel, connID, username)
+			h.logger.Info("Game service became unavailable, entering idle mode", "username", userInfo.Username)
+			err := h.handleServiceUnavailable(ctx, channel, connID, userInfo.Username)
 			if err != nil && err.Error() == "user quit" {
 				return fmt.Errorf("user quit")
 			}
@@ -1033,7 +1023,7 @@ func (h *Handler) startSpecificGameSession(ctx context.Context, channel ssh.Chan
 
 	// Successfully started game session
 	sessionID := sessionInfo.ID
-	h.logger.Info("Started game session", "session_id", sessionID, "user", username, "game", gameID)
+	h.logger.Info("Started game session", "session_id", sessionID, "user", userInfo.Username, "game", gameID)
 
 	// Update connection state
 	h.manager.UpdateConnectionState(connID, types.ConnectionStateActive, username)

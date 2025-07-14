@@ -235,7 +235,7 @@ func (pmh *PoolAwareMenuHandler) getWorkTypeForAction(action string) pools.WorkT
 	switch action {
 	case "login", "register":
 		return pools.WorkTypeAuthentication
-	case "play", "start_game", "list_games":
+	case "play", "start_game":
 		return pools.WorkTypeGameIO
 	case "watch":
 		return pools.WorkTypeStreamManagement
@@ -253,7 +253,7 @@ func (pmh *PoolAwareMenuHandler) getHandlerForAction(action string, userInfo int
 		}
 
 		switch action {
-		case "play", "list_games":
+		case "play":
 			if authUser, ok := userInfo.(*authv1.User); ok {
 				return pmh.gameHandler.HandleGameSelection(ctx, conn, authUser)
 			}

@@ -39,14 +39,76 @@ type MenuChoice struct {
 	Value  string
 }
 
+// InputValidator handles menu input validation and error messages
+type InputValidator struct {
+	ValidOptions []string
+	MenuName     string
+}
+
+// ValidateInput checks if input is valid and returns appropriate error message
+func (iv *InputValidator) ValidateInput(input string) (bool, string) {
+	inputLower := strings.ToLower(input)
+	
+	for _, option := range iv.ValidOptions {
+		if inputLower == strings.ToLower(option) {
+			return true, ""
+		}
+	}
+	
+	// Create helpful error message
+	optionsList := strings.Join(iv.ValidOptions, ", ")
+	errorMsg := fmt.Sprintf("Invalid choice '%s'. Valid options: %s\r\n", input, optionsList)
+	return false, errorMsg
+}
+
+// handleCtrlD processes Ctrl+D input consistently across all menus
+func handleCtrlD() *MenuChoice {
+	return &MenuChoice{Action: "quit", Value: ""}
+}
+
+// handleInvalidInput shows error message and redisplays menu
+func (mh *MenuHandler) handleInvalidInput(channel ssh.Channel, errorMsg, banner string) error {
+	// Show error message
+	if _, err := channel.Write([]byte(errorMsg)); err != nil {
+		if err == io.EOF {
+			return err
+		}
+		return fmt.Errorf("failed to write error message: %w", err)
+	}
+	
+	// Brief pause for user to read
+	time.Sleep(1 * time.Second)
+	
+	// Clear screen and redisplay menu
+	if _, err := channel.Write([]byte("\033[2J\033[H")); err != nil {
+		if err == io.EOF {
+			return err
+		}
+	}
+	
+	if _, err := channel.Write([]byte(banner)); err != nil {
+		if err == io.EOF {
+			return err
+		}
+		return fmt.Errorf("failed to redisplay banner: %w", err)
+	}
+	
+	return nil
+}
+
 // ShowAnonymousMenu displays the main menu for anonymous users and handles input
 func (mh *MenuHandler) ShowAnonymousMenu(ctx context.Context, channel ssh.Channel, username string) (*MenuChoice, error) {
+	// Create input validator for anonymous menu
+	validator := &InputValidator{
+		ValidOptions: []string{"[L]ogin", "[R]egister", "[C]redits", "[Q]uit"},
+		MenuName:     "Anonymous Menu",
+	}
+
 	// Clear screen and position cursor at top
 	if _, err := channel.Write([]byte("\033[2J\033[H")); err != nil {
 		if err == io.EOF {
-			return &MenuChoice{Action: "quit", Value: ""}, nil
+			return handleCtrlD(), nil
 		}
-		// For other errors, continue - the banner write will catch it
 	}
 
 	// Render the anonymous banner
@@ -60,8 +122,7 @@ func (mh *MenuHandler) ShowAnonymousMenu(ctx context.Context, channel ssh.Channe
 	_, err = channel.Write([]byte(banner))
 	if err != nil {
 		if err == io.EOF {
-			// Client disconnected gracefully
-			return &MenuChoice{Action: "quit", Value: ""}, nil
+			return handleCtrlD(), nil
 		}
 		return nil, fmt.Errorf("failed to write banner: %w", err)
 	}
@@ -74,12 +135,12 @@ func (mh *MenuHandler) ShowAnonymousMenu(ctx context.Context, channel ssh.Channe
 		event, err := inputHandler.ReadInput(ctx)
 		if err != nil {
 			if err.Error() == "user cancelled" {
-				return &MenuChoice{Action: "quit", Value: ""}, nil
+				return handleCtrlD(), nil
 			}
 			return nil, fmt.Errorf("failed to read user input: %w", err)
 		}
 
-		// Only handle character input for menu choices
+		// Handle character input for menu choices
 		if event.Type == terminal.EventCharacter {
 			choice := string(event.Character)
 
@@ -91,29 +152,21 @@ func (mh *MenuHandler) ShowAnonymousMenu(ctx context.Context, channel ssh.Channe
 			case "c":
 				return &MenuChoice{Action: "credit", Value: ""}, nil
 			case "q":
-				return &MenuChoice{Action: "quit", Value: ""}, nil
+				return handleCtrlD(), nil
 			default:
-				// Invalid choice, show error and continue waiting for input
-				errorMsg := fmt.Sprintf("\r\nInvalid choice '%s'. Please try again.\r\n", choice)
-				channel.Write([]byte(errorMsg))
-				// Brief pause to let user read the message
-				time.Sleep(1 * time.Second)
-				// Clear screen and redisplay the banner
-				if _, err := channel.Write([]byte("\033[2J\033[H")); err != nil {
+				// Invalid choice - use validator for consistent error message
+				_, errorMsg := validator.ValidateInput(choice)
+				if err := mh.handleInvalidInput(channel, errorMsg, banner); err != nil {
 					if err == io.EOF {
-						return &MenuChoice{Action: "quit", Value: ""}, nil
+						return handleCtrlD(), nil
 					}
-				}
-				if _, err := channel.Write([]byte(banner)); err != nil {
-					if err == io.EOF {
-						return &MenuChoice{Action: "quit", Value: ""}, nil
-					}
+					return nil, err
 				}
 			}
 		} else if event.Type == terminal.EventKey {
 			switch event.KeyCode {
 			case terminal.KeyCtrlC, terminal.KeyCtrlD:
-				return &MenuChoice{Action: "quit", Value: ""}, nil
+				return handleCtrlD(), nil
 			}
 		}
 	}
@@ -121,12 +174,17 @@ func (mh *MenuHandler) ShowAnonymousMenu(ctx context.Context, channel ssh.Channe
 
 // ShowUserMenu displays the main menu for authenticated users and handles input
 func (mh *MenuHandler) ShowUserMenu(ctx context.Context, channel ssh.Channel, username string) (*MenuChoice, error) {
+	// Create input validator for user menu
+	validator := &InputValidator{
+		ValidOptions: []string{"[P]lay", "[W]atch", "[E]dit profile", "[L]ist games", "[R]ecordings", "[S]tatistics", "[C]redits", "[Q]uit"},
+		MenuName:     "User Menu",
+	}
+
 	// Clear screen and position cursor at top
 	if _, err := channel.Write([]byte("\033[2J\033[H")); err != nil {
 		if err == io.EOF {
-			return &MenuChoice{Action: "quit", Value: ""}, nil
+			return handleCtrlD(), nil
 		}
-		// For other errors, continue - the banner write will catch it
 	}
 
 	// Render the user banner
@@ -140,8 +198,7 @@ func (mh *MenuHandler) ShowUserMenu(ctx context.Context, channel ssh.Channel, us
 	_, err = channel.Write([]byte(banner))
 	if err != nil {
 		if err == io.EOF {
-			// Client disconnected gracefully
-			return &MenuChoice{Action: "quit", Value: ""}, nil
+			return handleCtrlD(), nil
 		}
 		return nil, fmt.Errorf("failed to write banner: %w", err)
 	}
@@ -154,12 +211,12 @@ func (mh *MenuHandler) ShowUserMenu(ctx context.Context, channel ssh.Channel, us
 		event, err := inputHandler.ReadInput(ctx)
 		if err != nil {
 			if err.Error() == "user cancelled" {
-				return &MenuChoice{Action: "quit", Value: ""}, nil
+				return handleCtrlD(), nil
 			}
 			return nil, fmt.Errorf("failed to read user input: %w", err)
 		}
 
-		// Only handle character input for menu choices
+		// Handle character input for menu choices
 		if event.Type == terminal.EventCharacter {
 			choice := string(event.Character)
 
@@ -170,8 +227,6 @@ func (mh *MenuHandler) ShowUserMenu(ctx context.Context, channel ssh.Channel, us
 				return &MenuChoice{Action: "watch", Value: ""}, nil
 			case "e":
 				return &MenuChoice{Action: "edit_profile", Value: ""}, nil
-			case "l":
-				return &MenuChoice{Action: "list_games", Value: ""}, nil
 			case "r":
 				return &MenuChoice{Action: "view_recordings", Value: ""}, nil
 			case "s":
@@ -179,29 +234,21 @@ func (mh *MenuHandler) ShowUserMenu(ctx context.Context, channel ssh.Channel, us
 			case "c":
 				return &MenuChoice{Action: "credit", Value: ""}, nil
 			case "q":
-				return &MenuChoice{Action: "quit", Value: ""}, nil
+				return handleCtrlD(), nil
 			default:
-				// Invalid choice, show error and continue waiting for input
-				errorMsg := fmt.Sprintf("\r\nInvalid choice '%s'. Please try again.\r\n", choice)
-				channel.Write([]byte(errorMsg))
-				// Brief pause to let user read the message
-				time.Sleep(1 * time.Second)
-				// Clear screen and redisplay the banner
-				if _, err := channel.Write([]byte("\033[2J\033[H")); err != nil {
+				// Invalid choice - use validator for consistent error message
+				_, errorMsg := validator.ValidateInput(choice)
+				if err := mh.handleInvalidInput(channel, errorMsg, banner); err != nil {
 					if err == io.EOF {
-						return &MenuChoice{Action: "quit", Value: ""}, nil
+						return handleCtrlD(), nil
 					}
-				}
-				if _, err := channel.Write([]byte(banner)); err != nil {
-					if err == io.EOF {
-						return &MenuChoice{Action: "quit", Value: ""}, nil
-					}
+					return nil, err
 				}
 			}
 		} else if event.Type == terminal.EventKey {
 			switch event.KeyCode {
 			case terminal.KeyCtrlC, terminal.KeyCtrlD:
-				return &MenuChoice{Action: "quit", Value: ""}, nil
+				return handleCtrlD(), nil
 			}
 		}
 	}
@@ -277,6 +324,11 @@ func (mh *MenuHandler) ShowGameSelectionMenu(ctx context.Context, channel ssh.Ch
 			case terminal.EventKey:
 				key := event.KeyCode
 
+				// Handle Ctrl+D consistently
+				if key == terminal.KeyCtrlD {
+					return handleCtrlD(), nil
+				}
+
 				if key == terminal.KeyEnter {
 					choice := strings.TrimSpace(inputBuffer.String())
 					inputBuffer.Reset()
@@ -295,8 +347,9 @@ func (mh *MenuHandler) ShowGameSelectionMenu(ctx context.Context, channel ssh.Ch
 							Value:  selectedGame.Id,
 						}, nil
 					} else {
-						// Invalid choice, show error and redisplay menu
-						errorMsg := fmt.Sprintf("\r\nInvalid choice '%s'. Please enter a number from 1-%d, or 'q' to return.\r\n\r\n", choice, len(games))
+						// Invalid choice, show error with helpful options
+						validOptions := fmt.Sprintf("1-%d", len(games))
+						errorMsg := fmt.Sprintf("\r\nInvalid choice '%s'. Valid options: %s, or [Q]uit\r\n\r\n", choice, validOptions)
 						channel.Write([]byte(errorMsg))
 						// Redisplay the banner
 						channel.Write([]byte(banner))
@@ -317,15 +370,21 @@ func (mh *MenuHandler) ShowGameSelectionMenu(ctx context.Context, channel ssh.Ch
 	}
 }
 
-// buildGameSelectionBanner creates the game selection menu display
+// buildGameSelectionBanner creates the game selection menu display with header and footer
 func (mh *MenuHandler) buildGameSelectionBanner(games []*gamev2.Game, username string) string {
-	banner := fmt.Sprintf("\r\n=== DungeonGate - Game Selection ===\r\n\r\n")
+	// Get template variables for header/footer
+	variables := mh.bannerManager.GetTemplateVariables(username)
+	
+	// Get header
+	header := mh.bannerManager.RenderHeader("game_selection", variables)
+	
+	// Build main content
+	banner := fmt.Sprintf("=== DungeonGate - Game Selection ===\r\n\r\n")
 	banner += fmt.Sprintf("Welcome, %s! Choose a game to play:\r\n\r\n", username)
 
 	for i, game := range games {
 		status := "Available"
 		if game.Status != gamev2.GameStatus_GAME_STATUS_UNSPECIFIED {
-			// Add status information if available
 			status = fmt.Sprintf("Available (%s)", game.Status.String())
 		}
 
@@ -342,8 +401,13 @@ func (mh *MenuHandler) buildGameSelectionBanner(games []*gamev2.Game, username s
 
 	banner += "  [q] Return to main menu\r\n\r\n"
 	banner += "Enter your choice: "
-
-	return banner
+	
+	// Get footer
+	footer := mh.bannerManager.RenderFooter("game_selection", variables)
+	
+	// Combine header + banner + footer
+	result := header + banner + footer
+	return result
 }
 
 // parseGameChoice parses the user's game selection input

@@ -1,12 +1,11 @@
-Welcome to $SERVERID!
+DungeonGate
 
 Connected as: Anonymous
 Date: $DATE | Time: $TIME
 
-Menu Options:
-  [l] Login
-  [r] Register
-  [c] Credits
-  [q] Quit
+[L] Login
+[R] Register  
+[C] Credits
+[Q] Quit
 
 Choice: 

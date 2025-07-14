@@ -210,6 +210,43 @@ menu:
     # Banner shown when critical services are unavailable
     service_unavailable: "./assets/banners/service_unavailable.txt"
     
+    # Header configuration - displayed at the top of menus
+    headers:
+      # Global header - shown on all menus if no specific header is set
+      global: ""
+      
+      # Anonymous user menu header
+      anonymous: ""
+      
+      # Authenticated user menu header  
+      user: ""
+      
+      # Game selection menu header
+      game_selection: ""
+    
+    # Footer configuration - displayed at the bottom of menus (great for announcements)
+    footers:
+      # Global footer - shown on all menus if no specific footer is set
+      global: |
+        ───────────────────────────────────────────────────────────────
+        DungeonGate | For help, contact admin@dungeongate.local
+      
+      # Anonymous user menu footer
+      anonymous: |
+        ───────────────────────────────────────────────────────────────
+        Server Announcement: Welcome! Register today for full access.
+        Server Time: $TIME | Need help? Contact admin@dungeongate.local
+      
+      # Authenticated user menu footer  
+      user: |
+        ───────────────────────────────────────────────────────────────
+        Happy gaming, $USERNAME! | Server Time: $TIME | Uptime: $UPTIME
+      
+      # Game selection menu footer
+      game_selection: |
+        ───────────────────────────────────────────────────────────────
+        Tip: Save your progress frequently! Good luck, $USERNAME!
+    
   # Menu options configuration
   options:
     # Options available to anonymous users
@@ -223,9 +260,6 @@ menu:
       - key: "w"
         label: "Watch games"
         action: "watch"
-      - key: "g"
-        label: "List games"
-        action: "list_games"
       - key: "q"
         label: "Quit"
         action: "quit"
@@ -241,9 +275,6 @@ menu:
       - key: "e"
         label: "Edit profile"
         action: "edit_profile"
-      - key: "l"
-        label: "List games"
-        action: "list_games"
       - key: "r"
         label: "View recordings"
         action: "recordings"
@@ -819,7 +850,7 @@ advanced_pool_config:
     
     # Connection warming (pre-create connections)
     connection_warming:
-      enabled: false
+      enabled: true
       min_connections: 10
       warm_up_interval: "5s"
   
@@ -827,20 +858,12 @@ advanced_pool_config:
   worker_pool:
     # Enable dynamic worker scaling
     dynamic_scaling:
-      enabled: false
+      enabled: true
       min_workers: 10
       max_workers: 100
       scale_up_threshold: 0.8
       scale_down_threshold: 0.2
       scale_interval: "30s"
-    
-    # Worker specialization (assign workers to specific task types)
-    specialization:
-      enabled: false
-      auth_workers: 5
-      game_workers: 30
-      menu_workers: 10
-      cleanup_workers: 5
   
   # PTY pool advanced settings
   pty_pool:
@@ -880,7 +903,7 @@ advanced_pool_config:
 # Feature flags for migrating to pool-based architecture
 migration:
   # Enable pool-based handlers instead of legacy handlers
-  use_pool_based_handlers: false
+  use_pool_based_handlers: true
   
   # Fallback to legacy handlers if pool-based handlers fail
   fallback_to_legacy: true
