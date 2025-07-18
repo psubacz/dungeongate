@@ -53,6 +53,99 @@ func NewGameServiceServer(cfg *config.GameServiceConfig, gameService *applicatio
 	}
 }
 
+// AddSpectator adds a spectator to a game session
+func (s *GameServiceServer) AddSpectator(ctx context.Context, req *games_pb.AddSpectatorRequest) (*games_pb.AddSpectatorResponse, error) {
+	if req.SessionId == "" {
+		return &games_pb.AddSpectatorResponse{
+			Success: false,
+			Error:   "session_id is required",
+		}, status.Error(codes.InvalidArgument, "session_id is required")
+	}
+
+	if req.SpectatorUserId <= 0 {
+		return &games_pb.AddSpectatorResponse{
+			Success: false,
+			Error:   "spectator_user_id must be positive",
+		}, status.Error(codes.InvalidArgument, "spectator_user_id must be positive")
+	}
+
+	if req.SpectatorUsername == "" {
+		return &games_pb.AddSpectatorResponse{
+			Success: false,
+			Error:   "spectator_username is required",
+		}, status.Error(codes.InvalidArgument, "spectator_username is required")
+	}
+
+	// Add spectator through session service
+	err := s.sessionService.AddSpectator(ctx, req.SessionId, int(req.SpectatorUserId), req.SpectatorUsername)
+	if err != nil {
+		s.logger.Error("Failed to add spectator", "session_id", req.SessionId, "spectator_user_id", req.SpectatorUserId, "error", err)
+		return &games_pb.AddSpectatorResponse{
+			Success: false,
+			Error:   err.Error(),
+		}, status.Error(codes.Internal, "failed to add spectator")
+	}
+
+	// Get updated session info to return spectator details
+	session, err := s.sessionService.GetSessionByID(ctx, req.SessionId)
+	if err != nil {
+		s.logger.Error("Failed to get session after adding spectator", "session_id", req.SessionId, "error", err)
+		return &games_pb.AddSpectatorResponse{
+			Success: false,
+			Error:   "failed to get updated session info",
+		}, status.Error(codes.Internal, "failed to get updated session info")
+	}
+
+	// Find the added spectator
+	var spectatorInfo *games_pb.SpectatorInfo
+	for _, spec := range session.GetSpectators() {
+		if spec.UserId == req.SpectatorUserId {
+			spectatorInfo = spec
+			break
+		}
+	}
+
+	s.logger.Info("Spectator added successfully", "session_id", req.SessionId, "spectator_user_id", req.SpectatorUserId, "spectator_username", req.SpectatorUsername)
+
+	return &games_pb.AddSpectatorResponse{
+		Success:   true,
+		Spectator: spectatorInfo,
+	}, nil
+}
+
+// RemoveSpectator removes a spectator from a game session
+func (s *GameServiceServer) RemoveSpectator(ctx context.Context, req *games_pb.RemoveSpectatorRequest) (*games_pb.RemoveSpectatorResponse, error) {
+	if req.SessionId == "" {
+		return &games_pb.RemoveSpectatorResponse{
+			Success: false,
+			Error:   "session_id is required",
+		}, status.Error(codes.InvalidArgument, "session_id is required")
+	}
+
+	if req.SpectatorUserId <= 0 {
+		return &games_pb.RemoveSpectatorResponse{
+			Success: false,
+			Error:   "spectator_user_id must be positive",
+		}, status.Error(codes.InvalidArgument, "spectator_user_id must be positive")
+	}
+
+	// Remove spectator through session service
+	err := s.sessionService.RemoveSpectator(ctx, req.SessionId, int(req.SpectatorUserId))
+	if err != nil {
+		s.logger.Error("Failed to remove spectator", "session_id", req.SessionId, "spectator_user_id", req.SpectatorUserId, "error", err)
+		return &games_pb.RemoveSpectatorResponse{
+			Success: false,
+			Error:   err.Error(),
+		}, status.Error(codes.Internal, "failed to remove spectator")
+	}
+
+	s.logger.Info("Spectator removed successfully", "session_id", req.SessionId, "spectator_user_id", req.SpectatorUserId)
+
+	return &games_pb.RemoveSpectatorResponse{
+		Success: true,
+	}, nil
+}
+
 // Health implements the health check endpoint
 func (s *GameServiceServer) Health(ctx context.Context, req *emptypb.Empty) (*games_pb.HealthResponse, error) {
 	return &games_pb.HealthResponse{

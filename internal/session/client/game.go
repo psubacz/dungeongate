@@ -222,6 +222,75 @@ func (c *GameClient) ResizeTerminal(ctx context.Context, sessionID string, width
 	return nil
 }
 
+// GetActiveGameSessions returns all active game sessions for spectating
+func (c *GameClient) GetActiveGameSessions(ctx context.Context) ([]*gamev2.GameSession, error) {
+	req := &gamev2.ListGameSessionsRequest{
+		Status: gamev2.SessionStatus_SESSION_STATUS_ACTIVE,
+		Limit:  100,
+		Offset: 0,
+	}
+
+	resp, err := c.client.ListGameSessions(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list active game sessions: %w", err)
+	}
+
+	return resp.Sessions, nil
+}
+
+// GetGameSessionWithSpectators retrieves detailed session information including spectators
+func (c *GameClient) GetGameSessionWithSpectators(ctx context.Context, sessionID string) (*gamev2.GameSession, error) {
+	req := &gamev2.GetGameSessionRequest{
+		SessionId: sessionID,
+	}
+
+	resp, err := c.client.GetGameSession(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get game session with spectators: %w", err)
+	}
+
+	return resp.Session, nil
+}
+
+// AddSpectator adds a spectator to a game session
+func (c *GameClient) AddSpectator(ctx context.Context, sessionID string, spectatorUserID int32, spectatorUsername string) error {
+	req := &gamev2.AddSpectatorRequest{
+		SessionId:         sessionID,
+		SpectatorUserId:   spectatorUserID,
+		SpectatorUsername: spectatorUsername,
+	}
+
+	resp, err := c.client.AddSpectator(ctx, req)
+	if err != nil {
+		return fmt.Errorf("failed to add spectator: %w", err)
+	}
+
+	if !resp.Success {
+		return fmt.Errorf("failed to add spectator: %s", resp.Error)
+	}
+
+	return nil
+}
+
+// RemoveSpectator removes a spectator from a game session
+func (c *GameClient) RemoveSpectator(ctx context.Context, sessionID string, spectatorUserID int32) error {
+	req := &gamev2.RemoveSpectatorRequest{
+		SessionId:       sessionID,
+		SpectatorUserId: spectatorUserID,
+	}
+
+	resp, err := c.client.RemoveSpectator(ctx, req)
+	if err != nil {
+		return fmt.Errorf("failed to remove spectator: %w", err)
+	}
+
+	if !resp.Success {
+		return fmt.Errorf("failed to remove spectator: %s", resp.Error)
+	}
+
+	return nil
+}
+
 // convertSessionState converts protobuf session state to string
 func convertSessionState(state gamev2.SessionStatus) string {
 	switch state {

@@ -32,6 +32,10 @@ service GameService {
   rpc StreamGameIO(stream GameIORequest) returns (stream GameIOResponse);
   rpc ResizeTerminal(ResizeTerminalRequest) returns (ResizeTerminalResponse);
 
+  // Spectator management
+  rpc AddSpectator(AddSpectatorRequest) returns (AddSpectatorResponse);
+  rpc RemoveSpectator(RemoveSpectatorRequest) returns (RemoveSpectatorResponse);
+
   // Health check
   rpc Health(google.protobuf.Empty) returns (HealthResponse);
 }
@@ -438,6 +442,29 @@ message ResizeTerminalRequest {
 }
 
 message ResizeTerminalResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+// Spectator management requests/responses
+message AddSpectatorRequest {
+  string session_id = 1;
+  int32 spectator_user_id = 2;
+  string spectator_username = 3;
+}
+
+message AddSpectatorResponse {
+  bool success = 1;
+  string error = 2;
+  SpectatorInfo spectator = 3;
+}
+
+message RemoveSpectatorRequest {
+  string session_id = 1;
+  int32 spectator_user_id = 2;
+}
+
+message RemoveSpectatorResponse {
   bool success = 1;
   string error = 2;
 }
