@@ -15,6 +15,8 @@ import (
 )
 
 // Service represents the stateless Session Service
+// DEPRECATED: This service will be replaced by pool-based architecture.
+// Use pool-based handlers from internal/session/handlers for new implementations.
 type Service struct {
 	config *Config
 	logger *slog.Logger
@@ -64,17 +66,20 @@ func New(cfg *Config, logger *slog.Logger, metricsRegistry *metrics.Registry) (*
 
 	// Initialize servers
 	sshConfig := &server.SSHConfig{
-		Address:         cfg.SSH.Address,
-		Port:            cfg.SSH.Port,
-		MaxConns:        cfg.MaxConnections,
-		IdleTimeout:     cfg.SSH.IdleTimeout,
-		HostKey:         cfg.SSH.HostKey,
-		PasswordAuth:    cfg.SSH.PasswordAuth,
-		PublicKeyAuth:   cfg.SSH.PublicKeyAuth,
-		AllowAnonymous:  cfg.SSH.AllowAnonymous,
-		BannerMainAnon:  cfg.Menu.Banners.MainAnon,
-		BannerMainUser:  cfg.Menu.Banners.MainUser,
-		BannerWatchMenu: cfg.Menu.Banners.WatchMenu,
+		Address:                  cfg.SSH.Address,
+		Port:                     cfg.SSH.Port,
+		MaxConns:                 cfg.MaxConnections,
+		IdleTimeout:              cfg.SSH.IdleTimeout,
+		HostKey:                  cfg.SSH.HostKey,
+		PasswordAuth:             cfg.SSH.PasswordAuth,
+		PublicKeyAuth:            cfg.SSH.PublicKeyAuth,
+		AllowAnonymous:           cfg.SSH.AllowAnonymous,
+		BannerMainAnon:           cfg.Menu.Banners.MainAnon,
+		BannerMainUser:           cfg.Menu.Banners.MainUser,
+		BannerWatchMenu:          cfg.Menu.Banners.WatchMenu,
+		BannerIdleMode:           cfg.Menu.Banners.IdleMode,
+		BannerServiceUnavailable: cfg.Menu.Banners.ServiceUnavailable,
+		IdleRetryInterval:        cfg.IdleRetryInterval,
 	}
 	sshServer, err := server.NewSSHServer(sshConfig, gameClient, authClient, logger)
 	if err != nil {

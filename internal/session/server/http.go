@@ -103,11 +103,9 @@ func (h *HTTPServer) connectionsHandler(w http.ResponseWriter, r *http.Request) 
 
 	// Return a simplified connection list
 	response := map[string]interface{}{
-		"total_connections":    stats.Total,
-		"active_connections":   stats.Active,
-		"connections_by_state": stats.ByState,
-		"connections_by_user":  stats.ByUserID,
-		"connections_by_ip":    stats.ByRemoteIP,
+		"total_connections":  stats.Total,
+		"active_connections": stats.Active,
+		"note":               "Detailed stats available from Game Service",
 	}
 
 	w.Header().Set("Content-Type", "application/json")

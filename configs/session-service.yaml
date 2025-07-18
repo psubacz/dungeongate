@@ -140,6 +140,9 @@ session_management:
     # Detect idle period after this much inactivity
     idle_detection_threshold: "2m"
     
+    # How often to retry connecting to game service when in idle mode
+    idle_retry_interval: "5s"
+    
     # gRPC stream heartbeat configuration
     grpc_stream:
       # Enable heartbeat for gRPC streams
@@ -201,6 +204,49 @@ menu:
     # Banner for the game spectating menu
     watch_menu: "./assets/banners/watch_menu.txt"
     
+    # Banner shown when game service is unavailable
+    idle_mode: "./assets/banners/idle_mode.txt"
+    
+    # Banner shown when critical services are unavailable
+    service_unavailable: "./assets/banners/service_unavailable.txt"
+    
+    # Header configuration - displayed at the top of menus
+    headers:
+      # Global header - shown on all menus if no specific header is set
+      global: ""
+      
+      # Anonymous user menu header
+      anonymous: ""
+      
+      # Authenticated user menu header  
+      user: ""
+      
+      # Game selection menu header
+      game_selection: ""
+    
+    # Footer configuration - displayed at the bottom of menus (great for announcements)
+    footers:
+      # Global footer - shown on all menus if no specific footer is set
+      global: |
+        ───────────────────────────────────────────────────────────────
+        DungeonGate | For help, contact admin@dungeongate.local
+      
+      # Anonymous user menu footer
+      anonymous: |
+        ───────────────────────────────────────────────────────────────
+        Server Announcement: Welcome! Register today for full access.
+        Server Time: $TIME | Need help? Contact admin@dungeongate.local
+      
+      # Authenticated user menu footer  
+      user: |
+        ───────────────────────────────────────────────────────────────
+        Happy gaming, $USERNAME! | Server Time: $TIME | Uptime: $UPTIME
+      
+      # Game selection menu footer
+      game_selection: |
+        ───────────────────────────────────────────────────────────────
+        Tip: Save your progress frequently! Good luck, $USERNAME!
+    
   # Menu options configuration
   options:
     # Options available to anonymous users
@@ -214,9 +260,6 @@ menu:
       - key: "w"
         label: "Watch games"
         action: "watch"
-      - key: "g"
-        label: "List games"
-        action: "list_games"
       - key: "q"
         label: "Quit"
         action: "quit"
@@ -232,9 +275,6 @@ menu:
       - key: "e"
         label: "Edit profile"
         action: "edit_profile"
-      - key: "l"
-        label: "List games"
-        action: "list_games"
       - key: "r"
         label: "View recordings"
         action: "recordings"
@@ -592,3 +632,286 @@ games:
     networking:
       # Network isolation mode
       mode: "isolated"
+
+# ============================================================================
+# Pool-Based Architecture Configuration
+# ============================================================================
+# Configuration for the new pool-based connection and resource management
+
+# Connection Pool Configuration
+connection_pool:
+  # Maximum number of concurrent connections
+  max_connections: 1000
+  
+  # Size of the connection request queue
+  queue_size: 100
+  
+  # Timeout for queuing connection requests
+  queue_timeout: "5s"
+  
+  # Timeout for idle connections before cleanup
+  idle_timeout: "30m"
+  
+  # Timeout for graceful connection draining during shutdown
+  drain_timeout: "30s"
+
+# Worker Pool Configuration
+worker_pool:
+  # Number of worker goroutines in the pool
+  pool_size: 50
+  
+  # Size of the work item queue
+  queue_size: 1000
+  
+  # Timeout for individual work items
+  worker_timeout: "30s"
+  
+  # Timeout for graceful worker shutdown
+  shutdown_timeout: "10s"
+
+# PTY Pool Configuration
+pty_pool:
+  # Maximum number of PTYs to pool
+  max_ptys: 500
+  
+  # How long PTYs can be reused before recreation
+  reuse_timeout: "5m"
+  
+  # How often to clean up old PTYs
+  cleanup_interval: "1m"
+  
+  # File descriptor limit for PTY management
+  fd_limit: 1024
+
+# Backpressure Management Configuration
+backpressure:
+  # Enable backpressure management
+  enabled: true
+  
+  # Enable circuit breaker pattern
+  circuit_breaker:
+    enabled: true
+    failure_threshold: 10
+    recovery_timeout: "60s"
+  
+  # Enable load shedding
+  load_shedding:
+    enabled: true
+    cpu_threshold: 0.8      # 80% CPU usage
+    memory_threshold: 0.9   # 90% memory usage
+    queue_threshold: 0.9    # 90% queue utilization
+
+# Resource Management Configuration
+resource_management:
+  # Resource limits and quotas
+  limits:
+    # Global system limits
+    system:
+      max_connections: 1000
+      max_ptys: 500
+      max_memory: "8GB"
+      max_bandwidth: "1GB/s"
+      max_file_descriptors: 8192
+    
+    # Default user quotas
+    default_user_quota:
+      max_connections: 10
+      max_ptys: 5
+      max_memory: "256MB"
+      max_bandwidth: "10MB/s"
+      max_cpu_cores: 0.5
+      max_work_items: 100
+      expires_after: "24h"
+      priority: 1
+    
+    # VIP user quotas (higher limits)
+    vip_user_quota:
+      max_connections: 25
+      max_ptys: 10
+      max_memory: "512MB"
+      max_bandwidth: "50MB/s"
+      max_cpu_cores: 1.0
+      max_work_items: 200
+      expires_after: "168h"  # 7 days
+      priority: 5
+  
+  # Resource tracking settings
+  tracking:
+    cleanup_interval: "5m"
+    max_idle_time: "30m"
+    
+  # Resource usage warnings
+  warnings:
+    connection_threshold: 800    # 80% of max connections
+    pty_threshold: 400          # 80% of max PTYs
+    memory_threshold: 0.8       # 80% of max memory
+    fd_threshold: 6144          # 75% of max file descriptors
+
+# Metrics and Monitoring Configuration
+pool_metrics:
+  # Enable comprehensive metrics collection
+  enabled: true
+  
+  # Metrics collection interval
+  collection_interval: "10s"
+  
+  # Metrics export/logging interval
+  export_interval: "30s"
+  
+  # Metrics retention period
+  retention_period: "24h"
+  
+  # Histogram buckets for latency metrics
+  latency_buckets: [0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]
+  
+  # Custom metrics configuration
+  custom_metrics:
+    # Connection pool metrics
+    connection_pool:
+      - name: "active_connections"
+        type: "gauge"
+        help: "Number of active connections"
+      - name: "queued_requests"
+        type: "gauge"
+        help: "Number of queued connection requests"
+      - name: "queue_time"
+        type: "histogram"
+        help: "Time spent in connection queue"
+    
+    # Worker pool metrics
+    worker_pool:
+      - name: "active_workers"
+        type: "gauge"
+        help: "Number of active worker goroutines"
+      - name: "work_queue_size"
+        type: "gauge"
+        help: "Number of work items in queue"
+      - name: "work_processing_time"
+        type: "histogram"
+        help: "Time to process work items"
+    
+    # Resource usage metrics
+    resources:
+      - name: "pty_utilization"
+        type: "gauge"
+        help: "PTY pool utilization percentage"
+      - name: "memory_usage"
+        type: "gauge"
+        help: "Memory usage in bytes"
+      - name: "fd_usage"
+        type: "gauge"
+        help: "File descriptor usage count"
+
+# Health Check Configuration for Pool Components
+pool_health:
+  # Enable health checks for pool components
+  enabled: true
+  
+  # Health check intervals
+  check_interval: "30s"
+  
+  # Health check timeouts
+  check_timeout: "5s"
+  
+  # Health check endpoints
+  endpoints:
+    connection_pool: "/health/connection-pool"
+    worker_pool: "/health/worker-pool"
+    pty_pool: "/health/pty-pool"
+    resource_limiter: "/health/resource-limiter"
+  
+  # Health check thresholds
+  thresholds:
+    connection_pool:
+      max_queue_time: "1s"
+      max_utilization: 0.9
+    worker_pool:
+      max_queue_size: 800
+      min_available_workers: 5
+    pty_pool:
+      max_fd_utilization: 0.8
+      max_reuse_failures: 10
+    resource_limiter:
+      max_violation_rate: 0.1
+
+# Advanced Pool Configuration
+advanced_pool_config:
+  # Connection pool advanced settings
+  connection_pool:
+    # Enable connection prioritization
+    enable_prioritization: true
+    
+    # Priority queue weights
+    priority_weights:
+      critical: 4
+      high: 3
+      normal: 2
+      low: 1
+    
+    # Connection warming (pre-create connections)
+    connection_warming:
+      enabled: true
+      min_connections: 10
+      warm_up_interval: "5s"
+  
+  # Worker pool advanced settings
+  worker_pool:
+    # Enable dynamic worker scaling
+    dynamic_scaling:
+      enabled: true
+      min_workers: 10
+      max_workers: 100
+      scale_up_threshold: 0.8
+      scale_down_threshold: 0.2
+      scale_interval: "30s"
+  
+  # PTY pool advanced settings
+  pty_pool:
+    # Enable PTY pre-allocation
+    pre_allocation:
+      enabled: false
+      pre_allocate_count: 20
+      allocation_interval: "10s"
+    
+    # PTY health checking
+    health_checking:
+      enabled: true
+      check_interval: "2m"
+      max_failed_checks: 3
+  
+  # Advanced monitoring and alerting
+  monitoring:
+    # Enable detailed logging for debugging
+    debug_logging: false
+    
+    # Enable performance profiling
+    profiling:
+      enabled: false
+      cpu_profile_interval: "5m"
+      memory_profile_interval: "10m"
+    
+    # Alert thresholds
+    alerts:
+      high_connection_count: 900
+      high_queue_time: "2s"
+      high_error_rate: 0.05
+      high_resource_usage: 0.9
+
+# ============================================================================
+# Migration Configuration
+# ============================================================================
+# Feature flags for migrating to pool-based architecture
+migration:
+  # Enable pool-based handlers instead of legacy handlers
+  use_pool_based_handlers: true
+  
+  # Fallback to legacy handlers if pool-based handlers fail
+  fallback_to_legacy: true
+  
+  # Individual handler migration flags
+  handlers:
+    session_handler: true
+    auth_handler: true 
+    game_handler: true
+    stream_handler: true
+    menu_handler: true

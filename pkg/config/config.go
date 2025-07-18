@@ -41,11 +41,11 @@ type EncryptionConfig struct {
 
 // LoggingConfig represents logging configuration
 type LoggingConfig struct {
-	Level    string           `yaml:"level"`
-	Format   string           `yaml:"format"`
-	Output   string           `yaml:"output"`
-	File     *FileConfig      `yaml:"file,omitempty"`
-	Journald *JournaldConfig  `yaml:"journald,omitempty"`
+	Level    string          `yaml:"level"`
+	Format   string          `yaml:"format"`
+	Output   string          `yaml:"output"`
+	File     *FileConfig     `yaml:"file,omitempty"`
+	Journald *JournaldConfig `yaml:"journald,omitempty"`
 }
 
 // FileConfig represents file logging configuration
@@ -112,15 +112,16 @@ type SpectatingConfig struct {
 
 // HeartbeatConfig represents general heartbeat configuration
 type HeartbeatConfig struct {
-	Enabled               bool              `yaml:"enabled"`
-	Interval              string            `yaml:"interval"`
-	IdleDetectionThreshold string           `yaml:"idle_detection_threshold"`
-	GRPCStream            *GRPCStreamConfig `yaml:"grpc_stream"`
+	Enabled                bool              `yaml:"enabled"`
+	Interval               string            `yaml:"interval"`
+	IdleDetectionThreshold string            `yaml:"idle_detection_threshold"`
+	IdleRetryInterval      string            `yaml:"idle_retry_interval"`
+	GRPCStream             *GRPCStreamConfig `yaml:"grpc_stream"`
 }
 
 // GRPCStreamConfig represents gRPC stream heartbeat configuration
 type GRPCStreamConfig struct {
-	Enabled     bool   `yaml:"enabled"`
+	Enabled      bool   `yaml:"enabled"`
 	PingInterval string `yaml:"ping_interval"`
 	PongTimeout  string `yaml:"pong_timeout"`
 }

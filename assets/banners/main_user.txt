@@ -1,12 +1,14 @@
-Authenticated User: $USERNAME
+DungeonGate
+
+Welcome, $USERNAME
 Date: $DATE | Time: $TIME
 
-Menu Options:
-  [p] Play a game
-  [w] Watch games
-  [e] Edit profile
-  [l] List games
-  [r] View recordings
-  [s] Game Statistics
-  [c] Credits
-  [q] Quit
+[P] Play a game
+[W] Watch games
+[E] Edit profile
+[R] View recordings
+[S] Game Statistics
+[C] Credits
+[Q] Quit
+
+Choice: 

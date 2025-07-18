@@ -28,7 +28,7 @@ func setupLogger(cfg *config.SessionServiceConfig) *slog.Logger {
 	level := "info"
 	format := "text"
 	output := "stdout"
-	
+
 	if cfg.Logging != nil {
 		if cfg.Logging.Level != "" {
 			level = cfg.Logging.Level
@@ -40,7 +40,7 @@ func setupLogger(cfg *config.SessionServiceConfig) *slog.Logger {
 			output = cfg.Logging.Output
 		}
 	}
-	
+
 	return logging.NewLoggerBasic("session-service", level, format, output)
 }
 
@@ -62,11 +62,11 @@ func main() {
 	// Load configuration first to setup logging properly
 	cfg, err := config.LoadSessionServiceConfig(*configFile)
 	if err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to load configuration: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Failed to load configuration: %v\n", err)
 		os.Exit(1)
 	}
 
-	// Setup structured logging based on configuration  
+	// Setup structured logging based on configuration
 	logger := setupLogger(cfg)
 
 	// Initialize metrics registry
@@ -129,11 +129,23 @@ func main() {
 		MaxPTYs:        500,
 	}
 
+	// Set idle retry interval if available
+	if cfg.SessionManagement != nil && cfg.SessionManagement.Heartbeat != nil {
+		if interval, err := time.ParseDuration(cfg.SessionManagement.Heartbeat.IdleRetryInterval); err == nil {
+			sessionConfig.IdleRetryInterval = interval
+		} else {
+			sessionConfig.IdleRetryInterval = 5 * time.Second
+		}
+	} else {
+		sessionConfig.IdleRetryInterval = 5 * time.Second
+	}
+
 	// Set banner configuration if available
 	if cfg.Menu != nil && cfg.Menu.Banners != nil {
 		sessionConfig.Menu.Banners.MainAnon = cfg.Menu.Banners.MainAnon
 		sessionConfig.Menu.Banners.MainUser = cfg.Menu.Banners.MainUser
 		sessionConfig.Menu.Banners.WatchMenu = cfg.Menu.Banners.WatchMenu
+		sessionConfig.Menu.Banners.IdleMode = cfg.Menu.Banners.IdleMode
 	}
 
 	// Create stateless session service

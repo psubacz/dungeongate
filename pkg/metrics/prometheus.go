@@ -119,7 +119,6 @@ func NewServiceMetrics(namespace string) *ServiceMetrics {
 	}
 }
 
-
 // Registry represents a metrics registry for a service
 type Registry struct {
 	serviceName    string
@@ -129,10 +128,10 @@ type Registry struct {
 	logger         *slog.Logger
 
 	// Core metrics
-	Service            *ServiceMetrics
-	SessionService     *SessionServiceMetrics
-	GameService        *GameServiceMetrics
-	AuthService        *AuthServiceMetrics
+	Service        *ServiceMetrics
+	SessionService *SessionServiceMetrics
+	GameService    *GameServiceMetrics
+	AuthService    *AuthServiceMetrics
 
 	// HTTP server for metrics endpoint
 	server *http.Server
@@ -201,20 +200,20 @@ func (r *Registry) HTTPMiddleware() func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			start := time.Now()
-			
+
 			// Create response writer wrapper to capture status code
 			wrapped := &responseWriter{ResponseWriter: w, statusCode: http.StatusOK}
-			
+
 			// Process request
 			next.ServeHTTP(wrapped, req)
-			
+
 			// Record metrics
 			duration := time.Since(start)
 			status := strconv.Itoa(wrapped.statusCode)
-			
+
 			r.Service.HTTPRequestsTotal.WithLabelValues(req.Method, req.URL.Path, status).Inc()
 			r.Service.HTTPRequestDuration.WithLabelValues(req.Method, req.URL.Path).Observe(duration.Seconds())
-			
+
 			// Log request with metrics correlation
 			r.logger.Info("HTTP request",
 				"method", req.Method,
@@ -242,30 +241,30 @@ func (rw *responseWriter) WriteHeader(code int) {
 func (r *Registry) UnaryServerInterceptor() grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 		start := time.Now()
-		
+
 		// Process request
 		resp, err := handler(ctx, req)
-		
+
 		// Record metrics
 		duration := time.Since(start)
 		statusCode := "OK"
 		if err != nil {
 			statusCode = status.Code(err).String()
 		}
-		
+
 		// Extract method name from full method path
 		method := info.FullMethod
-		
+
 		r.Service.GRPCRequestsTotal.WithLabelValues(method, statusCode).Inc()
 		r.Service.GRPCRequestDuration.WithLabelValues(method).Observe(duration.Seconds())
-		
+
 		// Log request with metrics correlation
 		r.logger.Info("gRPC request",
 			"method", method,
 			"status", statusCode,
 			"duration_ms", duration.Milliseconds(),
 		)
-		
+
 		return resp, err
 	}
 }
@@ -274,29 +273,29 @@ func (r *Registry) UnaryServerInterceptor() grpc.UnaryServerInterceptor {
 func (r *Registry) StreamServerInterceptor() grpc.StreamServerInterceptor {
 	return func(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
 		start := time.Now()
-		
+
 		// Process stream
 		err := handler(srv, ss)
-		
+
 		// Record metrics
 		duration := time.Since(start)
 		statusCode := "OK"
 		if err != nil {
 			statusCode = status.Code(err).String()
 		}
-		
+
 		method := info.FullMethod
-		
+
 		r.Service.GRPCRequestsTotal.WithLabelValues(method, statusCode).Inc()
 		r.Service.GRPCRequestDuration.WithLabelValues(method).Observe(duration.Seconds())
-		
+
 		// Log stream with metrics correlation
 		r.logger.Info("gRPC stream",
 			"method", method,
 			"status", statusCode,
 			"duration_ms", duration.Milliseconds(),
 		)
-		
+
 		return err
 	}
 }

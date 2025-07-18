@@ -30,16 +30,16 @@ type SessionServiceConfig struct {
 
 // SSHConfig represents SSH server configuration
 type SSHConfig struct {
-	Enabled        bool               `yaml:"enabled"`
-	Port           int                `yaml:"port"`
-	Host           string             `yaml:"host"`
-	HostKeyPath    string             `yaml:"host_key_path"`
-	Banner         string             `yaml:"banner"`
-	MaxSessions    int                `yaml:"max_sessions"`
-	SessionTimeout string             `yaml:"session_timeout"`
-	IdleTimeout    string             `yaml:"idle_timeout"`
-	Auth           *SSHAuthConfig     `yaml:"auth"`
-	Terminal       *SSHTerminalConfig `yaml:"terminal"`
+	Enabled        bool                `yaml:"enabled"`
+	Port           int                 `yaml:"port"`
+	Host           string              `yaml:"host"`
+	HostKeyPath    string              `yaml:"host_key_path"`
+	Banner         string              `yaml:"banner"`
+	MaxSessions    int                 `yaml:"max_sessions"`
+	SessionTimeout string              `yaml:"session_timeout"`
+	IdleTimeout    string              `yaml:"idle_timeout"`
+	Auth           *SSHAuthConfig      `yaml:"auth"`
+	Terminal       *SSHTerminalConfig  `yaml:"terminal"`
 	Keepalive      *SSHKeepaliveConfig `yaml:"keepalive"`
 }
 
@@ -72,9 +72,11 @@ type MenuConfig struct {
 
 // BannersConfig represents banner configuration
 type BannersConfig struct {
-	MainAnon  string `yaml:"main_anon"`
-	MainUser  string `yaml:"main_user"`
-	WatchMenu string `yaml:"watch_menu"`
+	MainAnon           string `yaml:"main_anon"`
+	MainUser           string `yaml:"main_user"`
+	WatchMenu          string `yaml:"watch_menu"`
+	IdleMode           string `yaml:"idle_mode"`
+	ServiceUnavailable string `yaml:"service_unavailable"`
 }
 
 // MenuOptions represents menu options configuration
@@ -295,11 +297,12 @@ func applyDefaults(cfg *SessionServiceConfig) {
 	}
 	if cfg.SessionManagement.Heartbeat == nil {
 		cfg.SessionManagement.Heartbeat = &HeartbeatConfig{
-			Enabled:               true,
-			Interval:              "60s",
+			Enabled:                true,
+			Interval:               "60s",
 			IdleDetectionThreshold: "2m",
+			IdleRetryInterval:      "5s",
 			GRPCStream: &GRPCStreamConfig{
-				Enabled:     true,
+				Enabled:      true,
 				PingInterval: "45s",
 				PongTimeout:  "10s",
 			},
@@ -319,23 +322,23 @@ func applyDefaults(cfg *SessionServiceConfig) {
 	if cfg.Menu == nil {
 		cfg.Menu = &MenuConfig{
 			Banners: &BannersConfig{
-				MainAnon:  "./assets/banners/main_anon.txt",
-				MainUser:  "./assets/banners/main_user.txt",
-				WatchMenu: "./assets/banners/watch_menu.txt",
+				MainAnon:           "./assets/banners/main_anon.txt",
+				MainUser:           "./assets/banners/main_user.txt",
+				WatchMenu:          "./assets/banners/watch_menu.txt",
+				IdleMode:           "./assets/banners/idle_mode.txt",
+				ServiceUnavailable: "./assets/banners/service_unavailable.txt",
 			},
 			Options: &MenuOptions{
 				Anonymous: []*MenuOption{
 					{Key: "l", Label: "Login", Action: "login"},
 					{Key: "r", Label: "Register", Action: "register"},
 					{Key: "w", Label: "Watch games", Action: "watch"},
-					{Key: "g", Label: "List games", Action: "list_games"},
 					{Key: "q", Label: "Quit", Action: "quit"},
 				},
 				Authenticated: []*MenuOption{
 					{Key: "p", Label: "Play a game", Action: "play"},
 					{Key: "w", Label: "Watch games", Action: "watch"},
 					{Key: "e", Label: "Edit profile", Action: "edit_profile"},
-					{Key: "l", Label: "List games", Action: "list_games"},
 					{Key: "r", Label: "View recordings", Action: "recordings"},
 					{Key: "s", Label: "Statistics", Action: "stats"},
 					{Key: "q", Label: "Quit", Action: "quit"},
@@ -442,23 +445,23 @@ func (c *SessionServiceConfig) GetMenu() *MenuConfig {
 	if c.Menu == nil {
 		return &MenuConfig{
 			Banners: &BannersConfig{
-				MainAnon:  "./assets/banners/main_anon.txt",
-				MainUser:  "./assets/banners/main_user.txt",
-				WatchMenu: "./assets/banners/watch_menu.txt",
+				MainAnon:           "./assets/banners/main_anon.txt",
+				MainUser:           "./assets/banners/main_user.txt",
+				WatchMenu:          "./assets/banners/watch_menu.txt",
+				IdleMode:           "./assets/banners/idle_mode.txt",
+				ServiceUnavailable: "./assets/banners/service_unavailable.txt",
 			},
 			Options: &MenuOptions{
 				Anonymous: []*MenuOption{
 					{Key: "l", Label: "Login", Action: "login"},
 					{Key: "r", Label: "Register", Action: "register"},
 					{Key: "w", Label: "Watch games", Action: "watch"},
-					{Key: "g", Label: "List games", Action: "list_games"},
 					{Key: "q", Label: "Quit", Action: "quit"},
 				},
 				Authenticated: []*MenuOption{
 					{Key: "p", Label: "Play a game", Action: "play"},
 					{Key: "w", Label: "Watch games", Action: "watch"},
 					{Key: "e", Label: "Edit profile", Action: "edit_profile"},
-					{Key: "l", Label: "List games", Action: "list_games"},
 					{Key: "r", Label: "View recordings", Action: "recordings"},
 					{Key: "s", Label: "Statistics", Action: "stats"},
 					{Key: "q", Label: "Quit", Action: "quit"},
@@ -684,11 +687,12 @@ func GetDefaultDevelopmentConfig() *SessionServiceConfig {
 				SpectatorTimeout:        "30m",
 			},
 			Heartbeat: &HeartbeatConfig{
-				Enabled:               true,
-				Interval:              "60s",
+				Enabled:                true,
+				Interval:               "60s",
 				IdleDetectionThreshold: "2m",
+				IdleRetryInterval:      "5s",
 				GRPCStream: &GRPCStreamConfig{
-					Enabled:     true,
+					Enabled:      true,
 					PingInterval: "45s",
 					PongTimeout:  "10s",
 				},
