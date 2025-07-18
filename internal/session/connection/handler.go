@@ -701,8 +701,25 @@ func (h *Handler) handleMenuChoice(ctx context.Context, channel ssh.Channel, cho
 			return nil
 		}
 
+	case "spectate_session":
+		// Start spectating a specific game session
+		return h.startSpectating(ctx, channel, userInfo, choice.Value)
+
 	case "watch":
-		return h.handleWatchMode(ctx, channel, userInfo)
+		// Show the new formatted watch menu
+		watchChoice, err := h.menuHandler.ShowWatchMenu(ctx, channel, userInfo)
+		if err != nil {
+			h.logger.Error("Watch menu failed", "error", err)
+			return err
+		}
+		
+		// If no choice was made (user quit), return to main menu
+		if watchChoice == nil {
+			return nil
+		}
+		
+		// Handle the watch menu choice
+		return h.handleMenuChoice(ctx, channel, watchChoice, userInfo, connID, username, terminalCols, terminalRows, sshConn)
 
 	case "edit_profile":
 		channel.Write([]byte("Profile editing functionality not yet implemented.\r\n"))
@@ -1386,11 +1403,19 @@ func (h *Handler) handleWatchMode(ctx context.Context, channel ssh.Channel, user
 	selectedSession := availableSessions[sessionIndex-1]
 
 	// Start spectating the selected session
-	return h.startSpectating(ctx, channel, user, selectedSession)
+	return h.startSpectating(ctx, channel, user, selectedSession.Id)
 }
 
-// startSpectating starts spectating a game session
-func (h *Handler) startSpectating(ctx context.Context, channel ssh.Channel, user *authv1.User, session *gamev2.GameSession) error {
+// startSpectating starts spectating a game session by session ID
+func (h *Handler) startSpectating(ctx context.Context, channel ssh.Channel, user *authv1.User, sessionID string) error {
+	// First, get the session details
+	session, err := h.gameClient.GetGameSessionWithSpectators(ctx, sessionID)
+	if err != nil {
+		h.logger.Error("Failed to get session details", "error", err, "session_id", sessionID)
+		channel.Write([]byte("Failed to get session details. The session may have ended.\r\n"))
+		time.Sleep(2 * time.Second)
+		return nil
+	}
 	if user != nil {
 		h.logger.Info("Starting spectating",
 			"spectator_user_id", user.Id,
