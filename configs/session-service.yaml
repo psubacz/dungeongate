@@ -655,34 +655,6 @@ connection_pool:
   # Timeout for graceful connection draining during shutdown
   drain_timeout: "30s"
 
-# Worker Pool Configuration
-worker_pool:
-  # Number of worker goroutines in the pool
-  pool_size: 50
-  
-  # Size of the work item queue
-  queue_size: 1000
-  
-  # Timeout for individual work items
-  worker_timeout: "30s"
-  
-  # Timeout for graceful worker shutdown
-  shutdown_timeout: "10s"
-
-# PTY Pool Configuration
-pty_pool:
-  # Maximum number of PTYs to pool
-  max_ptys: 500
-  
-  # How long PTYs can be reused before recreation
-  reuse_timeout: "5m"
-  
-  # How often to clean up old PTYs
-  cleanup_interval: "1m"
-  
-  # File descriptor limit for PTY management
-  fd_limit: 1024
-
 # Backpressure Management Configuration
 backpressure:
   # Enable backpressure management
@@ -778,18 +750,6 @@ pool_metrics:
         type: "histogram"
         help: "Time spent in connection queue"
     
-    # Worker pool metrics
-    worker_pool:
-      - name: "active_workers"
-        type: "gauge"
-        help: "Number of active worker goroutines"
-      - name: "work_queue_size"
-        type: "gauge"
-        help: "Number of work items in queue"
-      - name: "work_processing_time"
-        type: "histogram"
-        help: "Time to process work items"
-    
     # Resource usage metrics
     resources:
       - name: "pty_utilization"
@@ -816,8 +776,6 @@ pool_health:
   # Health check endpoints
   endpoints:
     connection_pool: "/health/connection-pool"
-    worker_pool: "/health/worker-pool"
-    pty_pool: "/health/pty-pool"
     resource_limiter: "/health/resource-limiter"
   
   # Health check thresholds
@@ -825,12 +783,6 @@ pool_health:
     connection_pool:
       max_queue_time: "1s"
       max_utilization: 0.9
-    worker_pool:
-      max_queue_size: 800
-      min_available_workers: 5
-    pty_pool:
-      max_fd_utilization: 0.8
-      max_reuse_failures: 10
     resource_limiter:
       max_violation_rate: 0.1
 
@@ -854,25 +806,6 @@ advanced_pool_config:
       min_connections: 10
       warm_up_interval: "5s"
   
-  # Worker pool advanced settings
-  worker_pool:
-    # Enable dynamic worker scaling
-    dynamic_scaling:
-      enabled: true
-      min_workers: 10
-      max_workers: 100
-      scale_up_threshold: 0.8
-      scale_down_threshold: 0.2
-      scale_interval: "30s"
-  
-  # PTY pool advanced settings
-  pty_pool:
-    # Enable PTY pre-allocation
-    pre_allocation:
-      enabled: false
-      pre_allocate_count: 20
-      allocation_interval: "10s"
-    
     # PTY health checking
     health_checking:
       enabled: true

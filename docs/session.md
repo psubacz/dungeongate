@@ -108,43 +108,6 @@ err := workerPool.Submit(work)
 - `session_worker_processing_time` - Work processing duration
 - `session_worker_utilization` - Worker pool utilization percentage
 
-### 3. PTY Pool (`internal/session/pools/pty_pool.go`)
-
-The PTY pool manages pseudo-terminal resources with efficient reuse and cleanup.
-
-#### Key Features
-- **PTY Reuse**: Reuse PTYs across sessions to reduce overhead
-- **File Descriptor Management**: Track and limit FD usage
-- **Automatic Cleanup**: Remove old or invalid PTYs
-- **Health Monitoring**: Validate PTY health before reuse
-- **Resource Limits**: Configurable FD and PTY limits
-
-#### Configuration
-```yaml
-pty_pool:
-  max_ptys: 500
-  reuse_timeout: "5m"
-  cleanup_interval: "1m"
-  fd_limit: 1024
-```
-
-#### Usage Example
-```go
-// Acquire a PTY for a session
-ptyRes, err := ptyPool.AcquirePTY(sessionID)
-if err != nil {
-    return fmt.Errorf("PTY allocation failed: %w", err)
-}
-
-// Use the PTY
-defer ptyPool.ReleasePTY(ptyRes.ID)
-```
-
-#### Metrics
-- `session_pty_active_ptys` - PTYs currently in use
-- `session_pty_available_ptys` - PTYs available for reuse
-- `session_pty_fd_usage` - File descriptors in use
-- `session_pty_reuse_rate` - PTY reuse efficiency
 
 ### 4. Backpressure Manager (`internal/session/pools/backpressure.go`)
 
@@ -308,12 +271,6 @@ worker_pool:
   worker_timeout: "30s"
   shutdown_timeout: "10s"
 
-# PTY Pool Configuration
-pty_pool:
-  max_ptys: 500
-  reuse_timeout: "5m"
-  cleanup_interval: "1m"
-  fd_limit: 1024
 
 # Resource Management
 resource_management:
@@ -338,17 +295,8 @@ advanced_pool_config:
       enabled: true
       min_connections: 10
 
-  worker_pool:
-    dynamic_scaling:
-      enabled: true
-      min_workers: 10
-      max_workers: 100
-      scale_up_threshold: 0.8
 
-  pty_pool:
-    pre_allocation:
-      enabled: true
-      pre_allocate_count: 20
+
 ```
 
 ## Monitoring and Observability
@@ -510,21 +458,6 @@ For capacity planning, consider:
 
 Key performance tuning parameters:
 
-```yaml
-# High-throughput configuration
-connection_pool:
-  max_connections: 5000
-  queue_size: 500
-
-worker_pool:
-  pool_size: 100
-  queue_size: 5000
-
-pty_pool:
-  max_ptys: 2000
-  fd_limit: 4096
-```
-
 ## Development
 
 ### Quick Start
@@ -550,7 +483,6 @@ internal/session/
 ├── pools/                    # Pool infrastructure
 │   ├── connection_pool.go    # Connection management
 │   ├── worker_pool.go        # Worker goroutine pool
-│   ├── pty_pool.go          # PTY resource pool
 │   └── backpressure.go      # Backpressure management
 ├── resources/               # Resource management
 │   ├── limiter.go           # Resource limits and quotas
