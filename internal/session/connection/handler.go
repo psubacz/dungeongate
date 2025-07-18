@@ -1311,7 +1311,11 @@ func (h *Handler) readPassword(ctx context.Context, channel ssh.Channel) (string
 
 // handleWatchMode handles the spectating/watching functionality
 func (h *Handler) handleWatchMode(ctx context.Context, channel ssh.Channel, user *authv1.User) error {
-	h.logger.Info("Entering watch mode", "user_id", user.Id, "username", user.Username)
+	if user != nil {
+		h.logger.Info("Entering watch mode", "user_id", user.Id, "username", user.Username)
+	} else {
+		h.logger.Info("Entering watch mode (anonymous user)")
+	}
 
 	// Get active sessions available for spectating
 	sessions, err := h.gameClient.GetActiveGameSessions(ctx)
@@ -1322,21 +1326,26 @@ func (h *Handler) handleWatchMode(ctx context.Context, channel ssh.Channel, user
 		return nil
 	}
 
-	// Filter out user's own sessions
-	// Convert user ID to int32 for comparison
-	userID, err := strconv.ParseInt(user.Id, 10, 32)
-	if err != nil {
-		h.logger.Error("Invalid user ID format", "user_id", user.Id, "error", err)
-		channel.Write([]byte("Invalid user ID. Please contact administrator.\r\n"))
-		time.Sleep(2 * time.Second)
-		return nil
-	}
-
+	// Filter out user's own sessions (authenticated users only)
 	availableSessions := make([]*gamev2.GameSession, 0)
-	for _, session := range sessions {
-		if session.UserId != int32(userID) {
-			availableSessions = append(availableSessions, session)
+	if user != nil {
+		// For authenticated users, filter out their own sessions
+		userID, err := strconv.ParseInt(user.Id, 10, 32)
+		if err != nil {
+			h.logger.Error("Invalid user ID format", "user_id", user.Id, "error", err)
+			channel.Write([]byte("Invalid user ID. Please contact administrator.\r\n"))
+			time.Sleep(2 * time.Second)
+			return nil
 		}
+		
+		for _, session := range sessions {
+			if session.UserId != int32(userID) {
+				availableSessions = append(availableSessions, session)
+			}
+		}
+	} else {
+		// For anonymous users, show all sessions
+		availableSessions = sessions
 	}
 
 	if len(availableSessions) == 0 {
@@ -1382,29 +1391,47 @@ func (h *Handler) handleWatchMode(ctx context.Context, channel ssh.Channel, user
 
 // startSpectating starts spectating a game session
 func (h *Handler) startSpectating(ctx context.Context, channel ssh.Channel, user *authv1.User, session *gamev2.GameSession) error {
-	h.logger.Info("Starting spectating",
-		"spectator_user_id", user.Id,
-		"spectator_username", user.Username,
-		"session_id", session.Id,
-		"session_username", session.Username,
-		"game_id", session.GameId)
-
-	// Add user as spectator to the session
-	// Convert user ID to int32 for Game Service API
-	userID, err := strconv.ParseInt(user.Id, 10, 32)
-	if err != nil {
-		h.logger.Error("Invalid user ID format", "user_id", user.Id, "error", err)
-		channel.Write([]byte("Invalid user ID. Please contact administrator.\r\n"))
-		time.Sleep(2 * time.Second)
-		return nil
+	if user != nil {
+		h.logger.Info("Starting spectating",
+			"spectator_user_id", user.Id,
+			"spectator_username", user.Username,
+			"session_id", session.Id,
+			"session_username", session.Username,
+			"game_id", session.GameId)
+	} else {
+		h.logger.Info("Starting spectating (anonymous user)",
+			"session_id", session.Id,
+			"session_username", session.Username,
+			"game_id", session.GameId)
 	}
 
-	err = h.gameClient.AddSpectator(ctx, session.Id, int32(userID), user.Username)
-	if err != nil {
-		h.logger.Error("Failed to add spectator", "error", err)
-		channel.Write([]byte("Failed to join as spectator. Please try again later.\r\n"))
-		time.Sleep(2 * time.Second)
-		return nil
+	// Add user as spectator to the session (authenticated users only)
+	var userID int32 = 0
+	var username string = "anonymous"
+	
+	if user != nil {
+		// Convert user ID to int32 for Game Service API
+		userIDParsed, err := strconv.ParseInt(user.Id, 10, 32)
+		if err != nil {
+			h.logger.Error("Invalid user ID format", "user_id", user.Id, "error", err)
+			channel.Write([]byte("Invalid user ID. Please contact administrator.\r\n"))
+			time.Sleep(2 * time.Second)
+			return nil
+		}
+		userID = int32(userIDParsed)
+		username = user.Username
+	}
+
+	// For authenticated users, add them as a spectator
+	// For anonymous users, we'll skip this step and just watch without being tracked
+	if user != nil {
+		err := h.gameClient.AddSpectator(ctx, session.Id, userID, username)
+		if err != nil {
+			h.logger.Error("Failed to add spectator", "error", err)
+			channel.Write([]byte("Failed to join as spectator. Please try again later.\r\n"))
+			time.Sleep(2 * time.Second)
+			return nil
+		}
 	}
 
 	// Clear screen and show spectating banner
@@ -1418,8 +1445,10 @@ func (h *Handler) startSpectating(ctx context.Context, channel ssh.Channel, user
 	if err != nil {
 		h.logger.Error("Failed to create game I/O stream", "error", err)
 		channel.Write([]byte("Failed to connect to game stream.\r\n"))
-		// Clean up spectator
-		h.gameClient.RemoveSpectator(ctx, session.Id, int32(userID))
+		// Clean up spectator (authenticated users only)
+		if user != nil {
+			h.gameClient.RemoveSpectator(ctx, session.Id, int32(userID))
+		}
 		time.Sleep(2 * time.Second)
 		return nil
 	}
@@ -1442,8 +1471,10 @@ func (h *Handler) startSpectating(ctx context.Context, channel ssh.Channel, user
 	if err := stream.Send(connectReq); err != nil {
 		h.logger.Error("Failed to send connect request", "error", err)
 		channel.Write([]byte("Failed to connect to game stream.\r\n"))
-		// Clean up spectator
-		h.gameClient.RemoveSpectator(ctx, session.Id, int32(userID))
+		// Clean up spectator (authenticated users only)
+		if user != nil {
+			h.gameClient.RemoveSpectator(ctx, session.Id, int32(userID))
+		}
 		time.Sleep(2 * time.Second)
 		return nil
 	}
@@ -1451,9 +1482,11 @@ func (h *Handler) startSpectating(ctx context.Context, channel ssh.Channel, user
 	// Handle the spectating stream
 	err = h.handleSpectatingStream(ctx, stream, channel, user, session)
 
-	// Clean up spectator when done
-	if removeErr := h.gameClient.RemoveSpectator(ctx, session.Id, int32(userID)); removeErr != nil {
-		h.logger.Error("Failed to remove spectator", "error", removeErr)
+	// Clean up spectator when done (authenticated users only)
+	if user != nil {
+		if removeErr := h.gameClient.RemoveSpectator(ctx, session.Id, int32(userID)); removeErr != nil {
+			h.logger.Error("Failed to remove spectator", "error", removeErr)
+		}
 	}
 
 	return err
