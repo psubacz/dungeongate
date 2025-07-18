@@ -383,7 +383,23 @@ func (s *GameServiceServer) GetGameSession(ctx context.Context, req *games_pb.Ge
 		return nil, status.Error(codes.Unavailable, "session service not available")
 	}
 
-	return nil, status.Error(codes.Unimplemented, "method GetGameSession not implemented")
+	if req.SessionId == "" {
+		return nil, status.Error(codes.InvalidArgument, "session_id is required")
+	}
+
+	// Get the session from the session service
+	session, err := s.sessionService.GetGameSession(ctx, req.SessionId)
+	if err != nil {
+		s.logger.Error("Failed to get game session", "session_id", req.SessionId, "error", err)
+		return nil, status.Error(codes.NotFound, "session not found")
+	}
+
+	// Convert domain session to protobuf
+	pbSession := s.domainSessionToPb(session)
+
+	return &games_pb.GetGameSessionResponse{
+		Session: pbSession,
+	}, nil
 }
 
 // ListGameSessions lists game sessions
