@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/dungeongate/internal/games/infrastructure/pty"
+	"github.com/dungeongate/internal/games"
 	games_pb "github.com/dungeongate/pkg/api/games/v2"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -27,6 +28,65 @@ type StreamSession struct {
 	stream     games_pb.GameService_StreamGameIOServer
 	closeChan  chan struct{}
 	closeOnce  sync.Once
+}
+
+// GRPCSpectatorConnection implements SpectatorConnection for gRPC streams
+type GRPCSpectatorConnection struct {
+	stream    games_pb.GameService_StreamGameIOServer
+	sessionID string
+	logger    *slog.Logger
+	closed    bool
+	mu        sync.RWMutex
+}
+
+// NewGRPCSpectatorConnection creates a new gRPC spectator connection
+func NewGRPCSpectatorConnection(stream games_pb.GameService_StreamGameIOServer, sessionID string, logger *slog.Logger) *GRPCSpectatorConnection {
+	return &GRPCSpectatorConnection{
+		stream:    stream,
+		sessionID: sessionID,
+		logger:    logger,
+	}
+}
+
+// Write implements SpectatorConnection.Write
+func (c *GRPCSpectatorConnection) Write(frame *games.StreamFrame) error {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	
+	if c.closed {
+		return fmt.Errorf("connection closed")
+	}
+	
+	return c.stream.Send(&games_pb.GameIOResponse{
+		Response: &games_pb.GameIOResponse_Output{
+			Output: &games_pb.PTYOutput{
+				SessionId: c.sessionID,
+				Data:      frame.Data,
+			},
+		},
+	})
+}
+
+// Close implements SpectatorConnection.Close
+func (c *GRPCSpectatorConnection) Close() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	
+	c.closed = true
+	return nil
+}
+
+// GetType implements SpectatorConnection.GetType
+func (c *GRPCSpectatorConnection) GetType() string {
+	return "grpc"
+}
+
+// IsConnected implements SpectatorConnection.IsConnected
+func (c *GRPCSpectatorConnection) IsConnected() bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	
+	return !c.closed
 }
 
 // NewStreamHandler creates a new stream handler
@@ -109,14 +169,14 @@ func (h *StreamHandler) HandleStream(stream games_pb.GameService_StreamGameIOSer
 		return err
 	}
 
-	// Send current screen state to new spectator
+	// Send current screen state to new connection
 	if streamManager := ptySession.GetStreamManager(); streamManager != nil {
-		// Get recent frames to provide some context to the new spectator
+		// Get recent frames to provide some context to the new connection
 		recentFrames := streamManager.GetRecentFrames()
 		
-		// If we have recent frames, send them to the new spectator
+		// If we have recent frames, send them to the new connection
 		if len(recentFrames) > 0 {
-			h.logger.Info("Sending recent frames to new spectator", "session_id", sessionID, "frame_count", len(recentFrames))
+			h.logger.Info("Sending recent frames to new connection", "session_id", sessionID, "frame_count", len(recentFrames))
 			
 			// Send the frames in chronological order
 			for _, frame := range recentFrames {
@@ -128,7 +188,7 @@ func (h *StreamHandler) HandleStream(stream games_pb.GameService_StreamGameIOSer
 						},
 					},
 				}); err != nil {
-					h.logger.Error("Failed to send frame to spectator", "error", err, "session_id", sessionID, "frame_id", frame.FrameID)
+					h.logger.Error("Failed to send frame to connection", "error", err, "session_id", sessionID, "frame_id", frame.FrameID)
 					return err
 				}
 			}
@@ -136,7 +196,7 @@ func (h *StreamHandler) HandleStream(stream games_pb.GameService_StreamGameIOSer
 			// No recent frames available - send a clear screen and trigger redraw
 			h.logger.Info("No recent frames available, requesting fresh screen state", "session_id", sessionID)
 			
-			// Clear the spectator's screen
+			// Clear the connection's screen
 			clearScreen := []byte("\x1b[2J\x1b[H") // Clear screen and move cursor to home
 			if err := stream.Send(&games_pb.GameIOResponse{
 				Response: &games_pb.GameIOResponse_Output{
@@ -146,7 +206,7 @@ func (h *StreamHandler) HandleStream(stream games_pb.GameService_StreamGameIOSer
 					},
 				},
 			}); err != nil {
-				h.logger.Error("Failed to send clear screen to spectator", "error", err, "session_id", sessionID)
+				h.logger.Error("Failed to send clear screen to connection", "error", err, "session_id", sessionID)
 				return err
 			}
 			
@@ -157,14 +217,14 @@ func (h *StreamHandler) HandleStream(stream games_pb.GameService_StreamGameIOSer
 				h.logger.Warn("Failed to send redraw command to game", "error", err, "session_id", sessionID)
 			}
 			
-			h.logger.Info("Sent redraw command to game for new spectator", "session_id", sessionID)
+			h.logger.Info("Sent redraw command to game for new connection", "session_id", sessionID)
 		}
 	}
 
 	// Start goroutines for handling I/O
 	errChan := make(chan error, 2)
 
-	// Handle PTY output -> stream
+	// Handle PTY output -> stream (for player connections)
 	go func() {
 		errChan <- h.handlePTYOutput(streamSession)
 	}()
@@ -176,8 +236,7 @@ func (h *StreamHandler) HandleStream(stream games_pb.GameService_StreamGameIOSer
 
 	// Wait for either goroutine to finish
 	err = <-errChan
-	// Note: streamSession.Close() is already called in defer above - no need to call again
-
+	
 	// Send disconnect response if possible
 	stream.Send(&games_pb.GameIOResponse{
 		Response: &games_pb.GameIOResponse_Disconnected{
@@ -192,8 +251,15 @@ func (h *StreamHandler) HandleStream(stream games_pb.GameService_StreamGameIOSer
 
 // handlePTYOutput reads from PTY and sends to stream
 func (h *StreamHandler) handlePTYOutput(session *StreamSession) error {
-	outputChan := session.ptySession.GetOutput()
+	// Create a unique subscription ID for this connection
+	subscriptionID := fmt.Sprintf("grpc_%p", session.stream)
+	
+	// Subscribe to PTY output
+	outputChan := session.ptySession.SubscribeToOutput(subscriptionID)
 	errorChan := session.ptySession.GetError()
+	
+	// Ensure we unsubscribe when done
+	defer session.ptySession.UnsubscribeFromOutput(subscriptionID)
 
 	for {
 		select {

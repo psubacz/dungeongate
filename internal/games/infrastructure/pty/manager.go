@@ -43,6 +43,10 @@ type PTYSession struct {
 	onExit        ProcessExitCallback
 	logger        *slog.Logger
 	streamManager *games.StreamManager
+	
+	// Output subscribers for direct PTY streaming
+	outputSubscribers map[string]chan []byte
+	subscribersMu     sync.RWMutex
 }
 
 // NewPTYManager creates a new PTY manager
@@ -171,6 +175,7 @@ func (m *PTYManager) CreatePTYWithCallback(ctx context.Context, session *domain.
 		onExit:       onExit,
 		logger:       m.logger.With(slog.String("session_id", sessionID)),
 		streamManager: games.NewStreamManagerWithSize(int(size.Rows), int(size.Cols)),
+		outputSubscribers: make(map[string]chan []byte),
 	}
 
 	// Set initial terminal size
@@ -183,6 +188,11 @@ func (m *PTYManager) CreatePTYWithCallback(ctx context.Context, session *domain.
 	go ptySession.handleInput()
 	go ptySession.handleOutput()
 	go ptySession.waitForExit()
+
+	// Start the stream manager
+	if ptySession.streamManager != nil {
+		ptySession.streamManager.Start()
+	}
 
 	// Send initial input if adapter provides it
 	go ptySession.sendInitialInput()
@@ -295,12 +305,28 @@ func (s *PTYSession) handleOutput() {
 			// Send to stream manager for spectating (non-blocking)
 			// This ensures spectators don't interfere with player performance
 			if s.streamManager != nil {
+				// Create a copy of the data to avoid race conditions with buffer reuse
+				streamData := make([]byte, len(processedData))
+				copy(streamData, processedData)
 				go func(data []byte) {
 					s.streamManager.SendFrame(data)
-				}(processedData)
+				}(streamData)
 			}
 
-			// Send to player (priority channel - blocking is acceptable for player)
+			// Broadcast to all output subscribers (player connections)
+			s.subscribersMu.RLock()
+			for subscriptionID, outputChan := range s.outputSubscribers {
+				select {
+				case outputChan <- processedData:
+					// Successfully sent to subscriber
+				default:
+					// Channel is full, skip this subscriber to avoid blocking
+					s.logger.Warn("Output subscriber channel full, skipping", "subscription_id", subscriptionID)
+				}
+			}
+			s.subscribersMu.RUnlock()
+
+			// Send to legacy output channel for backward compatibility
 			select {
 			case s.outputChan <- processedData:
 			case <-s.closeChan:
@@ -471,6 +497,29 @@ func (s *PTYSession) GetExitCode() (int, error) {
 // GetStreamManager returns the stream manager for this PTY session
 func (s *PTYSession) GetStreamManager() *games.StreamManager {
 	return s.streamManager
+}
+
+// SubscribeToOutput subscribes to PTY output with a unique subscription ID
+func (s *PTYSession) SubscribeToOutput(subscriptionID string) <-chan []byte {
+	s.subscribersMu.Lock()
+	defer s.subscribersMu.Unlock()
+	
+	outputChan := make(chan []byte, 100)
+	s.outputSubscribers[subscriptionID] = outputChan
+	s.logger.Debug("Added output subscriber", "subscription_id", subscriptionID, "total_subscribers", len(s.outputSubscribers))
+	return outputChan
+}
+
+// UnsubscribeFromOutput removes a subscription to PTY output
+func (s *PTYSession) UnsubscribeFromOutput(subscriptionID string) {
+	s.subscribersMu.Lock()
+	defer s.subscribersMu.Unlock()
+	
+	if outputChan, exists := s.outputSubscribers[subscriptionID]; exists {
+		close(outputChan)
+		delete(s.outputSubscribers, subscriptionID)
+		s.logger.Debug("Removed output subscriber", "subscription_id", subscriptionID, "total_subscribers", len(s.outputSubscribers))
+	}
 }
 
 // sendInitialInput sends any initial input required by the game

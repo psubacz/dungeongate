@@ -154,11 +154,17 @@ type StreamManager struct {
 	screenBufferLock sync.RWMutex
 	terminalRows     int
 	terminalCols     int
+	
+	// Internal spectator registry
+	registry *atomic.Pointer[SpectatorRegistry]
 }
 
 // NewStreamManager creates a new stream manager for a session
 func NewStreamManager() *StreamManager {
 	const defaultBufferSize = 100 // Keep last 100 frames to provide better context for new spectators
+	registry := &atomic.Pointer[SpectatorRegistry]{}
+	registry.Store(NewSpectatorRegistry())
+	
 	return &StreamManager{
 		frameChannel: make(chan *StreamFrame, 1000), // Buffered channel for frames
 		stopChan:     make(chan struct{}),
@@ -168,6 +174,7 @@ func NewStreamManager() *StreamManager {
 		terminalRows: 24, // Default terminal size
 		terminalCols: 80,
 		screenBuffer: make([][]byte, 24), // Initialize with default size
+		registry:     registry,
 	}
 }
 
@@ -185,6 +192,9 @@ func NewStreamManagerWithSize(rows, cols int) *StreamManager {
 		}
 	}
 	
+	registry := &atomic.Pointer[SpectatorRegistry]{}
+	registry.Store(NewSpectatorRegistry())
+	
 	return &StreamManager{
 		frameChannel: make(chan *StreamFrame, 1000), // Buffered channel for frames
 		stopChan:     make(chan struct{}),
@@ -194,19 +204,34 @@ func NewStreamManagerWithSize(rows, cols int) *StreamManager {
 		terminalRows: rows,
 		terminalCols: cols,
 		screenBuffer: screenBuffer,
+		registry:     registry,
 	}
 }
 
 // Start begins the streaming process
-func (sm *StreamManager) Start(registry *atomic.Pointer[SpectatorRegistry]) {
+func (sm *StreamManager) Start() {
 	sm.wg.Add(1)
-	go sm.streamLoop(registry)
+	go sm.streamLoop(sm.registry)
 }
 
 // Stop gracefully stops the streaming process
 func (sm *StreamManager) Stop() {
 	close(sm.stopChan)
 	sm.wg.Wait()
+}
+
+// AddSpectator adds a spectator to the stream
+func (sm *StreamManager) AddSpectator(spectator *Spectator) {
+	currentRegistry := sm.registry.Load()
+	newRegistry := currentRegistry.AddSpectator(spectator)
+	sm.registry.Store(newRegistry)
+}
+
+// RemoveSpectator removes a spectator from the stream
+func (sm *StreamManager) RemoveSpectator(userID int, username string) {
+	currentRegistry := sm.registry.Load()
+	newRegistry := currentRegistry.RemoveSpectator(userID, username)
+	sm.registry.Store(newRegistry)
 }
 
 // SendFrame sends an immutable frame to all spectators
