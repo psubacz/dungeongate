@@ -6,8 +6,8 @@ import (
 	"log/slog"
 	"sync"
 
-	"github.com/dungeongate/internal/games/infrastructure/pty"
 	"github.com/dungeongate/internal/games"
+	"github.com/dungeongate/internal/games/infrastructure/pty"
 	games_pb "github.com/dungeongate/pkg/api/games/v2"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -52,11 +52,11 @@ func NewGRPCSpectatorConnection(stream games_pb.GameService_StreamGameIOServer, 
 func (c *GRPCSpectatorConnection) Write(frame *games.StreamFrame) error {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	
+
 	if c.closed {
 		return fmt.Errorf("connection closed")
 	}
-	
+
 	return c.stream.Send(&games_pb.GameIOResponse{
 		Response: &games_pb.GameIOResponse_Output{
 			Output: &games_pb.PTYOutput{
@@ -71,7 +71,7 @@ func (c *GRPCSpectatorConnection) Write(frame *games.StreamFrame) error {
 func (c *GRPCSpectatorConnection) Close() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	
+
 	c.closed = true
 	return nil
 }
@@ -85,7 +85,7 @@ func (c *GRPCSpectatorConnection) GetType() string {
 func (c *GRPCSpectatorConnection) IsConnected() bool {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	
+
 	return !c.closed
 }
 
@@ -173,11 +173,11 @@ func (h *StreamHandler) HandleStream(stream games_pb.GameService_StreamGameIOSer
 	if streamManager := ptySession.GetStreamManager(); streamManager != nil {
 		// Get recent frames to provide some context to the new connection
 		recentFrames := streamManager.GetRecentFrames()
-		
+
 		// If we have recent frames, send them to the new connection
 		if len(recentFrames) > 0 {
 			h.logger.Info("Sending recent frames to new connection", "session_id", sessionID, "frame_count", len(recentFrames))
-			
+
 			// Send the frames in chronological order
 			for _, frame := range recentFrames {
 				if err := stream.Send(&games_pb.GameIOResponse{
@@ -195,7 +195,7 @@ func (h *StreamHandler) HandleStream(stream games_pb.GameService_StreamGameIOSer
 		} else {
 			// No recent frames available - send a clear screen and trigger redraw
 			h.logger.Info("No recent frames available, requesting fresh screen state", "session_id", sessionID)
-			
+
 			// Clear the connection's screen
 			clearScreen := []byte("\x1b[2J\x1b[H") // Clear screen and move cursor to home
 			if err := stream.Send(&games_pb.GameIOResponse{
@@ -209,14 +209,14 @@ func (h *StreamHandler) HandleStream(stream games_pb.GameService_StreamGameIOSer
 				h.logger.Error("Failed to send clear screen to connection", "error", err, "session_id", sessionID)
 				return err
 			}
-			
+
 			// Send screen redraw command to game to capture full current state
 			// NetHack responds to Ctrl+L (redraw) command
 			redrawCmd := []byte{0x0C} // Ctrl+L
 			if err := ptySession.SendInput(redrawCmd); err != nil {
 				h.logger.Warn("Failed to send redraw command to game", "error", err, "session_id", sessionID)
 			}
-			
+
 			h.logger.Info("Sent redraw command to game for new connection", "session_id", sessionID)
 		}
 	}
@@ -236,7 +236,7 @@ func (h *StreamHandler) HandleStream(stream games_pb.GameService_StreamGameIOSer
 
 	// Wait for either goroutine to finish
 	err = <-errChan
-	
+
 	// Send disconnect response if possible
 	stream.Send(&games_pb.GameIOResponse{
 		Response: &games_pb.GameIOResponse_Disconnected{
@@ -253,11 +253,11 @@ func (h *StreamHandler) HandleStream(stream games_pb.GameService_StreamGameIOSer
 func (h *StreamHandler) handlePTYOutput(session *StreamSession) error {
 	// Create a unique subscription ID for this connection
 	subscriptionID := fmt.Sprintf("grpc_%p", session.stream)
-	
+
 	// Subscribe to PTY output
 	outputChan := session.ptySession.SubscribeToOutput(subscriptionID)
 	errorChan := session.ptySession.GetError()
-	
+
 	// Ensure we unsubscribe when done
 	defer session.ptySession.UnsubscribeFromOutput(subscriptionID)
 

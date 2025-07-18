@@ -154,7 +154,7 @@ type StreamManager struct {
 	screenBufferLock sync.RWMutex
 	terminalRows     int
 	terminalCols     int
-	
+
 	// Internal spectator registry
 	registry *atomic.Pointer[SpectatorRegistry]
 }
@@ -164,7 +164,7 @@ func NewStreamManager() *StreamManager {
 	const defaultBufferSize = 100 // Keep last 100 frames to provide better context for new spectators
 	registry := &atomic.Pointer[SpectatorRegistry]{}
 	registry.Store(NewSpectatorRegistry())
-	
+
 	return &StreamManager{
 		frameChannel: make(chan *StreamFrame, 1000), // Buffered channel for frames
 		stopChan:     make(chan struct{}),
@@ -181,7 +181,7 @@ func NewStreamManager() *StreamManager {
 // NewStreamManagerWithSize creates a new stream manager with specific terminal dimensions
 func NewStreamManagerWithSize(rows, cols int) *StreamManager {
 	const defaultBufferSize = 100 // Keep last 100 frames to provide better context for new spectators
-	
+
 	// Initialize screen buffer with terminal dimensions
 	screenBuffer := make([][]byte, rows)
 	for i := range screenBuffer {
@@ -191,10 +191,10 @@ func NewStreamManagerWithSize(rows, cols int) *StreamManager {
 			screenBuffer[i][j] = ' '
 		}
 	}
-	
+
 	registry := &atomic.Pointer[SpectatorRegistry]{}
 	registry.Store(NewSpectatorRegistry())
-	
+
 	return &StreamManager{
 		frameChannel: make(chan *StreamFrame, 1000), // Buffered channel for frames
 		stopChan:     make(chan struct{}),
@@ -263,7 +263,7 @@ func (sm *StreamManager) SendFrame(data []byte) {
 func (sm *StreamManager) storeFrameInBuffer(frame *StreamFrame) {
 	sm.recentFramesLock.Lock()
 	defer sm.recentFramesLock.Unlock()
-	
+
 	sm.recentFrames[sm.bufferIndex] = frame
 	sm.bufferIndex = (sm.bufferIndex + 1) % sm.bufferSize
 }
@@ -318,9 +318,9 @@ func (sm *StreamManager) UpdateScreenBuffer(data []byte) {
 	// For spectating, we want to preserve the current screen state
 	// Only clear the buffer when we see explicit clear screen commands
 	// This helps maintain visual continuity for spectators
-	
+
 	dataStr := string(data)
-	
+
 	// Check for explicit clear screen escape sequences
 	if strings.Contains(dataStr, "\x1b[2J") {
 		// Clear screen command - reset our buffer
@@ -331,11 +331,11 @@ func (sm *StreamManager) UpdateScreenBuffer(data []byte) {
 		}
 		return
 	}
-	
+
 	// Don't clear buffer on cursor home alone - this happens frequently in games
 	// like NetHack for normal screen updates without full clears
 	// Only clear when we see an explicit clear screen sequence
-	
+
 	// For now, don't try to parse complex escape sequences for position updates
 	// Just let the raw data through - the terminal emulator on the spectator side
 	// will handle the rendering. We preserve the recent frames which contain

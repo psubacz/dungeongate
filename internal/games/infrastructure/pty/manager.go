@@ -13,9 +13,9 @@ import (
 	"time"
 
 	"github.com/creack/pty"
+	"github.com/dungeongate/internal/games"
 	"github.com/dungeongate/internal/games/adapters"
 	"github.com/dungeongate/internal/games/domain"
-	"github.com/dungeongate/internal/games"
 )
 
 // PTYManager manages PTY instances for game sessions
@@ -43,7 +43,7 @@ type PTYSession struct {
 	onExit        ProcessExitCallback
 	logger        *slog.Logger
 	streamManager *games.StreamManager
-	
+
 	// Output subscribers for direct PTY streaming
 	outputSubscribers map[string]chan []byte
 	subscribersMu     sync.RWMutex
@@ -162,19 +162,19 @@ func (m *PTYManager) CreatePTYWithCallback(ctx context.Context, session *domain.
 
 	// Create PTY session
 	ptySession := &PTYSession{
-		SessionID:     sessionID,
-		PTY:           ptmx,
-		Cmd:          cmd,
-		Size:         size, // Use the size we already created
-		inputChan:    make(chan []byte, 100),
-		outputChan:   make(chan []byte, 100),
-		errorChan:    make(chan error, 1),
-		closeChan:    make(chan struct{}),
-		adapter:      adapter,
-		session:      session,
-		onExit:       onExit,
-		logger:       m.logger.With(slog.String("session_id", sessionID)),
-		streamManager: games.NewStreamManagerWithSize(int(size.Rows), int(size.Cols)),
+		SessionID:         sessionID,
+		PTY:               ptmx,
+		Cmd:               cmd,
+		Size:              size, // Use the size we already created
+		inputChan:         make(chan []byte, 100),
+		outputChan:        make(chan []byte, 100),
+		errorChan:         make(chan error, 1),
+		closeChan:         make(chan struct{}),
+		adapter:           adapter,
+		session:           session,
+		onExit:            onExit,
+		logger:            m.logger.With(slog.String("session_id", sessionID)),
+		streamManager:     games.NewStreamManagerWithSize(int(size.Rows), int(size.Cols)),
 		outputSubscribers: make(map[string]chan []byte),
 	}
 
@@ -503,7 +503,7 @@ func (s *PTYSession) GetStreamManager() *games.StreamManager {
 func (s *PTYSession) SubscribeToOutput(subscriptionID string) <-chan []byte {
 	s.subscribersMu.Lock()
 	defer s.subscribersMu.Unlock()
-	
+
 	outputChan := make(chan []byte, 100)
 	s.outputSubscribers[subscriptionID] = outputChan
 	s.logger.Debug("Added output subscriber", "subscription_id", subscriptionID, "total_subscribers", len(s.outputSubscribers))
@@ -514,7 +514,7 @@ func (s *PTYSession) SubscribeToOutput(subscriptionID string) <-chan []byte {
 func (s *PTYSession) UnsubscribeFromOutput(subscriptionID string) {
 	s.subscribersMu.Lock()
 	defer s.subscribersMu.Unlock()
-	
+
 	if outputChan, exists := s.outputSubscribers[subscriptionID]; exists {
 		close(outputChan)
 		delete(s.outputSubscribers, subscriptionID)

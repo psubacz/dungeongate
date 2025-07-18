@@ -207,7 +207,29 @@ func (s *GameServiceServer) GetGame(ctx context.Context, req *games_pb.GetGameRe
 		return nil, status.Error(codes.InvalidArgument, "game_id is required")
 	}
 
-	return nil, status.Error(codes.Unimplemented, "method GetGame not implemented")
+	// Get game from the application service
+	game, err := s.gameService.GetGame(ctx, req.GameId)
+	if err != nil {
+		s.logger.Error("Failed to get game", "game_id", req.GameId, "error", err)
+		return nil, status.Error(codes.NotFound, "game not found")
+	}
+
+	// Convert domain game to protobuf
+	pbGame := &games_pb.Game{
+		Id:          game.ID().String(),
+		Name:        game.Metadata().Name,
+		ShortName:   game.Metadata().ShortName,
+		Description: game.Metadata().Description,
+		Category:    game.Metadata().Category,
+		Tags:        game.Metadata().Tags,
+		Version:     game.Metadata().Version,
+		Difficulty:  int32(game.Metadata().Difficulty),
+		Status:      games_pb.GameStatus_GAME_STATUS_ENABLED,
+	}
+
+	return &games_pb.GetGameResponse{
+		Game: pbGame,
+	}, nil
 }
 
 // CreateGame creates a new game
@@ -216,7 +238,9 @@ func (s *GameServiceServer) CreateGame(ctx context.Context, req *games_pb.Create
 		return nil, status.Error(codes.Unavailable, "game service not available")
 	}
 
-	return nil, status.Error(codes.Unimplemented, "method CreateGame not implemented")
+	// This is a read-only service focused on playing existing games
+	// Game creation should be handled through configuration files
+	return nil, status.Error(codes.Unimplemented, "game creation not supported - use configuration files")
 }
 
 // UpdateGame updates an existing game
@@ -225,7 +249,9 @@ func (s *GameServiceServer) UpdateGame(ctx context.Context, req *games_pb.Update
 		return nil, status.Error(codes.Unavailable, "game service not available")
 	}
 
-	return nil, status.Error(codes.Unimplemented, "method UpdateGame not implemented")
+	// This is a read-only service focused on playing existing games
+	// Game updates should be handled through configuration files
+	return nil, status.Error(codes.Unimplemented, "game updates not supported - use configuration files")
 }
 
 // DeleteGame deletes a game
@@ -234,7 +260,9 @@ func (s *GameServiceServer) DeleteGame(ctx context.Context, req *games_pb.Delete
 		return nil, status.Error(codes.Unavailable, "game service not available")
 	}
 
-	return nil, status.Error(codes.Unimplemented, "method DeleteGame not implemented")
+	// This is a read-only service focused on playing existing games
+	// Game deletion should be handled through configuration files
+	return nil, status.Error(codes.Unimplemented, "game deletion not supported - use configuration files")
 }
 
 // StartGameSession starts a new game session
@@ -431,7 +459,7 @@ func (s *GameServiceServer) ListGameSessions(ctx context.Context, req *games_pb.
 	// Convert domain sessions to protobuf
 	pbSessions := make([]*games_pb.GameSession, len(sessions))
 	for i, session := range sessions {
-		pbSessions[i] = s.convertDomainSessionToProto(session)
+		pbSessions[i] = s.domainSessionToPb(session)
 	}
 
 	return &games_pb.ListGameSessionsResponse{
@@ -446,7 +474,17 @@ func (s *GameServiceServer) SaveGame(ctx context.Context, req *games_pb.SaveGame
 		return nil, status.Error(codes.Unavailable, "game service not available")
 	}
 
-	return nil, status.Error(codes.Unimplemented, "method SaveGame not implemented")
+	if req.UserId <= 0 {
+		return nil, status.Error(codes.InvalidArgument, "user_id is required")
+	}
+
+	if req.GameId == "" {
+		return nil, status.Error(codes.InvalidArgument, "game_id is required")
+	}
+
+	// For now, games auto-save through their native mechanisms
+	// Manual save triggering will be implemented in future versions
+	return nil, status.Error(codes.Unimplemented, "manual save triggering will be implemented in future versions")
 }
 
 // LoadGame loads game data
@@ -455,7 +493,12 @@ func (s *GameServiceServer) LoadGame(ctx context.Context, req *games_pb.LoadGame
 		return nil, status.Error(codes.Unavailable, "game service not available")
 	}
 
-	return nil, status.Error(codes.Unimplemented, "method LoadGame not implemented")
+	if req.SaveId == "" {
+		return nil, status.Error(codes.InvalidArgument, "save_id is required")
+	}
+
+	// Load functionality will be implemented when save management is added
+	return nil, status.Error(codes.Unimplemented, "save loading will be implemented in future versions")
 }
 
 // DeleteSave deletes a game save
@@ -464,7 +507,12 @@ func (s *GameServiceServer) DeleteSave(ctx context.Context, req *games_pb.Delete
 		return nil, status.Error(codes.Unavailable, "game service not available")
 	}
 
-	return nil, status.Error(codes.Unimplemented, "method DeleteSave not implemented")
+	if req.SaveId == "" {
+		return nil, status.Error(codes.InvalidArgument, "save_id is required")
+	}
+
+	// Save deletion will be implemented when save management is added
+	return nil, status.Error(codes.Unimplemented, "save deletion will be implemented in future versions")
 }
 
 // ListSaves lists game saves
@@ -473,7 +521,11 @@ func (s *GameServiceServer) ListSaves(ctx context.Context, req *games_pb.ListSav
 		return nil, status.Error(codes.Unavailable, "game service not available")
 	}
 
-	return nil, status.Error(codes.Unimplemented, "method ListSaves not implemented")
+	// Return empty list for now - save management will be implemented in future versions
+	return &games_pb.ListSavesResponse{
+		Saves:      []*games_pb.GameSave{},
+		TotalCount: 0,
+	}, nil
 }
 
 // domainSessionToPb converts a domain GameSession to protobuf GameSession
@@ -611,100 +663,4 @@ func (s *GameServiceServer) ResizeTerminal(ctx context.Context, req *games_pb.Re
 	return &games_pb.ResizeTerminalResponse{
 		Success: true,
 	}, nil
-}
-
-// convertDomainSessionToProto converts a domain GameSession to protobuf format
-func (s *GameServiceServer) convertDomainSessionToProto(session *domain.GameSession) *games_pb.GameSession {
-	pbSession := &games_pb.GameSession{
-		Id:           session.ID().String(),
-		UserId:       int32(session.UserID().Int()),
-		Username:     session.Username(),
-		GameId:       session.GameID().String(),
-		Status:       s.convertSessionStatus(session.Status()),
-		StartTime:    timestamppb.New(session.StartTime()),
-		LastActivity: timestamppb.New(session.LastActivity()),
-		TerminalSize: &games_pb.TerminalSize{
-			Width:  int32(session.TerminalSize().Width),
-			Height: int32(session.TerminalSize().Height),
-		},
-		Encoding: session.Encoding(),
-	}
-
-	// Add end time if session has ended
-	if session.EndTime() != nil {
-		pbSession.EndTime = timestamppb.New(*session.EndTime())
-	}
-
-	// Convert process info
-	processInfo := session.ProcessInfo()
-	pbSession.ProcessInfo = &games_pb.ProcessInfo{
-		Pid:         int32(processInfo.PID),
-		ContainerId: processInfo.ContainerID,
-		PodName:     processInfo.PodName,
-	}
-
-	// Handle optional fields
-	if processInfo.ExitCode != nil {
-		pbSession.ProcessInfo.ExitCode = int32(*processInfo.ExitCode)
-	}
-	if processInfo.Signal != nil {
-		pbSession.ProcessInfo.Signal = *processInfo.Signal
-	}
-
-	// Convert recording info
-	if recordingInfo := session.RecordingInfo(); recordingInfo != nil {
-		pbSession.Recording = &games_pb.RecordingInfo{
-			Enabled:   recordingInfo.Enabled,
-			FilePath:  recordingInfo.FilePath,
-			Format:    recordingInfo.Format,
-			StartTime: timestamppb.New(recordingInfo.StartTime),
-			FileSize:  recordingInfo.FileSize,
-		}
-	}
-
-	// Convert streaming info
-	if streamingInfo := session.StreamingInfo(); streamingInfo != nil {
-		pbSession.Streaming = &games_pb.StreamingInfo{
-			Enabled:       streamingInfo.Enabled,
-			Protocol:      streamingInfo.Protocol,
-			Encrypted:     streamingInfo.Encrypted,
-			FrameCount:    streamingInfo.FrameCount,
-			BytesStreamed: streamingInfo.BytesStreamed,
-		}
-	}
-
-	// Convert spectators
-	spectators := session.Spectators()
-	pbSession.Spectators = make([]*games_pb.SpectatorInfo, len(spectators))
-	for i, spectator := range spectators {
-		pbSession.Spectators[i] = &games_pb.SpectatorInfo{
-			UserId:    int32(spectator.UserID.Int()),
-			Username:  spectator.Username,
-			JoinTime:  timestamppb.New(spectator.JoinTime),
-			BytesSent: spectator.BytesSent,
-			IsActive:  spectator.IsActive,
-		}
-	}
-
-	return pbSession
-}
-
-// convertSessionStatus converts domain session status to protobuf
-func (s *GameServiceServer) convertSessionStatus(status domain.SessionStatus) games_pb.SessionStatus {
-	switch status {
-	case domain.SessionStatusStarting:
-		return games_pb.SessionStatus_SESSION_STATUS_STARTING
-	case domain.SessionStatusActive:
-		return games_pb.SessionStatus_SESSION_STATUS_ACTIVE
-	case domain.SessionStatusPaused:
-		return games_pb.SessionStatus_SESSION_STATUS_PAUSED
-	case domain.SessionStatusEnding:
-		return games_pb.SessionStatus_SESSION_STATUS_ENDING
-	case domain.SessionStatusEnded:
-		return games_pb.SessionStatus_SESSION_STATUS_ENDED
-	case domain.SessionStatusFailed:
-		return games_pb.SessionStatus_SESSION_STATUS_FAILED
-	default:
-		return games_pb.SessionStatus_SESSION_STATUS_UNSPECIFIED
-	}
 }
