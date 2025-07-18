@@ -107,7 +107,7 @@ func (s *CleanupService) CleanupOrphanedProcesses(ctx context.Context) error {
 	}
 
 	if orphanedCount > 0 {
-		s.logger.Info("Cleaned up %d orphaned sessions", orphanedCount)
+		s.logger.Info("Cleaned up orphaned sessions", "count", orphanedCount)
 	}
 
 	return nil
@@ -135,7 +135,7 @@ func (s *CleanupService) CleanupGameData(ctx context.Context, sessionID uuid.UUI
 	// Ensure all saves are properly stored before cleanup
 	for _, save := range saves {
 		if !save.Verify() {
-			s.logger.Info("Warning: Save %s failed verification before cleanup", save.ID().String())
+			s.logger.Info("Warning: Save failed verification before cleanup", "save_id", save.ID().String())
 			save.MarkCorrupt()
 			s.saveRepo.Save(ctx, save)
 		}
@@ -144,7 +144,7 @@ func (s *CleanupService) CleanupGameData(ctx context.Context, sessionID uuid.UUI
 	// Clean up temporary session directory
 	sessionTempDir := filepath.Join(gameDataPath, "sessions", sessionID.String())
 	if _, err := os.Stat(sessionTempDir); err == nil {
-		s.logger.Info("Removing session temp directory: %s", sessionTempDir)
+		s.logger.Info("Removing session temp directory", "path", sessionTempDir)
 		err = os.RemoveAll(sessionTempDir)
 		if err != nil {
 			return fmt.Errorf("failed to remove session temp directory: %w", err)
@@ -223,7 +223,7 @@ func (s *CleanupService) BackupAndCleanupOldSaves(ctx context.Context, userID in
 		}
 
 		s.logger.Info("Archived old save %s for user %d, game %d",
-			save.ID().String(), userID, gameID)
+			"save_id", save.ID().String(), "user_id", userID, "game_id", gameID)
 	}
 
 	return nil
@@ -234,7 +234,7 @@ func (s *CleanupService) StartPeriodicCleanup(ctx context.Context, interval time
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
-	s.logger.Info("Starting periodic cleanup every %v", interval)
+	s.logger.Info("Starting periodic cleanup", "interval", interval)
 
 	for {
 		select {
@@ -245,13 +245,13 @@ func (s *CleanupService) StartPeriodicCleanup(ctx context.Context, interval time
 			// Cleanup expired sessions (older than 24 hours)
 			err := s.CleanupExpiredSessions(ctx, 24*time.Hour)
 			if err != nil {
-				s.logger.Info("Error during session cleanup: %v", err)
+				s.logger.Info("Error during session cleanup", "error", err)
 			}
 
 			// Find and cleanup orphaned processes
 			err = s.CleanupOrphanedProcesses(ctx)
 			if err != nil {
-				s.logger.Info("Error during orphaned process cleanup: %v", err)
+				s.logger.Info("Error during orphaned process cleanup", "error", err)
 			}
 		}
 	}

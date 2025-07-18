@@ -3,7 +3,6 @@ package application
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"testing"
@@ -15,13 +14,14 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dungeongate/internal/games/domain"
+	"github.com/dungeongate/pkg/logging"
 )
 
 func TestCleanupService_CleanupExpiredSessions(t *testing.T) {
 	sessionRepo := &MockSessionRepository{}
 	saveRepo := &MockSaveRepository{}
 	eventRepo := &MockEventRepository{}
-	logger := log.New(os.Stdout, "TEST: ", log.LstdFlags)
+	logger := logging.NewLoggerBasic("test", "debug", "text", "stdout")
 
 	cleanupService := NewCleanupService(sessionRepo, saveRepo, eventRepo, logger)
 	ctx := context.Background()
@@ -42,7 +42,7 @@ func TestCleanupService_CleanupOrphanedProcesses(t *testing.T) {
 	sessionRepo := &MockSessionRepository{}
 	saveRepo := &MockSaveRepository{}
 	eventRepo := &MockEventRepository{}
-	logger := log.New(os.Stdout, "TEST: ", log.LstdFlags)
+	logger := logging.NewLoggerBasic("test", "debug", "text", "stdout")
 
 	cleanupService := NewCleanupService(sessionRepo, saveRepo, eventRepo, logger)
 	ctx := context.Background()
@@ -78,7 +78,7 @@ func TestCleanupService_CleanupGameData(t *testing.T) {
 	sessionRepo := &MockSessionRepository{}
 	saveRepo := &MockSaveRepository{}
 	eventRepo := &MockEventRepository{}
-	logger := log.New(os.Stdout, "TEST: ", log.LstdFlags)
+	logger := logging.NewLoggerBasic("test", "debug", "text", "stdout")
 
 	cleanupService := NewCleanupService(sessionRepo, saveRepo, eventRepo, logger)
 	ctx := context.Background()
@@ -126,7 +126,7 @@ func TestCleanupService_BackupAndCleanupOldSaves(t *testing.T) {
 	sessionRepo := &MockSessionRepository{}
 	saveRepo := &MockSaveRepository{}
 	eventRepo := &MockEventRepository{}
-	logger := log.New(os.Stdout, "TEST: ", log.LstdFlags)
+	logger := logging.NewLoggerBasic("test", "debug", "text", "stdout")
 
 	cleanupService := NewCleanupService(sessionRepo, saveRepo, eventRepo, logger)
 	ctx := context.Background()
@@ -168,7 +168,7 @@ func TestCleanupService_PeriodicCleanup(t *testing.T) {
 	sessionRepo := &MockSessionRepository{}
 	saveRepo := &MockSaveRepository{}
 	eventRepo := &MockEventRepository{}
-	logger := log.New(os.Stdout, "TEST: ", log.LstdFlags)
+	logger := logging.NewLoggerBasic("test", "debug", "text", "stdout")
 
 	cleanupService := NewCleanupService(sessionRepo, saveRepo, eventRepo, logger)
 
@@ -248,7 +248,7 @@ func BenchmarkCleanupService_CleanupExpiredSessions(b *testing.B) {
 	sessionRepo := &MockSessionRepository{}
 	saveRepo := &MockSaveRepository{}
 	eventRepo := &MockEventRepository{}
-	logger := log.New(os.Stdout, "TEST: ", log.LstdFlags)
+	logger := logging.NewLoggerBasic("test", "debug", "text", "stdout")
 
 	cleanupService := NewCleanupService(sessionRepo, saveRepo, eventRepo, logger)
 	ctx := context.Background()

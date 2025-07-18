@@ -3,7 +3,7 @@ package application
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"testing"
@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dungeongate/internal/games/domain"
+	"github.com/dungeongate/pkg/logging"
 )
 
 // Mock repositories for testing
@@ -308,8 +309,8 @@ func createTestSessionManager(t *testing.T) (*SessionManager, *MockSessionReposi
 	return sm, sessionRepo, saveRepo, gameRepo, eventRepo, tempDir
 }
 
-func createTestLogger(t *testing.T) *log.Logger {
-	return log.New(os.Stdout, "TEST: ", log.LstdFlags)
+func createTestLogger(t *testing.T) *slog.Logger {
+	return logging.NewLoggerBasic("test", "debug", "text", "stdout")
 }
 
 // Test Cases
