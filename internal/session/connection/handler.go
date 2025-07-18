@@ -692,7 +692,7 @@ func (h *Handler) handleMenuChoice(ctx context.Context, channel ssh.Channel, cho
 		}
 
 	case "watch":
-		return h.handleWatchMode(ctx, channel, user)
+		return h.handleWatchMode(ctx, channel, userInfo)
 
 	case "edit_profile":
 		channel.Write([]byte("Profile editing functionality not yet implemented.\r\n"))
@@ -756,7 +756,7 @@ func (h *Handler) startGameSession(ctx context.Context, channel ssh.Channel, use
 	gameID := "nethack"
 
 	// Start game session via Game Service
-	// Convert string ID to int32 for the API
+	// Convert string ID to int32 for the Game Service API
 	userID, err := strconv.ParseInt(userInfo.Id, 10, 32)
 	if err != nil {
 		h.logger.Error("Invalid user ID format", "user_id", userInfo.Id, "error", err)
@@ -983,7 +983,7 @@ func (h *Handler) handleGameSelection(ctx context.Context, channel ssh.Channel, 
 
 // startSpecificGameSession starts a game session with a specific game ID
 func (h *Handler) startSpecificGameSession(ctx context.Context, channel ssh.Channel, userInfo *authv1.User, connID, username, gameID string, terminalCols, terminalRows int) error {
-	// Convert string ID to int32 for the API
+	// Convert string ID to int32 for the Game Service API
 	userID, err := strconv.ParseInt(userInfo.Id, 10, 32)
 	if err != nil {
 		h.logger.Error("Invalid user ID format", "user_id", userInfo.Id, "error", err)
@@ -1297,4 +1297,259 @@ func (h *Handler) readPassword(ctx context.Context, channel ssh.Channel) (string
 		}
 		// Otherwise, continue reading the next line
 	}
+}
+
+// handleWatchMode handles the spectating/watching functionality
+func (h *Handler) handleWatchMode(ctx context.Context, channel ssh.Channel, user *authv1.User) error {
+	h.logger.Info("Entering watch mode", "user_id", user.Id, "username", user.Username)
+
+	// Get active sessions available for spectating
+	sessions, err := h.gameClient.GetActiveGameSessions(ctx)
+	if err != nil {
+		h.logger.Error("Failed to get active sessions", "error", err)
+		channel.Write([]byte("Failed to get active sessions. Please try again later.\r\n"))
+		time.Sleep(2 * time.Second)
+		return nil
+	}
+
+	// Filter out user's own sessions
+	// Convert user ID to int32 for comparison
+	userID, err := strconv.ParseInt(user.Id, 10, 32)
+	if err != nil {
+		h.logger.Error("Invalid user ID format", "user_id", user.Id, "error", err)
+		channel.Write([]byte("Invalid user ID. Please contact administrator.\r\n"))
+		time.Sleep(2 * time.Second)
+		return nil
+	}
+
+	availableSessions := make([]*gamev2.GameSession, 0)
+	for _, session := range sessions {
+		if session.UserId != int32(userID) {
+			availableSessions = append(availableSessions, session)
+		}
+	}
+
+	if len(availableSessions) == 0 {
+		channel.Write([]byte("No active sessions available for spectating.\r\n"))
+		time.Sleep(2 * time.Second)
+		return nil
+	}
+
+	// Display available sessions
+	channel.Write([]byte("\r\n=== Active Sessions ===\r\n"))
+	for i, session := range availableSessions {
+		spectatorCount := len(session.Spectators)
+		channel.Write([]byte(fmt.Sprintf("%d. %s playing %s (%d spectators)\r\n",
+			i+1, session.Username, session.GameId, spectatorCount)))
+	}
+	channel.Write([]byte(fmt.Sprintf("\r\nSelect a session to spectate (1-%d) or 'q' to quit: ", len(availableSessions))))
+
+	// Read user's choice
+	choice, err := h.readLineWithTerminal(ctx, channel)
+	if err != nil {
+		return err
+	}
+
+	choice = strings.TrimSpace(strings.ToLower(choice))
+	if choice == "q" || choice == "quit" {
+		return nil
+	}
+
+	// Parse choice
+	sessionIndex, err := strconv.Atoi(choice)
+	if err != nil || sessionIndex < 1 || sessionIndex > len(availableSessions) {
+		channel.Write([]byte("Invalid selection.\r\n"))
+		time.Sleep(2 * time.Second)
+		return nil
+	}
+
+	selectedSession := availableSessions[sessionIndex-1]
+
+	// Start spectating the selected session
+	return h.startSpectating(ctx, channel, user, selectedSession)
+}
+
+// startSpectating starts spectating a game session
+func (h *Handler) startSpectating(ctx context.Context, channel ssh.Channel, user *authv1.User, session *gamev2.GameSession) error {
+	h.logger.Info("Starting spectating",
+		"spectator_user_id", user.Id,
+		"spectator_username", user.Username,
+		"session_id", session.Id,
+		"session_username", session.Username,
+		"game_id", session.GameId)
+
+	// Add user as spectator to the session
+	// Convert user ID to int32 for Game Service API
+	userID, err := strconv.ParseInt(user.Id, 10, 32)
+	if err != nil {
+		h.logger.Error("Invalid user ID format", "user_id", user.Id, "error", err)
+		channel.Write([]byte("Invalid user ID. Please contact administrator.\r\n"))
+		time.Sleep(2 * time.Second)
+		return nil
+	}
+
+	err = h.gameClient.AddSpectator(ctx, session.Id, int32(userID), user.Username)
+	if err != nil {
+		h.logger.Error("Failed to add spectator", "error", err)
+		channel.Write([]byte("Failed to join as spectator. Please try again later.\r\n"))
+		time.Sleep(2 * time.Second)
+		return nil
+	}
+
+	// Show spectating banner
+	channel.Write([]byte(fmt.Sprintf("\r\n=== Spectating %s's game ===\r\n", session.Username)))
+	channel.Write([]byte("Press 'q' to quit spectating\r\n"))
+	channel.Write([]byte("Connecting to game stream...\r\n\r\n"))
+
+	// Create game I/O stream
+	stream, err := h.gameClient.StreamGameIO(ctx)
+	if err != nil {
+		h.logger.Error("Failed to create game I/O stream", "error", err)
+		channel.Write([]byte("Failed to connect to game stream.\r\n"))
+		// Clean up spectator
+		h.gameClient.RemoveSpectator(ctx, session.Id, int32(userID))
+		time.Sleep(2 * time.Second)
+		return nil
+	}
+	defer stream.CloseSend()
+
+	// Send connect request
+	connectReq := &gamev2.GameIORequest{
+		Request: &gamev2.GameIORequest_Connect{
+			Connect: &gamev2.ConnectPTYRequest{
+				SessionId: session.Id,
+				TerminalSize: &gamev2.TerminalSize{
+					Width:  80, // Default size, could be made dynamic
+					Height: 24,
+				},
+				TermType: "xterm",
+			},
+		},
+	}
+
+	if err := stream.Send(connectReq); err != nil {
+		h.logger.Error("Failed to send connect request", "error", err)
+		channel.Write([]byte("Failed to connect to game stream.\r\n"))
+		// Clean up spectator
+		h.gameClient.RemoveSpectator(ctx, session.Id, int32(userID))
+		time.Sleep(2 * time.Second)
+		return nil
+	}
+
+	// Handle the spectating stream
+	err = h.handleSpectatingStream(ctx, stream, channel, user, session)
+
+	// Clean up spectator when done
+	if removeErr := h.gameClient.RemoveSpectator(ctx, session.Id, int32(userID)); removeErr != nil {
+		h.logger.Error("Failed to remove spectator", "error", removeErr)
+	}
+
+	return err
+}
+
+// handleSpectatingStream handles the bidirectional stream for spectating
+func (h *Handler) handleSpectatingStream(ctx context.Context, stream gamev2.GameService_StreamGameIOClient, channel ssh.Channel, user *authv1.User, session *gamev2.GameSession) error {
+	// Channel for communicating between goroutines
+	done := make(chan error, 2)
+
+	// Goroutine to read from game stream and write to SSH channel
+	go func() {
+		defer func() {
+			done <- nil
+		}()
+
+		for {
+			resp, err := stream.Recv()
+			if err != nil {
+				if err == io.EOF {
+					h.logger.Info("Game stream closed", "session_id", session.Id)
+					return
+				}
+				h.logger.Error("Failed to receive from game stream", "error", err)
+				return
+			}
+
+			switch response := resp.Response.(type) {
+			case *gamev2.GameIOResponse_Connected:
+				if response.Connected.Success {
+					h.logger.Info("Successfully connected to game stream", "session_id", session.Id)
+				} else {
+					h.logger.Error("Failed to connect to game stream", "error", response.Connected.Error)
+					channel.Write([]byte("Failed to connect to game stream.\r\n"))
+					return
+				}
+
+			case *gamev2.GameIOResponse_Output:
+				// Write game output to SSH channel
+				if _, err := channel.Write(response.Output.Data); err != nil {
+					h.logger.Error("Failed to write to SSH channel", "error", err)
+					return
+				}
+
+			case *gamev2.GameIOResponse_Event:
+				// Handle game events
+				switch response.Event.Type {
+				case gamev2.PTYEventType_PTY_EVENT_PROCESS_EXIT:
+					channel.Write([]byte("\r\n=== Game session ended ===\r\n"))
+					return
+				case gamev2.PTYEventType_PTY_EVENT_SESSION_TERMINATED:
+					channel.Write([]byte("\r\n=== Session terminated ===\r\n"))
+					return
+				}
+
+			case *gamev2.GameIOResponse_Disconnected:
+				h.logger.Info("Disconnected from game stream", "session_id", session.Id)
+				return
+			}
+		}
+	}()
+
+	// Goroutine to read from SSH channel and handle spectator input
+	go func() {
+		defer func() {
+			done <- nil
+		}()
+
+		buffer := make([]byte, 1024)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+				// Read from SSH channel
+				n, err := channel.Read(buffer)
+				if err != nil {
+					if err == io.EOF {
+						return
+					}
+					h.logger.Error("Failed to read from SSH channel", "error", err)
+					return
+				}
+
+				// Check for quit command
+				input := string(buffer[:n])
+				if strings.Contains(strings.ToLower(input), "q") {
+					// Send disconnect request
+					disconnectReq := &gamev2.GameIORequest{
+						Request: &gamev2.GameIORequest_Disconnect{
+							Disconnect: &gamev2.DisconnectPTYRequest{
+								SessionId: session.Id,
+								Reason:    "Spectator quit",
+							},
+						},
+					}
+					stream.Send(disconnectReq)
+					return
+				}
+
+				// For spectators, we typically don't forward input to the game
+				// Only the player should be able to control the game
+				// But we could add special spectator commands here if needed
+			}
+		}
+	}()
+
+	// Wait for either goroutine to finish
+	<-done
+	return nil
 }
