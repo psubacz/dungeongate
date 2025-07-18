@@ -111,35 +111,54 @@ func (h *StreamHandler) HandleStream(stream games_pb.GameService_StreamGameIOSer
 
 	// Send current screen state to new spectator
 	if streamManager := ptySession.GetStreamManager(); streamManager != nil {
-		// Clear the recent frames buffer to avoid sending old data
-		streamManager.ClearRecentFrames()
+		// Get recent frames to provide some context to the new spectator
+		recentFrames := streamManager.GetRecentFrames()
 		
-		// Send a clear screen command to the spectator
-		clearScreen := []byte("\x1b[2J\x1b[H") // Clear screen and move cursor to home
-		if err := stream.Send(&games_pb.GameIOResponse{
-			Response: &games_pb.GameIOResponse_Output{
-				Output: &games_pb.PTYOutput{
-					SessionId: sessionID,
-					Data:      clearScreen,
+		// If we have recent frames, send them to the new spectator
+		if len(recentFrames) > 0 {
+			h.logger.Info("Sending recent frames to new spectator", "session_id", sessionID, "frame_count", len(recentFrames))
+			
+			// Send the frames in chronological order
+			for _, frame := range recentFrames {
+				if err := stream.Send(&games_pb.GameIOResponse{
+					Response: &games_pb.GameIOResponse_Output{
+						Output: &games_pb.PTYOutput{
+							SessionId: sessionID,
+							Data:      frame.Data,
+						},
+					},
+				}); err != nil {
+					h.logger.Error("Failed to send frame to spectator", "error", err, "session_id", sessionID, "frame_id", frame.FrameID)
+					return err
+				}
+			}
+		} else {
+			// No recent frames available - send a clear screen and trigger redraw
+			h.logger.Info("No recent frames available, requesting fresh screen state", "session_id", sessionID)
+			
+			// Clear the spectator's screen
+			clearScreen := []byte("\x1b[2J\x1b[H") // Clear screen and move cursor to home
+			if err := stream.Send(&games_pb.GameIOResponse{
+				Response: &games_pb.GameIOResponse_Output{
+					Output: &games_pb.PTYOutput{
+						SessionId: sessionID,
+						Data:      clearScreen,
+					},
 				},
-			},
-		}); err != nil {
-			h.logger.Error("Failed to send clear screen to spectator", "error", err, "session_id", sessionID)
-			return err
+			}); err != nil {
+				h.logger.Error("Failed to send clear screen to spectator", "error", err, "session_id", sessionID)
+				return err
+			}
+			
+			// Send screen redraw command to game to capture full current state
+			// NetHack responds to Ctrl+L (redraw) command
+			redrawCmd := []byte{0x0C} // Ctrl+L
+			if err := ptySession.SendInput(redrawCmd); err != nil {
+				h.logger.Warn("Failed to send redraw command to game", "error", err, "session_id", sessionID)
+			}
+			
+			h.logger.Info("Sent redraw command to game for new spectator", "session_id", sessionID)
 		}
-		
-		// Send screen redraw command to game to capture full current state
-		// NetHack responds to Ctrl+L (redraw) command
-		redrawCmd := []byte{0x0C} // Ctrl+L
-		if err := ptySession.SendInput(redrawCmd); err != nil {
-			h.logger.Warn("Failed to send redraw command to game", "error", err, "session_id", sessionID)
-		}
-		
-		h.logger.Info("Sent redraw command to game for new spectator", "session_id", sessionID)
-		
-		// The redraw command will cause the game to output its current state
-		// These frames will be captured by the stream manager and sent to all spectators
-		// including this new one via the normal streaming mechanism
 	}
 
 	// Start goroutines for handling I/O

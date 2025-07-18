@@ -158,7 +158,7 @@ type StreamManager struct {
 
 // NewStreamManager creates a new stream manager for a session
 func NewStreamManager() *StreamManager {
-	const defaultBufferSize = 20 // Keep last 20 frames
+	const defaultBufferSize = 100 // Keep last 100 frames to provide better context for new spectators
 	return &StreamManager{
 		frameChannel: make(chan *StreamFrame, 1000), // Buffered channel for frames
 		stopChan:     make(chan struct{}),
@@ -173,7 +173,7 @@ func NewStreamManager() *StreamManager {
 
 // NewStreamManagerWithSize creates a new stream manager with specific terminal dimensions
 func NewStreamManagerWithSize(rows, cols int) *StreamManager {
-	const defaultBufferSize = 20 // Keep last 20 frames
+	const defaultBufferSize = 100 // Keep last 100 frames to provide better context for new spectators
 	
 	// Initialize screen buffer with terminal dimensions
 	screenBuffer := make([][]byte, rows)
@@ -221,14 +221,26 @@ func (sm *StreamManager) SendFrame(data []byte) {
 	frameID := sm.frameID.Add(1)
 	frame := NewStreamFrame(data, frameID)
 
+	// Store frame in circular buffer immediately (for spectators joining later)
+	sm.storeFrameInBuffer(frame)
+
+	// Also queue for active spectators (non-blocking)
 	select {
 	case sm.frameChannel <- frame:
-		// Frame queued successfully
+		// Frame queued successfully for active spectators
 	default:
-		// Channel full, drop frame (prevents blocking)
-		// Note: would need to import log package for this
-		// log.Printf("Warning: Dropped frame %d due to full buffer", frameID)
+		// Channel full, but frame is still stored in buffer for new spectators
+		// This prevents blocking the player's output
 	}
+}
+
+// storeFrameInBuffer stores a frame directly in the circular buffer
+func (sm *StreamManager) storeFrameInBuffer(frame *StreamFrame) {
+	sm.recentFramesLock.Lock()
+	defer sm.recentFramesLock.Unlock()
+	
+	sm.recentFrames[sm.bufferIndex] = frame
+	sm.bufferIndex = (sm.bufferIndex + 1) % sm.bufferSize
 }
 
 // GetRecentFrames returns the recent frames from the circular buffer
@@ -278,15 +290,15 @@ func (sm *StreamManager) UpdateScreenBuffer(data []byte) {
 	sm.screenBufferLock.Lock()
 	defer sm.screenBufferLock.Unlock()
 
-	// For now, implement a simple approach: 
-	// When we detect clear screen sequences, clear our buffer
-	// This ensures spectators don't see stale data
+	// For spectating, we want to preserve the current screen state
+	// Only clear the buffer when we see explicit clear screen commands
+	// This helps maintain visual continuity for spectators
 	
 	dataStr := string(data)
 	
-	// Check for clear screen escape sequences
-	if strings.Contains(dataStr, "\x1b[2J") || strings.Contains(dataStr, "\x1b[H\x1b[2J") {
-		// Clear screen - reset our buffer
+	// Check for explicit clear screen escape sequences
+	if strings.Contains(dataStr, "\x1b[2J") {
+		// Clear screen command - reset our buffer
 		for row := 0; row < sm.terminalRows; row++ {
 			for col := 0; col < sm.terminalCols; col++ {
 				sm.screenBuffer[row][col] = ' '
@@ -295,21 +307,14 @@ func (sm *StreamManager) UpdateScreenBuffer(data []byte) {
 		return
 	}
 	
-	// Check for cursor home sequences
-	if strings.Contains(dataStr, "\x1b[H") || strings.Contains(dataStr, "\x1b[1;1H") {
-		// Cursor moved to home position - this often means screen refresh
-		// For games like NetHack, this typically means a full screen redraw
-		// Clear the buffer to avoid old data
-		for row := 0; row < sm.terminalRows; row++ {
-			for col := 0; col < sm.terminalCols; col++ {
-				sm.screenBuffer[row][col] = ' '
-			}
-		}
-	}
+	// Don't clear buffer on cursor home alone - this happens frequently in games
+	// like NetHack for normal screen updates without full clears
+	// Only clear when we see an explicit clear screen sequence
 	
-	// For now, don't try to parse complex escape sequences
+	// For now, don't try to parse complex escape sequences for position updates
 	// Just let the raw data through - the terminal emulator on the spectator side
-	// will handle the rendering. We mainly want to detect when to clear our buffer.
+	// will handle the rendering. We preserve the recent frames which contain
+	// the actual screen state that spectators need.
 }
 
 // streamLoop processes frames and distributes them to spectators
@@ -328,11 +333,7 @@ func (sm *StreamManager) streamLoop(registry *atomic.Pointer[SpectatorRegistry])
 
 // distributeFrame sends a frame to all active spectators
 func (sm *StreamManager) distributeFrame(frame *StreamFrame, registry *atomic.Pointer[SpectatorRegistry]) {
-	// Store frame in circular buffer
-	sm.recentFramesLock.Lock()
-	sm.recentFrames[sm.bufferIndex] = frame
-	sm.bufferIndex = (sm.bufferIndex + 1) % sm.bufferSize
-	sm.recentFramesLock.Unlock()
+	// Frame is already stored in buffer by SendFrame method, so no need to store again
 
 	// Load current immutable registry
 	currentRegistry := registry.Load()

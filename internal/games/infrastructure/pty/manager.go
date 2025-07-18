@@ -292,11 +292,15 @@ func (s *PTYSession) handleOutput() {
 			// Process output through adapter
 			processedData := s.adapter.ProcessOutput(rawData)
 
-			// Send to stream manager for spectating
+			// Send to stream manager for spectating (non-blocking)
+			// This ensures spectators don't interfere with player performance
 			if s.streamManager != nil {
-				s.streamManager.SendFrame(processedData)
+				go func(data []byte) {
+					s.streamManager.SendFrame(data)
+				}(processedData)
 			}
 
+			// Send to player (priority channel - blocking is acceptable for player)
 			select {
 			case s.outputChan <- processedData:
 			case <-s.closeChan:
