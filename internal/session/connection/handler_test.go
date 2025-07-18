@@ -37,10 +37,10 @@ func TestNewHandler(t *testing.T) {
 
 	// Create a mock menu handler for testing
 	bannerConfig := &banner.BannerConfig{}
-	bannerManager := banner.NewBannerManager(bannerConfig)
+	bannerManager := banner.NewBannerManager(bannerConfig, "test-version")
 	menuHandler := menu.NewMenuHandler(bannerManager, gameClient, authClient, logger)
 
-	handler := NewHandler(manager, gameClient, authClient, menuHandler, logger)
+	handler := NewHandler(manager, gameClient, authClient, menuHandler, logger, 5*time.Second)
 
 	assert.NotNil(t, handler)
 	assert.Equal(t, manager, handler.manager)
@@ -75,10 +75,10 @@ func TestHandlerHandleConnectionRegistration(t *testing.T) {
 
 	// Create a mock menu handler for testing
 	bannerConfig := &banner.BannerConfig{}
-	bannerManager := banner.NewBannerManager(bannerConfig)
+	bannerManager := banner.NewBannerManager(bannerConfig, "test-version")
 	menuHandler := menu.NewMenuHandler(bannerManager, gameClient, authClient, logger)
 
-	handler := NewHandler(manager, gameClient, authClient, menuHandler, logger)
+	handler := NewHandler(manager, gameClient, authClient, menuHandler, logger, 5*time.Second)
 
 	// Create mock connection
 	conn := &mockNetConn{
@@ -128,10 +128,10 @@ func TestHandlerHandleConnectionMaxConnections(t *testing.T) {
 
 	// Create a mock menu handler for testing
 	bannerConfig := &banner.BannerConfig{}
-	bannerManager := banner.NewBannerManager(bannerConfig)
+	bannerManager := banner.NewBannerManager(bannerConfig, "test-version")
 	menuHandler := menu.NewMenuHandler(bannerManager, gameClient, authClient, logger)
 
-	handler := NewHandler(manager, gameClient, authClient, menuHandler, logger)
+	handler := NewHandler(manager, gameClient, authClient, menuHandler, logger, 5*time.Second)
 
 	// Register first connection
 	conn1 := &mockNetConn{
@@ -238,10 +238,10 @@ func TestParsePTYRequest(t *testing.T) {
 
 	// Create a mock menu handler for testing
 	bannerConfig := &banner.BannerConfig{}
-	bannerManager := banner.NewBannerManager(bannerConfig)
+	bannerManager := banner.NewBannerManager(bannerConfig, "test-version")
 	menuHandler := menu.NewMenuHandler(bannerManager, gameClient, authClient, logger)
 
-	handler := NewHandler(manager, gameClient, authClient, menuHandler, logger)
+	handler := NewHandler(manager, gameClient, authClient, menuHandler, logger, 5*time.Second)
 
 	tests := []struct {
 		name     string
@@ -293,10 +293,10 @@ func TestParseWindowChange(t *testing.T) {
 
 	// Create a mock menu handler for testing
 	bannerConfig := &banner.BannerConfig{}
-	bannerManager := banner.NewBannerManager(bannerConfig)
+	bannerManager := banner.NewBannerManager(bannerConfig, "test-version")
 	menuHandler := menu.NewMenuHandler(bannerManager, gameClient, authClient, logger)
 
-	handler := NewHandler(manager, gameClient, authClient, menuHandler, logger)
+	handler := NewHandler(manager, gameClient, authClient, menuHandler, logger, 5*time.Second)
 
 	tests := []struct {
 		name     string

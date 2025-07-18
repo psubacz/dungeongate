@@ -15,6 +15,7 @@ type BannerManager struct {
 	cache         *BannerCache
 	serverStarted time.Time
 	unicode       *UnicodeSupport
+	version       string
 	mu            sync.RWMutex
 }
 
@@ -152,7 +153,7 @@ type HeaderFooterConfig struct {
 }
 
 // NewBannerManager creates a new banner manager with caching and Unicode support
-func NewBannerManager(config *BannerConfig) *BannerManager {
+func NewBannerManager(config *BannerConfig, version string) *BannerManager {
 	cache := &BannerCache{
 		banners: make(map[string]*CachedBanner),
 		ttl:     5 * time.Minute, // Cache for 5 minutes
@@ -167,6 +168,7 @@ func NewBannerManager(config *BannerConfig) *BannerManager {
 		cache:         cache,
 		serverStarted: time.Now(),
 		unicode:       unicode,
+		version:       version,
 	}
 }
 
@@ -396,10 +398,14 @@ func (bm *BannerManager) GetTemplateVariables(username string) map[string]string
 		"$SERVERID": "DungeonGate",
 		"$DATE":     now.Format("2006-01-02"),
 		"$TIME":     now.Format("15:04:05"),
-		"$USERNAME": username,
 		"$UPTIME":   formatUptime(uptime),
-		"$VERSION":  "v1.0.0", // TODO: Get from build info
+		"$VERSION":  bm.version,
 		"$TIMEZONE": now.Format("MST"),
+	}
+
+	// Only include USERNAME variable if username is provided
+	if username != "" {
+		variables["$USERNAME"] = username
 	}
 
 	return variables

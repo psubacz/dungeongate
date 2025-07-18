@@ -15,8 +15,6 @@ import (
 )
 
 // Service represents the stateless Session Service
-// DEPRECATED: This service will be replaced by pool-based architecture.
-// Use pool-based handlers from internal/session/handlers for new implementations.
 type Service struct {
 	config *Config
 	logger *slog.Logger
@@ -80,6 +78,7 @@ func New(cfg *Config, logger *slog.Logger, metricsRegistry *metrics.Registry) (*
 		BannerIdleMode:           cfg.Menu.Banners.IdleMode,
 		BannerServiceUnavailable: cfg.Menu.Banners.ServiceUnavailable,
 		IdleRetryInterval:        cfg.IdleRetryInterval,
+		Version:                  cfg.Version,
 	}
 	sshServer, err := server.NewSSHServer(sshConfig, gameClient, authClient, logger)
 	if err != nil {

@@ -187,8 +187,6 @@ The Session Service is a stateless SSH gateway that provides terminal access to 
 - [ ] **Kubernetes Native**: Helm charts and operators
 - [ ] **Service Mesh**: Istio/Linkerd integration
 - [ ] **Geographic Distribution**: Multi-region deployment
-- [ ] **Edge Caching**: CDN integration for static content
-- [ ] **Auto-Scaling**: Dynamic instance scaling
 
 #### 4.5 Monitoring and Observability
 - [ ] **Distributed Tracing**: OpenTelemetry integration for PTY tunneling

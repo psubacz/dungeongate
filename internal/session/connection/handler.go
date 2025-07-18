@@ -712,12 +712,12 @@ func (h *Handler) handleMenuChoice(ctx context.Context, channel ssh.Channel, cho
 			h.logger.Error("Spectate menu failed", "error", err)
 			return err
 		}
-		
+
 		// If no choice was made (user quit), return to main menu
 		if spectateChoice == nil {
 			return nil
 		}
-		
+
 		// Handle the spectate menu choice
 		return h.handleMenuChoice(ctx, channel, spectateChoice, userInfo, connID, username, terminalCols, terminalRows, sshConn)
 
@@ -1354,7 +1354,7 @@ func (h *Handler) handleWatchMode(ctx context.Context, channel ssh.Channel, user
 			time.Sleep(2 * time.Second)
 			return nil
 		}
-		
+
 		for _, session := range sessions {
 			if session.UserId != int32(userID) {
 				availableSessions = append(availableSessions, session)
@@ -1433,7 +1433,7 @@ func (h *Handler) startSpectating(ctx context.Context, channel ssh.Channel, user
 	// Add user as spectator to the session (authenticated users only)
 	var userID int32 = 0
 	var username string = "anonymous"
-	
+
 	if user != nil {
 		// Convert user ID to int32 for Game Service API
 		userIDParsed, err := strconv.ParseInt(user.Id, 10, 32)
@@ -1485,7 +1485,7 @@ func (h *Handler) startSpectating(ctx context.Context, channel ssh.Channel, user
 			Connect: &gamev2.ConnectPTYRequest{
 				SessionId: session.Id,
 				TerminalSize: &gamev2.TerminalSize{
-					Width:  session.TerminalSize.Width,   // Use actual game session terminal size
+					Width:  session.TerminalSize.Width, // Use actual game session terminal size
 					Height: session.TerminalSize.Height,
 				},
 				TermType: "xterm",

@@ -510,7 +510,7 @@ func (mh *MenuHandler) ShowSpectateMenu(ctx context.Context, channel ssh.Channel
 		case <-updateTicker.C:
 			// Update display every second
 			now := time.Now()
-			
+
 			// Only refresh if it's been at least 1 second since last update
 			if now.Sub(lastUpdateTime) >= time.Second {
 				// Get fresh session data every 30 seconds or if session count might have changed
@@ -525,7 +525,7 @@ func (mh *MenuHandler) ShowSpectateMenu(ctx context.Context, channel ssh.Channel
 
 				// Rebuild and redisplay the banner with updated idle times
 				newBanner := mh.buildSpectateMenuBanner(availableSessions)
-				
+
 				// Only update if the banner actually changed or if idle times need updating
 				if newBanner != banner || mh.hasIdleTimeUpdates(availableSessions) {
 					// Clear screen and redisplay
@@ -537,12 +537,12 @@ func (mh *MenuHandler) ShowSpectateMenu(ctx context.Context, channel ssh.Channel
 						// Don't return error for write failures during updates
 						continue
 					}
-					
+
 					// Restore any typed input
 					if inputBuffer.Len() > 0 {
 						channel.Write([]byte(inputBuffer.String()))
 					}
-					
+
 					banner = newBanner
 				}
 				lastUpdateTime = now
@@ -561,7 +561,7 @@ type inputEvent struct {
 // handleSpectateMenuInput handles user input in a separate goroutine
 func (mh *MenuHandler) handleSpectateMenuInput(ctx context.Context, channel ssh.Channel, inputChan chan<- *inputEvent, errorChan chan<- error) {
 	inputHandler := terminal.NewInputHandler(channel)
-	
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -575,13 +575,13 @@ func (mh *MenuHandler) handleSpectateMenuInput(ctx context.Context, channel ssh.
 				}
 				return
 			}
-			
+
 			inputEvent := &inputEvent{
 				eventType: event.Type,
 				character: event.Character,
 				keyCode:   event.KeyCode,
 			}
-			
+
 			select {
 			case inputChan <- inputEvent:
 			case <-ctx.Done():
@@ -647,9 +647,9 @@ func (mh *MenuHandler) processInputEvent(event *inputEvent, inputBuffer *strings
 			if char >= 'a' && char <= 'z' {
 				sessionIndex = int(char - 'a')
 			} else {
-				sessionIndex = int(char - 'A') + 26 // A-Z maps to sessions 26-51
+				sessionIndex = int(char-'A') + 26 // A-Z maps to sessions 26-51
 			}
-			
+
 			if sessionIndex < len(availableSessions) {
 				selectedSession := availableSessions[sessionIndex]
 				// Clear the line to remove echoed input
@@ -666,7 +666,7 @@ func (mh *MenuHandler) processInputEvent(event *inputEvent, inputBuffer *strings
 				} else {
 					maxLetter = 'Z'
 				}
-				errorMsg := fmt.Sprintf("\r\nInvalid choice '%c'. Valid options: a-%c, '?' for help, or 'q' to quit\r\n\r\n", 
+				errorMsg := fmt.Sprintf("\r\nInvalid choice '%c'. Valid options: a-%c, '?' for help, or 'q' to quit\r\n\r\n",
 					char, maxLetter)
 				channel.Write([]byte(errorMsg))
 			}
@@ -708,7 +708,7 @@ func (mh *MenuHandler) processInputEvent(event *inputEvent, inputBuffer *strings
 				// Invalid choice, show error with helpful options
 				validLetters := fmt.Sprintf("a-%c", 'a'+rune(len(availableSessions)-1))
 				validNumbers := fmt.Sprintf("1-%d", len(availableSessions))
-				errorMsg := fmt.Sprintf("\r\nInvalid choice '%s'. Valid options: %s, %s, '?' for help, or 'q' to quit\r\n\r\n", 
+				errorMsg := fmt.Sprintf("\r\nInvalid choice '%s'. Valid options: %s, %s, '?' for help, or 'q' to quit\r\n\r\n",
 					choice, validLetters, validNumbers)
 				channel.Write([]byte(errorMsg))
 			}
@@ -724,14 +724,14 @@ func (mh *MenuHandler) processInputEvent(event *inputEvent, inputBuffer *strings
 			}
 		}
 	}
-	
+
 	return nil // Continue showing menu
 }
 
 // filterUserSessions filters out user's own sessions for authenticated users
 func (mh *MenuHandler) filterUserSessions(sessions []*gamev2.GameSession, user *authv1.User) []*gamev2.GameSession {
 	availableSessions := make([]*gamev2.GameSession, 0)
-	
+
 	if user != nil {
 		// For authenticated users, filter out their own sessions
 		userID, err := strconv.ParseInt(user.Id, 10, 32)
@@ -749,7 +749,7 @@ func (mh *MenuHandler) filterUserSessions(sessions []*gamev2.GameSession, user *
 		// For anonymous users, show all sessions
 		availableSessions = sessions
 	}
-	
+
 	return availableSessions
 }
 
@@ -772,12 +772,12 @@ func (mh *MenuHandler) hasIdleTimeUpdates(sessions []*gamev2.GameSession) bool {
 // buildSpectateMenuBanner creates the formatted spectate menu display
 func (mh *MenuHandler) buildSpectateMenuBanner(sessions []*gamev2.GameSession) string {
 	var banner strings.Builder
-	
+
 	banner.WriteString("The following games are in progress:\r\n\r\n")
-	
+
 	// Header
 	banner.WriteString("    Username         Game    Size    Start date & time    Idle time   Watchers\r\n")
-	
+
 	// Session entries
 	for i, session := range sessions {
 		// Convert session data to display format (a-z, then A-Z)
@@ -791,37 +791,37 @@ func (mh *MenuHandler) buildSpectateMenuBanner(sessions []*gamev2.GameSession) s
 		if len(username) > 15 {
 			username = username[:12] + "..."
 		}
-		
+
 		// Game ID formatting (convert "nethack" to "NH370" format)
 		gameDisplay := mh.formatGameDisplay(session.GameId)
-		
+
 		// Terminal size
 		size := "80x24" // Default
 		if session.TerminalSize != nil {
 			size = fmt.Sprintf("%dx%d", session.TerminalSize.Width, session.TerminalSize.Height)
 		}
-		
+
 		// Start time formatting
 		startTime := "Unknown"
 		if session.StartTime != nil {
 			startTime = session.StartTime.AsTime().Format("2006-01-02 15:04:05")
 		}
-		
+
 		// Calculate idle time
 		idleTime := mh.calculateIdleTime(session)
-		
+
 		// Spectator count
 		spectatorCount := len(session.Spectators)
-		
+
 		// Format the line with proper spacing
 		banner.WriteString(fmt.Sprintf(" %s) %-15s %-7s %-8s %-19s %-11s %d\r\n",
 			letter, username, gameDisplay, size, startTime, idleTime, spectatorCount))
 	}
-	
+
 	// Footer with pagination info and prompt
 	banner.WriteString(fmt.Sprintf("\r\n (1-%d of %d)\r\n\r\n", len(sessions), len(sessions)))
 	banner.WriteString(" Spectate which game? ('?' for help) => ")
-	
+
 	return banner.String()
 }
 
@@ -850,16 +850,16 @@ func (mh *MenuHandler) calculateIdleTime(session *gamev2.GameSession) string {
 	if session.LastActivity == nil {
 		return ""
 	}
-	
+
 	now := time.Now()
 	lastActivity := session.LastActivity.AsTime()
 	duration := now.Sub(lastActivity)
-	
+
 	// If less than 30 seconds, consider not idle
 	if duration < 30*time.Second {
 		return ""
 	}
-	
+
 	// Format duration in a human-readable way
 	if duration < time.Minute {
 		return fmt.Sprintf("%ds", int(duration.Seconds()))
@@ -900,13 +900,13 @@ func (mh *MenuHandler) showSpectateHelp(channel ssh.Channel) {
 	help += "  r        resize your terminal to match the player's terminal.\r\n"
 	help += "\r\n\r\n"
 	help += "Press any key to continue...\r\n"
-	
+
 	channel.Write([]byte(help))
-	
+
 	// Wait for any key press
 	buffer := make([]byte, 1)
 	channel.Read(buffer)
-	
+
 	// Clear screen and position cursor
 	channel.Write([]byte("\033[2J\033[H"))
 }

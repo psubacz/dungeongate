@@ -4,6 +4,9 @@ import "time"
 
 // Config represents the configuration for the Session Service
 type Config struct {
+	// Version information
+	Version string `yaml:"-"`
+
 	// Service addresses
 	GameService struct {
 		Address string `yaml:"address" default:"localhost:50051"`

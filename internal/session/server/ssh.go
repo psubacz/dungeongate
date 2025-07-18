@@ -48,6 +48,7 @@ type SSHConfig struct {
 	BannerIdleMode           string
 	BannerServiceUnavailable string
 	IdleRetryInterval        time.Duration
+	Version                  string
 }
 
 // NewSSHServer creates a new SSH server
@@ -63,7 +64,7 @@ func NewSSHServer(config *SSHConfig, gameClient *client.GameClient, authClient *
 		IdleMode:           config.BannerIdleMode,
 		ServiceUnavailable: config.BannerServiceUnavailable,
 	}
-	bannerManager := banner.NewBannerManager(bannerConfig)
+	bannerManager := banner.NewBannerManager(bannerConfig, config.Version)
 
 	// Create menu handler
 	menuHandler := menu.NewMenuHandler(bannerManager, gameClient, authClient, logger)

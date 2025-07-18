@@ -129,11 +129,11 @@ func TestHandlerWithRealAuthService(t *testing.T) {
 
 	// Create menu handler
 	bannerConfig := &banner.BannerConfig{}
-	bannerManager := banner.NewBannerManager(bannerConfig)
+	bannerManager := banner.NewBannerManager(bannerConfig, "test-version")
 	menuHandler := menu.NewMenuHandler(bannerManager, gameClient, authClient, logger)
 
 	// Create handler
-	handler := NewHandler(manager, gameClient, authClient, menuHandler, logger)
+	handler := NewHandler(manager, gameClient, authClient, menuHandler, logger, 5*time.Second)
 
 	// Test that handler was created successfully
 	assert.NotNil(t, handler)
@@ -156,7 +156,7 @@ func TestReadLineLogic(t *testing.T) {
 
 	// Create a minimal handler for testing
 	manager := NewManager(100, logger)
-	handler := NewHandler(manager, nil, nil, nil, logger)
+	handler := NewHandler(manager, nil, nil, nil, logger, 5*time.Second)
 
 	// Test input scenarios with mock channel that simulates reading
 	t.Run("SimpleInput", func(t *testing.T) {

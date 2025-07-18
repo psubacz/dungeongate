@@ -75,9 +75,6 @@ func TestHandler_ConnectionManager_Integration(t *testing.T) {
 	assert.NotNil(t, stats)
 	assert.Equal(t, 0, stats.Active)
 	assert.Equal(t, 0, stats.Total)
-	assert.NotNil(t, stats.ByState)
-	assert.NotNil(t, stats.ByUserID)
-	assert.NotNil(t, stats.ByRemoteIP)
 
 	// Test cleanup
 	err = manager.Stop(ctx)

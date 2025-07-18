@@ -36,7 +36,7 @@ Choice: `
 		MainUser:  "",
 		WatchMenu: "",
 	}
-	manager := NewBannerManager(config)
+	manager := NewBannerManager(config, "test-version")
 
 	// Test rendering
 	result, err := manager.RenderMainAnon()
@@ -77,7 +77,7 @@ Choice: `
 		MainUser:  tempFile.Name(),
 		WatchMenu: "",
 	}
-	manager := NewBannerManager(config)
+	manager := NewBannerManager(config, "test-version")
 
 	// Test rendering
 	result, err := manager.RenderMainUser("testuser")
@@ -98,7 +98,7 @@ func TestBannerManager_EmptyPath(t *testing.T) {
 		MainUser:  "",
 		WatchMenu: "",
 	}
-	manager := NewBannerManager(config)
+	manager := NewBannerManager(config, "test-version")
 
 	// Test rendering with empty path
 	result, err := manager.RenderMainAnon()
@@ -114,7 +114,7 @@ func TestBannerManager_FileNotFound(t *testing.T) {
 		MainUser:  "",
 		WatchMenu: "",
 	}
-	manager := NewBannerManager(config)
+	manager := NewBannerManager(config, "test-version")
 
 	// Test rendering with non-existent file
 	result, err := manager.RenderMainAnon()
@@ -144,7 +144,7 @@ Time: $TIME`
 		MainUser:  tempFile.Name(),
 		WatchMenu: "",
 	}
-	manager := NewBannerManager(config)
+	manager := NewBannerManager(config, "test-version")
 
 	// Test anonymous banner (no USERNAME)
 	result, err := manager.RenderMainAnon()
@@ -191,7 +191,7 @@ Choice: `
 		MainUser:  "",
 		WatchMenu: tempFile.Name(),
 	}
-	manager := NewBannerManager(config)
+	manager := NewBannerManager(config, "test-version")
 
 	// Test rendering
 	result, err := manager.RenderWatchMenu()
@@ -223,7 +223,7 @@ func TestBannerManager_LineEndingConversion(t *testing.T) {
 		MainUser:  "",
 		WatchMenu: "",
 	}
-	manager := NewBannerManager(config)
+	manager := NewBannerManager(config, "test-version")
 
 	// Test rendering
 	result, err := manager.RenderMainAnon()

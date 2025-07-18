@@ -97,7 +97,7 @@ func (m *MockSSHChannel) EnableWriteTracking() {
 func TestNewMenuHandler(t *testing.T) {
 	// Create a real banner manager for testing
 	bannerConfig := &banner.BannerConfig{}
-	bannerManager := banner.NewBannerManager(bannerConfig)
+	bannerManager := banner.NewBannerManager(bannerConfig, "test-version")
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
 
@@ -133,7 +133,7 @@ Choose an option:
 	bannerConfig := &banner.BannerConfig{
 		MainAnon: tempFile.Name(),
 	}
-	bannerManager := banner.NewBannerManager(bannerConfig)
+	bannerManager := banner.NewBannerManager(bannerConfig, "test-version")
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
 
 	handler := NewMenuHandler(bannerManager, nil, nil, logger)
@@ -201,7 +201,7 @@ Choose an option:
 			bannerConfig := &banner.BannerConfig{
 				MainAnon: tempFile.Name(),
 			}
-			bannerManager := banner.NewBannerManager(bannerConfig)
+			bannerManager := banner.NewBannerManager(bannerConfig, "test-version")
 			logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
 
 			handler := NewMenuHandler(bannerManager, nil, nil, logger)
@@ -246,7 +246,7 @@ Choose an option:
 	bannerConfig := &banner.BannerConfig{
 		MainAnon: tempFile.Name(),
 	}
-	bannerManager := banner.NewBannerManager(bannerConfig)
+	bannerManager := banner.NewBannerManager(bannerConfig, "test-version")
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
 
 	handler := NewMenuHandler(bannerManager, nil, nil, logger)
@@ -273,7 +273,7 @@ func TestShowUserMenu_Success(t *testing.T) {
 	bannerConfig := &banner.BannerConfig{
 		MainUser: "/Users/caboose/dungeongate/assets/banners/main_user.txt",
 	}
-	bannerManager := banner.NewBannerManager(bannerConfig)
+	bannerManager := banner.NewBannerManager(bannerConfig, "test-version")
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
 
 	handler := NewMenuHandler(bannerManager, nil, nil, logger)
@@ -325,7 +325,7 @@ func TestShowUserMenu_AllChoices(t *testing.T) {
 			bannerConfig := &banner.BannerConfig{
 				MainUser: "/Users/caboose/dungeongate/assets/banners/main_user.txt",
 			}
-			bannerManager := banner.NewBannerManager(bannerConfig)
+			bannerManager := banner.NewBannerManager(bannerConfig, "test-version")
 			logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
 
 			handler := NewMenuHandler(bannerManager, nil, nil, logger)
@@ -384,7 +384,7 @@ func TestBuildGameSelectionBanner(t *testing.T) {
 	bannerConfig := &banner.BannerConfig{
 		MainUser: "/Users/caboose/dungeongate/assets/banners/main_user.txt",
 	}
-	bannerManager := banner.NewBannerManager(bannerConfig)
+	bannerManager := banner.NewBannerManager(bannerConfig, "test-version")
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
 
 	handler := NewMenuHandler(bannerManager, nil, nil, logger)
@@ -426,7 +426,7 @@ func TestBuildGameSelectionBanner(t *testing.T) {
 // Benchmark tests
 func BenchmarkShowAnonymousMenu(b *testing.B) {
 	bannerConfig := &banner.BannerConfig{}
-	bannerManager := banner.NewBannerManager(bannerConfig)
+	bannerManager := banner.NewBannerManager(bannerConfig, "test-version")
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
 	handler := NewMenuHandler(bannerManager, nil, nil, logger)
 
@@ -444,7 +444,7 @@ func BenchmarkShowAnonymousMenu(b *testing.B) {
 
 func TestBuildSpectateMenuBanner(t *testing.T) {
 	bannerConfig := &banner.BannerConfig{}
-	bannerManager := banner.NewBannerManager(bannerConfig)
+	bannerManager := banner.NewBannerManager(bannerConfig, "test-version")
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
 
 	handler := NewMenuHandler(bannerManager, nil, nil, logger)
@@ -489,7 +489,7 @@ func TestBuildSpectateMenuBanner(t *testing.T) {
 
 func TestFormatGameDisplay(t *testing.T) {
 	bannerConfig := &banner.BannerConfig{}
-	bannerManager := banner.NewBannerManager(bannerConfig)
+	bannerManager := banner.NewBannerManager(bannerConfig, "test-version")
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
 
 	handler := NewMenuHandler(bannerManager, nil, nil, logger)
@@ -519,7 +519,7 @@ func TestFormatGameDisplay(t *testing.T) {
 
 func TestCalculateIdleTime(t *testing.T) {
 	bannerConfig := &banner.BannerConfig{}
-	bannerManager := banner.NewBannerManager(bannerConfig)
+	bannerManager := banner.NewBannerManager(bannerConfig, "test-version")
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
 
 	handler := NewMenuHandler(bannerManager, nil, nil, logger)
@@ -553,7 +553,7 @@ func TestCalculateIdleTime(t *testing.T) {
 
 func TestHasIdleTimeUpdates(t *testing.T) {
 	bannerConfig := &banner.BannerConfig{}
-	bannerManager := banner.NewBannerManager(bannerConfig)
+	bannerManager := banner.NewBannerManager(bannerConfig, "test-version")
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
 
 	handler := NewMenuHandler(bannerManager, nil, nil, logger)
@@ -610,7 +610,7 @@ func TestHasIdleTimeUpdates(t *testing.T) {
 
 func TestFilterUserSessions(t *testing.T) {
 	bannerConfig := &banner.BannerConfig{}
-	bannerManager := banner.NewBannerManager(bannerConfig)
+	bannerManager := banner.NewBannerManager(bannerConfig, "test-version")
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
 
 	handler := NewMenuHandler(bannerManager, nil, nil, logger)
@@ -641,7 +641,7 @@ func TestFilterUserSessions(t *testing.T) {
 
 func TestBuildSpectateMenuBannerWithManySessions(t *testing.T) {
 	bannerConfig := &banner.BannerConfig{}
-	bannerManager := banner.NewBannerManager(bannerConfig)
+	bannerManager := banner.NewBannerManager(bannerConfig, "test-version")
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
 
 	handler := NewMenuHandler(bannerManager, nil, nil, logger)
@@ -666,18 +666,18 @@ func TestBuildSpectateMenuBannerWithManySessions(t *testing.T) {
 	// Verify it uses a-z for first 26 sessions
 	assert.Contains(t, banner, "a) user1")
 	assert.Contains(t, banner, "z) user26")
-	
+
 	// Verify it uses A-Z for sessions 27+
 	assert.Contains(t, banner, "A) user27")
 	assert.Contains(t, banner, "D) user30")
-	
+
 	// Verify pagination info
 	assert.Contains(t, banner, "(1-30 of 30)")
 }
 
 func BenchmarkBuildGameSelectionBanner(b *testing.B) {
 	bannerConfig := &banner.BannerConfig{}
-	bannerManager := banner.NewBannerManager(bannerConfig)
+	bannerManager := banner.NewBannerManager(bannerConfig, "test-version")
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
 	handler := NewMenuHandler(bannerManager, nil, nil, logger)
 

@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"io/ioutil"
 	"log/slog"
 	"net"
 	"os"
@@ -556,7 +555,7 @@ func TestHostKeyPathHandling(t *testing.T) {
 
 	t.Run("Host key path creates and loads key", func(t *testing.T) {
 		// Create temporary directory for test
-		tempDir, err := ioutil.TempDir("", "ssh_test")
+		tempDir, err := os.MkdirTemp("", "ssh_test")
 		require.NoError(t, err)
 		defer os.RemoveAll(tempDir)
 
@@ -586,7 +585,7 @@ func TestHostKeyPathHandling(t *testing.T) {
 		assert.Equal(t, os.FileMode(0600), info.Mode().Perm())
 
 		// Get key content
-		keyContent1, err := ioutil.ReadFile(hostKeyPath)
+		keyContent1, err := os.ReadFile(hostKeyPath)
 		require.NoError(t, err)
 
 		// Second call should load the existing key
@@ -594,7 +593,7 @@ func TestHostKeyPathHandling(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify key file content hasn't changed
-		keyContent2, err := ioutil.ReadFile(hostKeyPath)
+		keyContent2, err := os.ReadFile(hostKeyPath)
 		require.NoError(t, err)
 		assert.Equal(t, keyContent1, keyContent2)
 
@@ -605,7 +604,7 @@ func TestHostKeyPathHandling(t *testing.T) {
 
 	t.Run("Host key path with non-existent directory", func(t *testing.T) {
 		// Create temporary directory for test
-		tempDir, err := ioutil.TempDir("", "ssh_test")
+		tempDir, err := os.MkdirTemp("", "ssh_test")
 		require.NoError(t, err)
 		defer os.RemoveAll(tempDir)
 
@@ -650,7 +649,7 @@ func TestLoadOrGenerateHostKey(t *testing.T) {
 	})
 
 	t.Run("Non-existent file generates and saves key", func(t *testing.T) {
-		tempDir, err := ioutil.TempDir("", "ssh_key_test")
+		tempDir, err := os.MkdirTemp("", "ssh_key_test")
 		require.NoError(t, err)
 		defer os.RemoveAll(tempDir)
 
@@ -679,14 +678,14 @@ func TestLoadOrGenerateHostKey(t *testing.T) {
 	})
 
 	t.Run("Invalid key file returns error", func(t *testing.T) {
-		tempDir, err := ioutil.TempDir("", "ssh_key_test")
+		tempDir, err := os.MkdirTemp("", "ssh_key_test")
 		require.NoError(t, err)
 		defer os.RemoveAll(tempDir)
 
 		keyPath := filepath.Join(tempDir, "invalid_key")
 
 		// Create invalid key file
-		err = ioutil.WriteFile(keyPath, []byte("invalid key content"), 0600)
+		err = os.WriteFile(keyPath, []byte("invalid key content"), 0600)
 		require.NoError(t, err)
 
 		// Should return error

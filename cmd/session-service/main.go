@@ -127,6 +127,7 @@ func main() {
 		},
 		MaxConnections: 1000,
 		MaxPTYs:        500,
+		Version:        version,
 	}
 
 	// Set idle retry interval if available
