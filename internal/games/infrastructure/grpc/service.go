@@ -87,7 +87,7 @@ func (s *GameServiceServer) AddSpectator(ctx context.Context, req *games_pb.AddS
 	}
 
 	// Get updated session info to return spectator details
-	session, err := s.sessionService.GetSessionByID(ctx, req.SessionId)
+	session, err := s.sessionService.GetGameSession(ctx, req.SessionId)
 	if err != nil {
 		s.logger.Error("Failed to get session after adding spectator", "session_id", req.SessionId, "error", err)
 		return &games_pb.AddSpectatorResponse{
@@ -98,9 +98,14 @@ func (s *GameServiceServer) AddSpectator(ctx context.Context, req *games_pb.AddS
 
 	// Find the added spectator
 	var spectatorInfo *games_pb.SpectatorInfo
-	for _, spec := range session.GetSpectators() {
-		if spec.UserId == req.SpectatorUserId {
-			spectatorInfo = spec
+	for _, spec := range session.Spectators() {
+		if spec.UserID.Int() == int(req.SpectatorUserId) {
+			spectatorInfo = &games_pb.SpectatorInfo{
+				UserId:   int32(spec.UserID.Int()),
+				Username: spec.Username,
+				JoinTime: timestamppb.New(spec.JoinTime),
+				IsActive: spec.IsActive,
+			}
 			break
 		}
 	}
