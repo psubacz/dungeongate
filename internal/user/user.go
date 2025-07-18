@@ -124,6 +124,11 @@ func NewService(db *database.Connection, cfg *config.UserServiceConfig, sessionC
 		return nil, fmt.Errorf("failed to initialize database schema: %w", err)
 	}
 
+	// Create default admin user if it doesn't exist
+	if err := service.createDefaultAdminUser(context.Background()); err != nil {
+		return nil, fmt.Errorf("failed to create default admin user: %w", err)
+	}
+
 	return service, nil
 }
 
@@ -546,4 +551,237 @@ func (s *Service) GetUserByUsername(ctx context.Context, username string) (*User
 	}
 
 	return &user, nil
+}
+
+// createDefaultAdminUser creates a default admin user if none exists
+func (s *Service) createDefaultAdminUser(ctx context.Context) error {
+	// Check if any admin user already exists
+	hasAdmin, err := s.hasAdminUser(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to check for existing admin users: %w", err)
+	}
+
+	if hasAdmin {
+		return nil // Admin user already exists
+	}
+
+	// Create default admin user
+	defaultPassword := "admin123" // Should be changed on first login
+	req := &RegistrationRequest{
+		Username:        "admin",
+		Password:        defaultPassword,
+		PasswordConfirm: defaultPassword,
+		Email:           "admin@dungeongate.local",
+		AcceptTerms:     true,
+		Source:          "system",
+	}
+
+	// Create the user first
+	resp, err := s.RegisterUser(ctx, req)
+	if err != nil {
+		return fmt.Errorf("failed to register default admin user: %w", err)
+	}
+
+	if !resp.Success {
+		// Check if user already exists
+		if len(resp.Errors) > 0 && resp.Errors[0].Code == "USERNAME_EXISTS" {
+			// User exists, just promote to admin
+			return s.promoteUserToAdmin(ctx, "admin")
+		}
+		return fmt.Errorf("failed to create default admin user: %s", resp.Message)
+	}
+
+	// Promote user to admin
+	if err := s.promoteUserToAdmin(ctx, "admin"); err != nil {
+		return fmt.Errorf("failed to promote default user to admin: %w", err)
+	}
+
+	fmt.Printf("Default admin user created: username=admin, password=%s\n", defaultPassword)
+	fmt.Println("IMPORTANT: Please change the default admin password immediately!")
+
+	return nil
+}
+
+// hasAdminUser checks if any admin user exists in the database
+func (s *Service) hasAdminUser(ctx context.Context) (bool, error) {
+	var count int
+	query := "SELECT COUNT(*) FROM users WHERE (flags & ?) != 0 AND is_active = TRUE"
+	err := s.db.QueryRowContext(ctx, query, int(UserFlagAdmin)).Scan(&count)
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
+// promoteUserToAdmin promotes a user to admin status
+func (s *Service) promoteUserToAdmin(ctx context.Context, username string) error {
+	query := "UPDATE users SET flags = flags | ? WHERE username = ?"
+	_, err := s.db.ExecContext(ctx, query, int(UserFlagAdmin), username)
+	return err
+}
+
+// IsAdmin checks if a user has admin privileges
+func (u *User) IsAdmin() bool {
+	return (u.Flags & UserFlagAdmin) != 0
+}
+
+// Admin Management Methods
+
+// UnlockUserAccount unlocks a user account
+func (s *Service) UnlockUserAccount(ctx context.Context, username string) error {
+	query := `
+		UPDATE users 
+		SET account_locked = FALSE, 
+			locked_until = NULL, 
+			failed_login_attempts = 0 
+		WHERE username = ?
+	`
+	result, err := s.db.ExecContext(ctx, query, username)
+	if err != nil {
+		return fmt.Errorf("failed to unlock user account: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("user not found: %s", username)
+	}
+
+	return nil
+}
+
+// DeleteUserAccount deletes a user account
+func (s *Service) DeleteUserAccount(ctx context.Context, username string) error {
+	// First check if user exists and is not the only admin
+	user, err := s.GetUserByUsername(ctx, username)
+	if err != nil {
+		return fmt.Errorf("user not found: %s", username)
+	}
+
+	// Prevent deleting the last admin
+	if user.IsAdmin() {
+		adminCount, err := s.getAdminCount(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to check admin count: %w", err)
+		}
+		if adminCount <= 1 {
+			return fmt.Errorf("cannot delete the last admin user")
+		}
+	}
+
+	query := "DELETE FROM users WHERE username = ?"
+	result, err := s.db.ExecContext(ctx, query, username)
+	if err != nil {
+		return fmt.Errorf("failed to delete user account: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("user not found: %s", username)
+	}
+
+	return nil
+}
+
+// ResetUserPassword resets a user's password
+func (s *Service) ResetUserPassword(ctx context.Context, username, newPassword string) error {
+	// Validate new password
+	if errors := s.validatePassword(newPassword); len(errors) > 0 {
+		return fmt.Errorf("invalid password: %s", errors[0].Message)
+	}
+
+	// Hash new password
+	passwordHash, salt, err := s.hashPassword(newPassword)
+	if err != nil {
+		return fmt.Errorf("failed to hash password: %w", err)
+	}
+
+	query := `
+		UPDATE users 
+		SET password_hash = ?, 
+			salt = ?, 
+			updated_at = CURRENT_TIMESTAMP 
+		WHERE username = ?
+	`
+	result, err := s.db.ExecContext(ctx, query, passwordHash, salt, username)
+	if err != nil {
+		return fmt.Errorf("failed to reset user password: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("user not found: %s", username)
+	}
+
+	return nil
+}
+
+// PromoteUserToAdmin promotes a user to admin
+func (s *Service) PromoteUserToAdmin(ctx context.Context, username string) error {
+	return s.promoteUserToAdmin(ctx, username)
+}
+
+// getAdminCount returns the number of active admin users
+func (s *Service) getAdminCount(ctx context.Context) (int, error) {
+	var count int
+	query := "SELECT COUNT(*) FROM users WHERE (flags & ?) != 0 AND is_active = TRUE"
+	err := s.db.QueryRowContext(ctx, query, int(UserFlagAdmin)).Scan(&count)
+	return count, err
+}
+
+// GetServerStatistics returns server statistics
+func (s *Service) GetServerStatistics(ctx context.Context) (map[string]interface{}, error) {
+	stats := make(map[string]interface{})
+
+	// Total users
+	var totalUsers int
+	err := s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM users").Scan(&totalUsers)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get total users: %w", err)
+	}
+	stats["total_users"] = totalUsers
+
+	// Active users
+	var activeUsers int
+	err = s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM users WHERE is_active = TRUE").Scan(&activeUsers)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get active users: %w", err)
+	}
+	stats["active_users"] = activeUsers
+
+	// Admin users
+	adminCount, err := s.getAdminCount(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get admin count: %w", err)
+	}
+	stats["admin_users"] = adminCount
+
+	// Locked users
+	var lockedUsers int
+	err = s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM users WHERE account_locked = TRUE").Scan(&lockedUsers)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get locked users: %w", err)
+	}
+	stats["locked_users"] = lockedUsers
+
+	// Users created today
+	var usersToday int
+	err = s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM users WHERE DATE(created_at) = DATE('now')").Scan(&usersToday)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get users created today: %w", err)
+	}
+	stats["users_created_today"] = usersToday
+
+	return stats, nil
 }

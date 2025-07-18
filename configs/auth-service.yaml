@@ -10,7 +10,6 @@
 # ============================================================================
 
 # Configuration file format version
-version: "0.4.0"
 
 # ============================================================================
 # Common Configuration Import
@@ -69,7 +68,7 @@ auth:
   jwt_secret: "dev-secret-please-change-in-production"
   
   # JWT issuer name (identifies this auth service)
-  jwt_issuer: "dungeongate-dev"
+  jwt_issuer: "dungeongate"
   
   # How long access tokens are valid (short for security)
   access_token_expiration: "15m"

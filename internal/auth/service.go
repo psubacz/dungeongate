@@ -482,6 +482,329 @@ func (s *Service) Health(ctx context.Context, req *emptypb.Empty) (*proto.Health
 	}, nil
 }
 
+// Admin Management Methods
+
+// UnlockUserAccount unlocks a user account (admin only)
+func (s *Service) UnlockUserAccount(ctx context.Context, req *proto.AdminActionRequest) (*proto.AdminActionResponse, error) {
+	// Validate admin token
+	validateResp, err := s.ValidateToken(ctx, &proto.ValidateTokenRequest{
+		AccessToken: req.AdminToken,
+	})
+	if err != nil {
+		return &proto.AdminActionResponse{
+			Success: false,
+			Error:   "Failed to validate admin token",
+		}, err
+	}
+
+	if !validateResp.Valid {
+		return &proto.AdminActionResponse{
+			Success: false,
+			Error:   "Invalid admin token",
+		}, nil
+	}
+
+	// Check if user is admin
+	userIDInt, err := strconv.Atoi(validateResp.User.Id)
+	if err != nil {
+		return &proto.AdminActionResponse{
+			Success: false,
+			Error:   "Invalid admin user ID",
+		}, nil
+	}
+
+	adminUser, err := s.userSvc.GetUserByID(ctx, userIDInt)
+	if err != nil {
+		return &proto.AdminActionResponse{
+			Success: false,
+			Error:   "Admin user not found",
+		}, nil
+	}
+
+	if !adminUser.IsAdmin() {
+		return &proto.AdminActionResponse{
+			Success: false,
+			Error:   "Insufficient privileges - admin access required",
+		}, nil
+	}
+
+	// Unlock the target user account
+	err = s.userSvc.UnlockUserAccount(ctx, req.TargetUsername)
+	if err != nil {
+		return &proto.AdminActionResponse{
+			Success: false,
+			Error:   fmt.Sprintf("Failed to unlock user account: %v", err),
+		}, nil
+	}
+
+	s.logger.Info("User account unlocked by admin", 
+		"admin_user", adminUser.Username,
+		"target_user", req.TargetUsername,
+	)
+
+	return &proto.AdminActionResponse{
+		Success: true,
+		Message: fmt.Sprintf("User account '%s' has been unlocked", req.TargetUsername),
+	}, nil
+}
+
+// DeleteUserAccount deletes a user account (admin only)
+func (s *Service) DeleteUserAccount(ctx context.Context, req *proto.AdminActionRequest) (*proto.AdminActionResponse, error) {
+	// Validate admin token
+	validateResp, err := s.ValidateToken(ctx, &proto.ValidateTokenRequest{
+		AccessToken: req.AdminToken,
+	})
+	if err != nil {
+		return &proto.AdminActionResponse{
+			Success: false,
+			Error:   "Failed to validate admin token",
+		}, err
+	}
+
+	if !validateResp.Valid {
+		return &proto.AdminActionResponse{
+			Success: false,
+			Error:   "Invalid admin token",
+		}, nil
+	}
+
+	// Check if user is admin
+	userIDInt, err := strconv.Atoi(validateResp.User.Id)
+	if err != nil {
+		return &proto.AdminActionResponse{
+			Success: false,
+			Error:   "Invalid admin user ID",
+		}, nil
+	}
+
+	adminUser, err := s.userSvc.GetUserByID(ctx, userIDInt)
+	if err != nil {
+		return &proto.AdminActionResponse{
+			Success: false,
+			Error:   "Admin user not found",
+		}, nil
+	}
+
+	if !adminUser.IsAdmin() {
+		return &proto.AdminActionResponse{
+			Success: false,
+			Error:   "Insufficient privileges - admin access required",
+		}, nil
+	}
+
+	// Delete the target user account
+	err = s.userSvc.DeleteUserAccount(ctx, req.TargetUsername)
+	if err != nil {
+		return &proto.AdminActionResponse{
+			Success: false,
+			Error:   fmt.Sprintf("Failed to delete user account: %v", err),
+		}, nil
+	}
+
+	s.logger.Info("User account deleted by admin", 
+		"admin_user", adminUser.Username,
+		"target_user", req.TargetUsername,
+	)
+
+	return &proto.AdminActionResponse{
+		Success: true,
+		Message: fmt.Sprintf("User account '%s' has been deleted", req.TargetUsername),
+	}, nil
+}
+
+// ResetUserPassword resets a user's password (admin only)
+func (s *Service) ResetUserPassword(ctx context.Context, req *proto.ResetPasswordAdminRequest) (*proto.AdminActionResponse, error) {
+	// Validate admin token
+	validateResp, err := s.ValidateToken(ctx, &proto.ValidateTokenRequest{
+		AccessToken: req.AdminToken,
+	})
+	if err != nil {
+		return &proto.AdminActionResponse{
+			Success: false,
+			Error:   "Failed to validate admin token",
+		}, err
+	}
+
+	if !validateResp.Valid {
+		return &proto.AdminActionResponse{
+			Success: false,
+			Error:   "Invalid admin token",
+		}, nil
+	}
+
+	// Check if user is admin
+	userIDInt, err := strconv.Atoi(validateResp.User.Id)
+	if err != nil {
+		return &proto.AdminActionResponse{
+			Success: false,
+			Error:   "Invalid admin user ID",
+		}, nil
+	}
+
+	adminUser, err := s.userSvc.GetUserByID(ctx, userIDInt)
+	if err != nil {
+		return &proto.AdminActionResponse{
+			Success: false,
+			Error:   "Admin user not found",
+		}, nil
+	}
+
+	if !adminUser.IsAdmin() {
+		return &proto.AdminActionResponse{
+			Success: false,
+			Error:   "Insufficient privileges - admin access required",
+		}, nil
+	}
+
+	// Reset the target user's password
+	err = s.userSvc.ResetUserPassword(ctx, req.TargetUsername, req.NewPassword)
+	if err != nil {
+		return &proto.AdminActionResponse{
+			Success: false,
+			Error:   fmt.Sprintf("Failed to reset user password: %v", err),
+		}, nil
+	}
+
+	s.logger.Info("User password reset by admin", 
+		"admin_user", adminUser.Username,
+		"target_user", req.TargetUsername,
+	)
+
+	return &proto.AdminActionResponse{
+		Success: true,
+		Message: fmt.Sprintf("Password for user '%s' has been reset", req.TargetUsername),
+	}, nil
+}
+
+// PromoteUserToAdmin promotes a user to admin status (admin only)
+func (s *Service) PromoteUserToAdmin(ctx context.Context, req *proto.AdminActionRequest) (*proto.AdminActionResponse, error) {
+	// Validate admin token
+	validateResp, err := s.ValidateToken(ctx, &proto.ValidateTokenRequest{
+		AccessToken: req.AdminToken,
+	})
+	if err != nil {
+		return &proto.AdminActionResponse{
+			Success: false,
+			Error:   "Failed to validate admin token",
+		}, err
+	}
+
+	if !validateResp.Valid {
+		return &proto.AdminActionResponse{
+			Success: false,
+			Error:   "Invalid admin token",
+		}, nil
+	}
+
+	// Check if user is admin
+	userIDInt, err := strconv.Atoi(validateResp.User.Id)
+	if err != nil {
+		return &proto.AdminActionResponse{
+			Success: false,
+			Error:   "Invalid admin user ID",
+		}, nil
+	}
+
+	adminUser, err := s.userSvc.GetUserByID(ctx, userIDInt)
+	if err != nil {
+		return &proto.AdminActionResponse{
+			Success: false,
+			Error:   "Admin user not found",
+		}, nil
+	}
+
+	if !adminUser.IsAdmin() {
+		return &proto.AdminActionResponse{
+			Success: false,
+			Error:   "Insufficient privileges - admin access required",
+		}, nil
+	}
+
+	// Promote the target user to admin
+	err = s.userSvc.PromoteUserToAdmin(ctx, req.TargetUsername)
+	if err != nil {
+		return &proto.AdminActionResponse{
+			Success: false,
+			Error:   fmt.Sprintf("Failed to promote user to admin: %v", err),
+		}, nil
+	}
+
+	s.logger.Info("User promoted to admin", 
+		"admin_user", adminUser.Username,
+		"target_user", req.TargetUsername,
+	)
+
+	return &proto.AdminActionResponse{
+		Success: true,
+		Message: fmt.Sprintf("User '%s' has been promoted to admin", req.TargetUsername),
+	}, nil
+}
+
+// GetServerStatistics returns server statistics (admin only)
+func (s *Service) GetServerStatistics(ctx context.Context, req *proto.ServerStatsRequest) (*proto.ServerStatsResponse, error) {
+	// Validate admin token
+	validateResp, err := s.ValidateToken(ctx, &proto.ValidateTokenRequest{
+		AccessToken: req.AdminToken,
+	})
+	if err != nil {
+		return &proto.ServerStatsResponse{
+			Success: false,
+			Error:   "Failed to validate admin token",
+		}, err
+	}
+
+	if !validateResp.Valid {
+		return &proto.ServerStatsResponse{
+			Success: false,
+			Error:   "Invalid admin token",
+		}, nil
+	}
+
+	// Check if user is admin
+	userIDInt, err := strconv.Atoi(validateResp.User.Id)
+	if err != nil {
+		return &proto.ServerStatsResponse{
+			Success: false,
+			Error:   "Invalid admin user ID",
+		}, nil
+	}
+
+	adminUser, err := s.userSvc.GetUserByID(ctx, userIDInt)
+	if err != nil {
+		return &proto.ServerStatsResponse{
+			Success: false,
+			Error:   "Admin user not found",
+		}, nil
+	}
+
+	if !adminUser.IsAdmin() {
+		return &proto.ServerStatsResponse{
+			Success: false,
+			Error:   "Insufficient privileges - admin access required",
+		}, nil
+	}
+
+	// Get server statistics
+	stats, err := s.userSvc.GetServerStatistics(ctx)
+	if err != nil {
+		return &proto.ServerStatsResponse{
+			Success: false,
+			Error:   fmt.Sprintf("Failed to get server statistics: %v", err),
+		}, nil
+	}
+
+	// Convert stats map to string values
+	stringStats := make(map[string]string)
+	for key, value := range stats {
+		stringStats[key] = fmt.Sprintf("%v", value)
+	}
+
+	return &proto.ServerStatsResponse{
+		Success: true,
+		Stats:   stringStats,
+	}, nil
+}
+
 // Private helper methods
 
 func (s *Service) generateTokens(user *user.User) (string, string, error) {

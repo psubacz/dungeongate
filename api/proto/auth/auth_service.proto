@@ -41,6 +41,23 @@ service AuthService {
   
   // Health check
   rpc Health(google.protobuf.Empty) returns (HealthResponse);
+  
+  // Admin Operations
+  
+  // UnlockUserAccount unlocks a user account (admin only)
+  rpc UnlockUserAccount(AdminActionRequest) returns (AdminActionResponse);
+  
+  // DeleteUserAccount deletes a user account (admin only)
+  rpc DeleteUserAccount(AdminActionRequest) returns (AdminActionResponse);
+  
+  // ResetUserPassword resets a user's password (admin only)
+  rpc ResetUserPassword(ResetPasswordAdminRequest) returns (AdminActionResponse);
+  
+  // PromoteUserToAdmin promotes a user to admin status (admin only)
+  rpc PromoteUserToAdmin(AdminActionRequest) returns (AdminActionResponse);
+  
+  // GetServerStatistics returns server statistics (admin only)
+  rpc GetServerStatistics(ServerStatsRequest) returns (ServerStatsResponse);
 }
 
 // RegisterRequest represents a user registration request
@@ -248,4 +265,38 @@ message TokenClaims {
   string issuer = 11;
   string audience = 12;
   map<string, string> metadata = 13;
+}
+
+// Admin API Messages
+
+// AdminActionRequest represents a generic admin action request
+message AdminActionRequest {
+  string admin_token = 1;
+  string target_username = 2;
+}
+
+// AdminActionResponse represents a generic admin action response
+message AdminActionResponse {
+  bool success = 1;
+  string error = 2;
+  string message = 3;
+}
+
+// ResetPasswordAdminRequest represents an admin password reset request
+message ResetPasswordAdminRequest {
+  string admin_token = 1;
+  string target_username = 2;
+  string new_password = 3;
+}
+
+// ServerStatsRequest represents a server statistics request
+message ServerStatsRequest {
+  string admin_token = 1;
+}
+
+// ServerStatsResponse represents a server statistics response
+message ServerStatsResponse {
+  bool success = 1;
+  string error = 2;
+  map<string, string> stats = 3;
 }
