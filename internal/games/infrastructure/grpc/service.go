@@ -626,7 +626,7 @@ func (s *GameServiceServer) convertDomainSessionToProto(session *domain.GameSess
 		ContainerId: processInfo.ContainerID,
 		PodName:     processInfo.PodName,
 	}
-	
+
 	// Handle optional fields
 	if processInfo.ExitCode != nil {
 		pbSession.ProcessInfo.ExitCode = int32(*processInfo.ExitCode)

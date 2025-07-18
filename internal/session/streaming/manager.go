@@ -298,7 +298,7 @@ func (m *Manager) GetStats(ctx context.Context) *StreamingStats {
 	// Calculate statistics
 	activeStreams := 0
 	activeSpectators := 0
-	
+
 	for _, session := range sessions {
 		if session.Status == gamev2.SessionStatus_SESSION_STATUS_ACTIVE {
 			activeStreams++
@@ -351,7 +351,7 @@ func parseSpectatorID(spectatorID string) []string {
 	// Simple split by "-spectator-"
 	parts := []string{}
 	spectatorIndex := -1
-	
+
 	// Find the last occurrence of "-spectator-"
 	for i := len(spectatorID) - 11; i >= 0; i-- {
 		if spectatorID[i:i+11] == "-spectator-" {
@@ -359,18 +359,18 @@ func parseSpectatorID(spectatorID string) []string {
 			break
 		}
 	}
-	
+
 	if spectatorIndex == -1 {
 		return parts
 	}
-	
+
 	// Extract parts
 	streamID := spectatorID[:spectatorIndex]
 	userID := spectatorID[spectatorIndex+11:]
-	
+
 	parts = append(parts, streamID)
 	parts = append(parts, "spectator")
 	parts = append(parts, userID)
-	
+
 	return parts
 }

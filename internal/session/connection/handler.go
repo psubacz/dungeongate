@@ -1335,8 +1335,9 @@ func (h *Handler) handleWatchMode(ctx context.Context, channel ssh.Channel, user
 		return nil
 	}
 
-	// Display available sessions
-	channel.Write([]byte("\r\n=== Active Sessions ===\r\n"))
+	// Clear screen and display available sessions
+	channel.Write([]byte("\033[2J\033[H"))
+	channel.Write([]byte("=== Active Sessions ===\r\n"))
 	for i, session := range availableSessions {
 		spectatorCount := len(session.Spectators)
 		channel.Write([]byte(fmt.Sprintf("%d. %s playing %s (%d spectators)\r\n",
@@ -1396,8 +1397,9 @@ func (h *Handler) startSpectating(ctx context.Context, channel ssh.Channel, user
 		return nil
 	}
 
-	// Show spectating banner
-	channel.Write([]byte(fmt.Sprintf("\r\n=== Spectating %s's game ===\r\n", session.Username)))
+	// Clear screen and show spectating banner
+	channel.Write([]byte("\033[2J\033[H"))
+	channel.Write([]byte(fmt.Sprintf("=== Spectating %s's game ===\r\n", session.Username)))
 	channel.Write([]byte("Press 'q' to quit spectating\r\n"))
 	channel.Write([]byte("Connecting to game stream...\r\n\r\n"))
 
