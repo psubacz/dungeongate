@@ -352,23 +352,33 @@ func (h *Handler) handleGameIOWithStream(ctx context.Context, channel ssh.Channe
 			resp, err := stream.Recv()
 			if err != nil {
 				h.logger.Debug("gRPC stream receive error", "error", err, "session_id", sessionID)
-				done <- err
+				// Check if this is EOF or context cancellation (normal game exit)
+				if err == io.EOF || strings.Contains(err.Error(), "context canceled") {
+					// Game ended normally - clear terminal and show message
+					channel.Write([]byte("\033[2J\033[H")) // Clear screen and move cursor to home
+					channel.Write([]byte("\r\n=== Game ended ===\r\n"))
+					channel.Write([]byte("Returning to main menu...\r\n\r\n"))
+					time.Sleep(2 * time.Second)
+					done <- io.EOF
+				} else {
+					done <- err
+				}
 				return
 			}
 
 			// Handle different response types
 			switch respType := resp.Response.(type) {
 			case *gamev2.GameIOResponse_Output:
-				fmt.Printf("DEBUG: Received %d bytes from game for session %s: %q\n", len(respType.Output.Data), sessionID, string(respType.Output.Data))
+				h.logger.Debug("Received bytes from game", "session_id", sessionID, "bytes", len(respType.Output.Data), "data", string(respType.Output.Data))
 				// Forward output to SSH channel
 				n, err := channel.Write(respType.Output.Data)
 				if err != nil {
-					fmt.Printf("DEBUG: Failed to write %d bytes to SSH channel for session %s: %v\n", len(respType.Output.Data), sessionID, err)
+					h.logger.Debug("Failed to write bytes to SSH channel", "session_id", sessionID, "bytes", len(respType.Output.Data), "error", err)
 					h.logger.Error("Failed to write to SSH channel", "error", err, "session_id", sessionID)
 					done <- err
 					return
 				} else {
-					fmt.Printf("DEBUG: Successfully wrote %d bytes to SSH channel for session %s\n", n, sessionID)
+					h.logger.Debug("Successfully wrote bytes to SSH channel", "session_id", sessionID, "bytes_written", n)
 				}
 
 			case *gamev2.GameIOResponse_Event:
@@ -1463,8 +1473,14 @@ func (h *Handler) handleSpectatingStream(ctx context.Context, stream gamev2.Game
 		for {
 			resp, err := stream.Recv()
 			if err != nil {
-				if err == io.EOF {
+				if err == io.EOF || strings.Contains(err.Error(), "context canceled") {
 					h.logger.Info("Game stream closed", "session_id", session.Id)
+					// Game ended - clear terminal and show message for spectators
+					channel.Write([]byte("\033[2J\033[H")) // Clear screen and move cursor to home
+					channel.Write([]byte("\r\n=== Game ended ===\r\n"))
+					channel.Write([]byte("The game you were spectating has ended.\r\n"))
+					channel.Write([]byte("Returning to main menu...\r\n\r\n"))
+					time.Sleep(2 * time.Second)
 					return
 				}
 				h.logger.Error("Failed to receive from game stream", "error", err)
@@ -1492,10 +1508,20 @@ func (h *Handler) handleSpectatingStream(ctx context.Context, stream gamev2.Game
 				// Handle game events
 				switch response.Event.Type {
 				case gamev2.PTYEventType_PTY_EVENT_PROCESS_EXIT:
-					channel.Write([]byte("\r\n=== Game session ended ===\r\n"))
+					// Clear terminal and show clean message for spectators
+					channel.Write([]byte("\033[2J\033[H")) // Clear screen and move cursor to home
+					channel.Write([]byte("\r\n=== Game ended ===\r\n"))
+					channel.Write([]byte("The game you were spectating has ended.\r\n"))
+					channel.Write([]byte("Returning to main menu...\r\n\r\n"))
+					time.Sleep(2 * time.Second)
 					return
 				case gamev2.PTYEventType_PTY_EVENT_SESSION_TERMINATED:
+					// Clear terminal and show clean message for spectators
+					channel.Write([]byte("\033[2J\033[H")) // Clear screen and move cursor to home
 					channel.Write([]byte("\r\n=== Session terminated ===\r\n"))
+					channel.Write([]byte("The session you were spectating has been terminated.\r\n"))
+					channel.Write([]byte("Returning to main menu...\r\n\r\n"))
+					time.Sleep(2 * time.Second)
 					return
 				}
 

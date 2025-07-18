@@ -100,7 +100,7 @@ func (mh *MenuHandler) handleInvalidInput(channel ssh.Channel, errorMsg, banner 
 func (mh *MenuHandler) ShowAnonymousMenu(ctx context.Context, channel ssh.Channel, username string) (*MenuChoice, error) {
 	// Create input validator for anonymous menu
 	validator := &InputValidator{
-		ValidOptions: []string{"[L]ogin", "[R]egister", "[C]redits", "[Q]uit"},
+		ValidOptions: []string{"[L]ogin", "[R]egister", "[W]atch", "[C]redits", "[Q]uit"},
 		MenuName:     "Anonymous Menu",
 	}
 
@@ -149,6 +149,8 @@ func (mh *MenuHandler) ShowAnonymousMenu(ctx context.Context, channel ssh.Channe
 				return &MenuChoice{Action: "login", Value: ""}, nil
 			case "r":
 				return &MenuChoice{Action: "register", Value: ""}, nil
+			case "w":
+				return &MenuChoice{Action: "watch", Value: ""}, nil
 			case "c":
 				return &MenuChoice{Action: "credit", Value: ""}, nil
 			case "q":
