@@ -39,15 +39,14 @@ The session service is the main entry point for users, handling SSH connections 
 
 **Key Components:**
 - **SSH Server**: Full SSH-2.0 protocol implementation
-- **PTY Manager**: Pseudo-terminal allocation and management
-- **Session Manager**: Game session lifecycle and state management
-- **Spectating System**: Real-time terminal streaming with immutable data patterns
+- **Connection Handler**: Manages SSH connections and user sessions
+- **Game Client**: gRPC client for Game Service integration
+- **Menu System**: User interface for game selection and spectating
 
 **Architecture Patterns:**
-- **Immutable Data Sharing**: Lock-free concurrent programming for spectator management
-- **Atomic Operations**: `atomic.Pointer[T]` for thread-safe registry updates
-- **Stream Processing**: Buffered channel-based frame distribution
-- **Copy-on-Write**: Efficient memory usage for spectator lists
+- **Stateless Design**: Horizontally scalable connection handling
+- **gRPC Integration**: Service-to-service communication with Game Service
+- **Input Filtering**: Spectator input filtering at the session layer
 
 ### User Service (Implemented)
 
@@ -79,40 +78,54 @@ Centralized authentication and authorization service providing gRPC-based authen
 
 ### Game Service (Implemented)
 
-Stateful, scalable game backend extracted from the Session Service in phases 1-4. The Game Service runs inside containers/pods and scales independently to handle multiple concurrent games.
+Stateful, scalable game backend that manages game sessions, PTY processes, and the spectating system. The Game Service runs inside containers/pods and scales independently to handle multiple concurrent games.
 
 **Key Features:**
-- Multi-game pod management (multiple games per pod)
-- World state synchronization across pods (NetHack bones files, shared levels)
-- User data management accessible from any pod
-- Load balancing and session routing
-- Cross-pod event streaming and state consistency
-- Real-time game process management
+- **PTY Management**: Pseudo-terminal allocation and game process management
+- **Broadcast System**: Race-free output distribution to multiple connections
+- **Spectating System**: Real-time terminal streaming with immutable data patterns
+- **gRPC Streaming**: Unified streaming endpoint for players and spectators
+- **Session Management**: Game session lifecycle and state management
+- **Multi-game Support**: Multiple game types with adapter pattern
 
 **Architecture Patterns:**
-- **Stateful Microservice**: Runs inside pods with horizontal scaling capability
-- **Shared World State**: Cross-pod synchronization of game world data
-- **Load Balancing**: Session service routes to available pods based on capacity
-- **Event-Driven Sync**: Real-time synchronization of bones files and save data
-- **Pod-Aware Design**: Games can run on any pod in the cluster
+- **Broadcast Architecture**: Eliminates race conditions between player and spectator connections
+- **Subscription System**: Dedicated channels for each connection
+- **Immutable Data Sharing**: Lock-free concurrent programming for spectator management
+- **Atomic Operations**: `atomic.Pointer[T]` for thread-safe registry updates
+- **Stream Processing**: Buffered channel-based frame distribution
+- **Copy-on-Write**: Efficient memory usage for spectator lists
 
 **Service Integration:**
-The Session Service integrates with the Game Service cluster through load balancing and service discovery:
+The Session Service integrates with the Game Service through gRPC streaming:
 
 ```go
-type gameClientAdapter struct {
-    loadBalancer *LoadBalancer
-    podRegistry  *PodRegistry
+// Session Service connects to Game Service for both players and spectators
+func (h *Handler) handleGameIO(ctx context.Context, sessionID string) {
+    // Start game session
+    gameSession, err := h.gameClient.StartGameSession(ctx, req)
+    
+    // Connect to streaming endpoint (same for players and spectators)
+    stream, err := h.gameClient.StreamGameIO(ctx)
+    
+    // Handle bidirectional streaming
+    go h.handleStreamIO(stream, channel)
 }
 
-// Session Service routes to available pods
-func (a *gameClientAdapter) StartGame(ctx context.Context, req *StartGameRequest) (*StartGameResponse, error) {
-    pod := a.loadBalancer.SelectPod(req.GameType, req.ResourceRequirements)
-    return pod.StartGame(ctx, req)
+// Spectator connections use the same streaming infrastructure
+func (h *Handler) startSpectating(ctx context.Context, sessionID string) {
+    // Add spectator to session
+    h.gameClient.AddSpectator(ctx, sessionID, userID, username)
+    
+    // Connect to same streaming endpoint
+    stream, err := h.gameClient.StreamGameIO(ctx)
+    
+    // Input is filtered at session service level
+    go h.handleSpectatingStream(stream, channel)
 }
 ```
 
-This design enables horizontal scaling while maintaining clean separation of concerns and ensuring world state consistency across pods.
+This unified approach eliminates race conditions and ensures consistent streaming for both players and spectators.
 
 For detailed Game Service documentation, see [game-service.md](./game-service.md).
 

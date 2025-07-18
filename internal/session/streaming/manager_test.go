@@ -13,7 +13,7 @@ import (
 func TestNewManager(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
 
-	manager := NewManager(logger)
+	manager := NewManager(logger, nil)
 
 	assert.NotNil(t, manager)
 	assert.Equal(t, logger, manager.logger)
@@ -21,7 +21,7 @@ func TestNewManager(t *testing.T) {
 
 func TestManager_Start(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
-	manager := NewManager(logger)
+	manager := NewManager(logger, nil)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
@@ -33,7 +33,7 @@ func TestManager_Start(t *testing.T) {
 
 func TestManager_Stop(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
-	manager := NewManager(logger)
+	manager := NewManager(logger, nil)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
@@ -45,7 +45,7 @@ func TestManager_Stop(t *testing.T) {
 
 func TestManager_StartStop(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
-	manager := NewManager(logger)
+	manager := NewManager(logger, nil)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
@@ -61,7 +61,7 @@ func TestManager_StartStop(t *testing.T) {
 
 func TestManager_ContextCancellation(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
-	manager := NewManager(logger)
+	manager := NewManager(logger, nil)
 
 	// Create a context that is already cancelled
 	ctx, cancel := context.WithCancel(context.Background())
@@ -116,7 +116,7 @@ func TestSpectator_Creation(t *testing.T) {
 // Test concurrent operations
 func TestManager_ConcurrentOperations(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
-	manager := NewManager(logger)
+	manager := NewManager(logger, nil)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
@@ -144,7 +144,7 @@ func TestManager_ConcurrentOperations(t *testing.T) {
 // Test that manager truly is stateless
 func TestManager_Stateless(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
-	manager := NewManager(logger)
+	manager := NewManager(logger, nil)
 
 	// Since the manager is stateless, we can call start and stop multiple times
 	// without any issues
@@ -162,7 +162,7 @@ func TestManager_Stateless(t *testing.T) {
 // Test with different contexts
 func TestManager_DifferentContexts(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
-	manager := NewManager(logger)
+	manager := NewManager(logger, nil)
 
 	// Test with background context
 	err := manager.Start(context.Background())
@@ -193,7 +193,7 @@ func TestManager_DifferentContexts(t *testing.T) {
 // Benchmark tests
 func BenchmarkManager_Start(b *testing.B) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
-	manager := NewManager(logger)
+	manager := NewManager(logger, nil)
 	ctx := context.Background()
 
 	b.ResetTimer()
@@ -204,7 +204,7 @@ func BenchmarkManager_Start(b *testing.B) {
 
 func BenchmarkManager_Stop(b *testing.B) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
-	manager := NewManager(logger)
+	manager := NewManager(logger, nil)
 	ctx := context.Background()
 
 	b.ResetTimer()
@@ -215,7 +215,7 @@ func BenchmarkManager_Stop(b *testing.B) {
 
 func BenchmarkManager_StartStop(b *testing.B) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
-	manager := NewManager(logger)
+	manager := NewManager(logger, nil)
 	ctx := context.Background()
 
 	b.ResetTimer()
@@ -228,7 +228,7 @@ func BenchmarkManager_StartStop(b *testing.B) {
 // Test edge cases
 func TestManager_NilLogger(t *testing.T) {
 	// Test that manager can handle nil logger gracefully
-	manager := NewManager(nil)
+	manager := NewManager(nil, nil)
 	assert.NotNil(t, manager)
 	assert.Nil(t, manager.logger)
 
@@ -266,7 +266,7 @@ func TestSpectator_DefaultValues(t *testing.T) {
 // Test with realistic scenarios
 func TestManager_RealisticScenario(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
-	manager := NewManager(logger)
+	manager := NewManager(logger, nil)
 
 	// Scenario: Starting streaming manager during service startup
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -293,9 +293,9 @@ func TestManager_MultipleInstances(t *testing.T) {
 	// Test that multiple manager instances can coexist (stateless design)
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
 
-	manager1 := NewManager(logger)
-	manager2 := NewManager(logger)
-	manager3 := NewManager(logger)
+	manager1 := NewManager(logger, nil)
+	manager2 := NewManager(logger, nil)
+	manager3 := NewManager(logger, nil)
 
 	ctx := context.Background()
 

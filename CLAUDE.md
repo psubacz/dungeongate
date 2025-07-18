@@ -81,7 +81,7 @@ Protocol Buffers with versioned APIs:
 - Centralized auth service with JWT tokens
 - User registration and authentication flows
 - PTY bridging and terminal recording (ttyrec)
-- Spectating system for watching games
+- **Broadcast Spectating System**: Race-free spectating with dedicated channels per connection
 - Database abstraction with dual-mode support (SQLite/PostgreSQL)
 - gRPC communication between services
 - Comprehensive configuration management
@@ -153,6 +153,28 @@ The project supports dual-mode database operation:
 - **Auth Service**: Uses Auth API v1 for authentication operations
 - **Game Service**: Uses Games API v2 for game management and session orchestration
 - **Session Service**: Consumer of both Auth v1 and Games v2 APIs
+
+## Spectating System Architecture
+
+### Broadcast System
+The spectating system uses a **broadcast architecture** that eliminates race conditions between player and spectator connections:
+
+- **PTY Output Broadcast**: Each PTY output is broadcast to all connected subscribers
+- **Dedicated Channels**: Each connection (player or spectator) gets its own output channel
+- **Subscription System**: Unique subscription IDs for automatic cleanup
+- **Race-Free Design**: Eliminates every-other-frame skipping issues
+
+### Key Components
+- **PTY Manager**: Handles broadcast to multiple subscribers (`internal/games/infrastructure/pty/manager.go`)
+- **Stream Manager**: Manages spectator-specific features with internal registry (`internal/games/types.go`)
+- **gRPC Streaming**: Unified streaming endpoint for both players and spectators (`internal/games/infrastructure/grpc/streaming.go`)
+- **Session Service**: Handles spectator registration and input filtering (`internal/session/connection/handler.go`)
+
+### Connection Flow
+1. **Player**: Starts session → connects to StreamGameIO → gets dedicated channel
+2. **Spectator**: Added via AddSpectator → connects to StreamGameIO → gets dedicated channel
+3. **Broadcast**: PTY output sent to all subscribed channels simultaneously
+4. **Input**: Player input forwarded to game, spectator input filtered at session service level
 
 ## Testing the Platform
 

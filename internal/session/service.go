@@ -62,7 +62,7 @@ func New(cfg *Config, logger *slog.Logger, metricsRegistry *metrics.Registry) (*
 
 	// Initialize core components
 	connectionManager := connection.NewManager(cfg.MaxConnections, logger)
-	streamingManager := streaming.NewManager(logger)
+	streamingManager := streaming.NewManager(logger, gameClient)
 
 	// Initialize servers
 	sshConfig := &server.SSHConfig{
@@ -217,6 +217,6 @@ func (s *Service) Health() map[string]interface{} {
 	return map[string]interface{}{
 		"status":      "healthy",
 		"connections": s.connectionManager.GetStats(),
-		"streaming":   s.streamingManager.GetStats(),
+		"streaming":   s.streamingManager.GetStats(s.ctx),
 	}
 }

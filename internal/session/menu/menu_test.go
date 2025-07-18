@@ -2,6 +2,7 @@ package menu
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log/slog"
 	"os"
@@ -11,8 +12,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/dungeongate/internal/session/banner"
+	authv1 "github.com/dungeongate/pkg/api/auth/v1"
 	gamev2 "github.com/dungeongate/pkg/api/games/v2"
 )
 
@@ -437,6 +440,239 @@ func BenchmarkShowAnonymousMenu(b *testing.B) {
 		handler.ShowAnonymousMenu(ctx, channel, "user")
 		cancel()
 	}
+}
+
+func TestBuildSpectateMenuBanner(t *testing.T) {
+	bannerConfig := &banner.BannerConfig{}
+	bannerManager := banner.NewBannerManager(bannerConfig)
+	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
+
+	handler := NewMenuHandler(bannerManager, nil, nil, logger)
+
+	// Create mock sessions for testing
+	now := time.Now()
+	sessions := []*gamev2.GameSession{
+		{
+			Id:           "session1",
+			Username:     "dorkfish",
+			GameId:       "nethack",
+			TerminalSize: &gamev2.TerminalSize{Width: 120, Height: 30},
+			StartTime:    timestamppb.New(now.Add(-10 * time.Minute)),
+			LastActivity: timestamppb.New(now.Add(-5 * time.Second)),
+			Spectators:   []*gamev2.SpectatorInfo{},
+		},
+		{
+			Id:           "session2",
+			Username:     "GhostTown",
+			GameId:       "nethack",
+			TerminalSize: &gamev2.TerminalSize{Width: 209, Height: 46},
+			StartTime:    timestamppb.New(now.Add(-40 * time.Minute)),
+			LastActivity: timestamppb.New(now.Add(-4*time.Minute - 16*time.Second)),
+			Spectators:   []*gamev2.SpectatorInfo{},
+		},
+	}
+
+	banner := handler.buildSpectateMenuBanner(sessions)
+
+	// Verify banner contains expected elements
+	assert.Contains(t, banner, "The following games are in progress:")
+	assert.Contains(t, banner, "Username         Game    Size    Start date & time    Idle time   Watchers")
+	assert.Contains(t, banner, "a) dorkfish")
+	assert.Contains(t, banner, "NH370")
+	assert.Contains(t, banner, "120x30")
+	assert.Contains(t, banner, "b) GhostTown")
+	assert.Contains(t, banner, "209x46")
+	assert.Contains(t, banner, "4m 16s") // Idle time for second session
+	assert.Contains(t, banner, "(1-2 of 2)")
+	assert.Contains(t, banner, "Spectate which game? ('?' for help) =>")
+}
+
+func TestFormatGameDisplay(t *testing.T) {
+	bannerConfig := &banner.BannerConfig{}
+	bannerManager := banner.NewBannerManager(bannerConfig)
+	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
+
+	handler := NewMenuHandler(bannerManager, nil, nil, logger)
+
+	testCases := []struct {
+		gameID   string
+		expected string
+	}{
+		{"nethack", "NH370"},
+		{"NETHACK", "NH370"},
+		{"dcss", "DCSS"},
+		{"crawl", "DCSS"},
+		{"angband", "ANG"},
+		{"tome", "TOME"},
+		{"unknown", "UNKNO"},
+		{"long_game_name", "LONG_"},
+		{"short", "SHORT"},
+	}
+
+	for _, tc := range testCases {
+		t.Run("gameID_"+tc.gameID, func(t *testing.T) {
+			result := handler.formatGameDisplay(tc.gameID)
+			assert.Equal(t, tc.expected, result)
+		})
+	}
+}
+
+func TestCalculateIdleTime(t *testing.T) {
+	bannerConfig := &banner.BannerConfig{}
+	bannerManager := banner.NewBannerManager(bannerConfig)
+	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
+
+	handler := NewMenuHandler(bannerManager, nil, nil, logger)
+
+	now := time.Now()
+	testCases := []struct {
+		name         string
+		lastActivity *timestamppb.Timestamp
+		expected     string
+	}{
+		{"no_activity", nil, ""},
+		{"recent_activity", timestamppb.New(now.Add(-10 * time.Second)), ""},
+		{"one_minute", timestamppb.New(now.Add(-1 * time.Minute)), "1m"},
+		{"one_minute_30_seconds", timestamppb.New(now.Add(-90 * time.Second)), "1m 30s"},
+		{"five_minutes", timestamppb.New(now.Add(-5 * time.Minute)), "5m"},
+		{"one_hour", timestamppb.New(now.Add(-1 * time.Hour)), "1h"},
+		{"one_hour_30_minutes", timestamppb.New(now.Add(-90 * time.Minute)), "1h 30m"},
+		{"45_seconds", timestamppb.New(now.Add(-45 * time.Second)), "45s"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			session := &gamev2.GameSession{
+				LastActivity: tc.lastActivity,
+			}
+			result := handler.calculateIdleTime(session)
+			assert.Equal(t, tc.expected, result)
+		})
+	}
+}
+
+func TestHasIdleTimeUpdates(t *testing.T) {
+	bannerConfig := &banner.BannerConfig{}
+	bannerManager := banner.NewBannerManager(bannerConfig)
+	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
+
+	handler := NewMenuHandler(bannerManager, nil, nil, logger)
+
+	now := time.Now()
+	testCases := []struct {
+		name     string
+		sessions []*gamev2.GameSession
+		expected bool
+	}{
+		{
+			name:     "no_sessions",
+			sessions: []*gamev2.GameSession{},
+			expected: false,
+		},
+		{
+			name: "recent_activity_only",
+			sessions: []*gamev2.GameSession{
+				{LastActivity: timestamppb.New(now.Add(-10 * time.Second))},
+			},
+			expected: false,
+		},
+		{
+			name: "has_idle_time",
+			sessions: []*gamev2.GameSession{
+				{LastActivity: timestamppb.New(now.Add(-2 * time.Minute))},
+			},
+			expected: true,
+		},
+		{
+			name: "mixed_activity",
+			sessions: []*gamev2.GameSession{
+				{LastActivity: timestamppb.New(now.Add(-10 * time.Second))},
+				{LastActivity: timestamppb.New(now.Add(-3 * time.Minute))},
+			},
+			expected: true,
+		},
+		{
+			name: "nil_activity",
+			sessions: []*gamev2.GameSession{
+				{LastActivity: nil},
+			},
+			expected: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := handler.hasIdleTimeUpdates(tc.sessions)
+			assert.Equal(t, tc.expected, result)
+		})
+	}
+}
+
+func TestFilterUserSessions(t *testing.T) {
+	bannerConfig := &banner.BannerConfig{}
+	bannerManager := banner.NewBannerManager(bannerConfig)
+	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
+
+	handler := NewMenuHandler(bannerManager, nil, nil, logger)
+
+	sessions := []*gamev2.GameSession{
+		{Id: "session1", UserId: 1, Username: "user1"},
+		{Id: "session2", UserId: 2, Username: "user2"},
+		{Id: "session3", UserId: 1, Username: "user1"},
+		{Id: "session4", UserId: 3, Username: "user3"},
+	}
+
+	// Test with anonymous user (should return all sessions)
+	result := handler.filterUserSessions(sessions, nil)
+	assert.Len(t, result, 4)
+
+	// Test with authenticated user (should filter out their own sessions)
+	user := &authv1.User{Id: "1", Username: "user1"}
+	result = handler.filterUserSessions(sessions, user)
+	assert.Len(t, result, 2)
+	assert.Equal(t, "session2", result[0].Id)
+	assert.Equal(t, "session4", result[1].Id)
+
+	// Test with user who has no sessions
+	user = &authv1.User{Id: "99", Username: "user99"}
+	result = handler.filterUserSessions(sessions, user)
+	assert.Len(t, result, 4)
+}
+
+func TestBuildSpectateMenuBannerWithManySessions(t *testing.T) {
+	bannerConfig := &banner.BannerConfig{}
+	bannerManager := banner.NewBannerManager(bannerConfig)
+	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
+
+	handler := NewMenuHandler(bannerManager, nil, nil, logger)
+
+	// Create 30 sessions to test a-z and A-Z lettering
+	sessions := make([]*gamev2.GameSession, 30)
+	now := time.Now()
+	for i := 0; i < 30; i++ {
+		sessions[i] = &gamev2.GameSession{
+			Id:           fmt.Sprintf("session%d", i+1),
+			Username:     fmt.Sprintf("user%d", i+1),
+			GameId:       "nethack",
+			TerminalSize: &gamev2.TerminalSize{Width: 80, Height: 24},
+			StartTime:    timestamppb.New(now.Add(-10 * time.Minute)),
+			LastActivity: timestamppb.New(now.Add(-5 * time.Second)),
+			Spectators:   []*gamev2.SpectatorInfo{},
+		}
+	}
+
+	banner := handler.buildSpectateMenuBanner(sessions)
+
+	// Verify it uses a-z for first 26 sessions
+	assert.Contains(t, banner, "a) user1")
+	assert.Contains(t, banner, "z) user26")
+	
+	// Verify it uses A-Z for sessions 27+
+	assert.Contains(t, banner, "A) user27")
+	assert.Contains(t, banner, "D) user30")
+	
+	// Verify pagination info
+	assert.Contains(t, banner, "(1-30 of 30)")
 }
 
 func BenchmarkBuildGameSelectionBanner(b *testing.B) {

@@ -2,6 +2,7 @@ package games
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -147,24 +148,70 @@ type StreamManager struct {
 	recentFramesLock sync.RWMutex
 	bufferSize       int
 	bufferIndex      int
+
+	// Full screen state buffer sized to terminal dimensions
+	screenBuffer     [][]byte // [row][col] - 2D array representing the screen
+	screenBufferLock sync.RWMutex
+	terminalRows     int
+	terminalCols     int
+	
+	// Internal spectator registry
+	registry *atomic.Pointer[SpectatorRegistry]
 }
 
 // NewStreamManager creates a new stream manager for a session
 func NewStreamManager() *StreamManager {
-	const defaultBufferSize = 20 // Keep last 20 frames
+	const defaultBufferSize = 100 // Keep last 100 frames to provide better context for new spectators
+	registry := &atomic.Pointer[SpectatorRegistry]{}
+	registry.Store(NewSpectatorRegistry())
+	
 	return &StreamManager{
 		frameChannel: make(chan *StreamFrame, 1000), // Buffered channel for frames
 		stopChan:     make(chan struct{}),
 		bufferSize:   defaultBufferSize,
 		recentFrames: make([]*StreamFrame, defaultBufferSize),
 		bufferIndex:  0,
+		terminalRows: 24, // Default terminal size
+		terminalCols: 80,
+		screenBuffer: make([][]byte, 24), // Initialize with default size
+		registry:     registry,
+	}
+}
+
+// NewStreamManagerWithSize creates a new stream manager with specific terminal dimensions
+func NewStreamManagerWithSize(rows, cols int) *StreamManager {
+	const defaultBufferSize = 100 // Keep last 100 frames to provide better context for new spectators
+	
+	// Initialize screen buffer with terminal dimensions
+	screenBuffer := make([][]byte, rows)
+	for i := range screenBuffer {
+		screenBuffer[i] = make([]byte, cols)
+		// Initialize with spaces
+		for j := range screenBuffer[i] {
+			screenBuffer[i][j] = ' '
+		}
+	}
+	
+	registry := &atomic.Pointer[SpectatorRegistry]{}
+	registry.Store(NewSpectatorRegistry())
+	
+	return &StreamManager{
+		frameChannel: make(chan *StreamFrame, 1000), // Buffered channel for frames
+		stopChan:     make(chan struct{}),
+		bufferSize:   defaultBufferSize,
+		recentFrames: make([]*StreamFrame, defaultBufferSize),
+		bufferIndex:  0,
+		terminalRows: rows,
+		terminalCols: cols,
+		screenBuffer: screenBuffer,
+		registry:     registry,
 	}
 }
 
 // Start begins the streaming process
-func (sm *StreamManager) Start(registry *atomic.Pointer[SpectatorRegistry]) {
+func (sm *StreamManager) Start() {
 	sm.wg.Add(1)
-	go sm.streamLoop(registry)
+	go sm.streamLoop(sm.registry)
 }
 
 // Stop gracefully stops the streaming process
@@ -173,23 +220,52 @@ func (sm *StreamManager) Stop() {
 	sm.wg.Wait()
 }
 
+// AddSpectator adds a spectator to the stream
+func (sm *StreamManager) AddSpectator(spectator *Spectator) {
+	currentRegistry := sm.registry.Load()
+	newRegistry := currentRegistry.AddSpectator(spectator)
+	sm.registry.Store(newRegistry)
+}
+
+// RemoveSpectator removes a spectator from the stream
+func (sm *StreamManager) RemoveSpectator(userID int, username string) {
+	currentRegistry := sm.registry.Load()
+	newRegistry := currentRegistry.RemoveSpectator(userID, username)
+	sm.registry.Store(newRegistry)
+}
+
 // SendFrame sends an immutable frame to all spectators
 func (sm *StreamManager) SendFrame(data []byte) {
 	if len(data) == 0 {
 		return
 	}
 
+	// Update the screen buffer with the new data
+	sm.UpdateScreenBuffer(data)
+
 	frameID := sm.frameID.Add(1)
 	frame := NewStreamFrame(data, frameID)
 
+	// Store frame in circular buffer immediately (for spectators joining later)
+	sm.storeFrameInBuffer(frame)
+
+	// Also queue for active spectators (non-blocking)
 	select {
 	case sm.frameChannel <- frame:
-		// Frame queued successfully
+		// Frame queued successfully for active spectators
 	default:
-		// Channel full, drop frame (prevents blocking)
-		// Note: would need to import log package for this
-		// log.Printf("Warning: Dropped frame %d due to full buffer", frameID)
+		// Channel full, but frame is still stored in buffer for new spectators
+		// This prevents blocking the player's output
 	}
+}
+
+// storeFrameInBuffer stores a frame directly in the circular buffer
+func (sm *StreamManager) storeFrameInBuffer(frame *StreamFrame) {
+	sm.recentFramesLock.Lock()
+	defer sm.recentFramesLock.Unlock()
+	
+	sm.recentFrames[sm.bufferIndex] = frame
+	sm.bufferIndex = (sm.bufferIndex + 1) % sm.bufferSize
 }
 
 // GetRecentFrames returns the recent frames from the circular buffer
@@ -212,6 +288,60 @@ func (sm *StreamManager) GetRecentFrames() []*StreamFrame {
 	return frames
 }
 
+// ClearRecentFrames clears the recent frames buffer
+func (sm *StreamManager) ClearRecentFrames() {
+	sm.recentFramesLock.Lock()
+	defer sm.recentFramesLock.Unlock()
+
+	// Clear all frames
+	for i := range sm.recentFrames {
+		sm.recentFrames[i] = nil
+	}
+	sm.bufferIndex = 0
+}
+
+// GetFullScreen returns the complete screen state as a single byte slice
+func (sm *StreamManager) GetFullScreen() []byte {
+	sm.screenBufferLock.RLock()
+	defer sm.screenBufferLock.RUnlock()
+
+	// For now, return empty - we'll rely on the redraw command to get current state
+	// This avoids the complexity of terminal emulation while still providing the interface
+	return []byte{}
+}
+
+// UpdateScreenBuffer processes terminal escape sequences and updates the screen buffer
+func (sm *StreamManager) UpdateScreenBuffer(data []byte) {
+	sm.screenBufferLock.Lock()
+	defer sm.screenBufferLock.Unlock()
+
+	// For spectating, we want to preserve the current screen state
+	// Only clear the buffer when we see explicit clear screen commands
+	// This helps maintain visual continuity for spectators
+	
+	dataStr := string(data)
+	
+	// Check for explicit clear screen escape sequences
+	if strings.Contains(dataStr, "\x1b[2J") {
+		// Clear screen command - reset our buffer
+		for row := 0; row < sm.terminalRows; row++ {
+			for col := 0; col < sm.terminalCols; col++ {
+				sm.screenBuffer[row][col] = ' '
+			}
+		}
+		return
+	}
+	
+	// Don't clear buffer on cursor home alone - this happens frequently in games
+	// like NetHack for normal screen updates without full clears
+	// Only clear when we see an explicit clear screen sequence
+	
+	// For now, don't try to parse complex escape sequences for position updates
+	// Just let the raw data through - the terminal emulator on the spectator side
+	// will handle the rendering. We preserve the recent frames which contain
+	// the actual screen state that spectators need.
+}
+
 // streamLoop processes frames and distributes them to spectators
 func (sm *StreamManager) streamLoop(registry *atomic.Pointer[SpectatorRegistry]) {
 	defer sm.wg.Done()
@@ -228,11 +358,7 @@ func (sm *StreamManager) streamLoop(registry *atomic.Pointer[SpectatorRegistry])
 
 // distributeFrame sends a frame to all active spectators
 func (sm *StreamManager) distributeFrame(frame *StreamFrame, registry *atomic.Pointer[SpectatorRegistry]) {
-	// Store frame in circular buffer
-	sm.recentFramesLock.Lock()
-	sm.recentFrames[sm.bufferIndex] = frame
-	sm.bufferIndex = (sm.bufferIndex + 1) % sm.bufferSize
-	sm.recentFramesLock.Unlock()
+	// Frame is already stored in buffer by SendFrame method, so no need to store again
 
 	// Load current immutable registry
 	currentRegistry := registry.Load()

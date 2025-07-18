@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.5.1
 // - protoc             v5.29.3
-// source: games/game_service_v2.proto
+// source: api/proto/games/game_service_v2.proto
 
 package v2
 
@@ -35,6 +35,8 @@ const (
 	GameService_ListSaves_FullMethodName        = "/dungeongate.games.v2.GameService/ListSaves"
 	GameService_StreamGameIO_FullMethodName     = "/dungeongate.games.v2.GameService/StreamGameIO"
 	GameService_ResizeTerminal_FullMethodName   = "/dungeongate.games.v2.GameService/ResizeTerminal"
+	GameService_AddSpectator_FullMethodName     = "/dungeongate.games.v2.GameService/AddSpectator"
+	GameService_RemoveSpectator_FullMethodName  = "/dungeongate.games.v2.GameService/RemoveSpectator"
 	GameService_Health_FullMethodName           = "/dungeongate.games.v2.GameService/Health"
 )
 
@@ -63,6 +65,9 @@ type GameServiceClient interface {
 	// PTY streaming for terminal I/O
 	StreamGameIO(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[GameIORequest, GameIOResponse], error)
 	ResizeTerminal(ctx context.Context, in *ResizeTerminalRequest, opts ...grpc.CallOption) (*ResizeTerminalResponse, error)
+	// Spectator management
+	AddSpectator(ctx context.Context, in *AddSpectatorRequest, opts ...grpc.CallOption) (*AddSpectatorResponse, error)
+	RemoveSpectator(ctx context.Context, in *RemoveSpectatorRequest, opts ...grpc.CallOption) (*RemoveSpectatorResponse, error)
 	// Health check
 	Health(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*HealthResponse, error)
 }
@@ -228,6 +233,26 @@ func (c *gameServiceClient) ResizeTerminal(ctx context.Context, in *ResizeTermin
 	return out, nil
 }
 
+func (c *gameServiceClient) AddSpectator(ctx context.Context, in *AddSpectatorRequest, opts ...grpc.CallOption) (*AddSpectatorResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AddSpectatorResponse)
+	err := c.cc.Invoke(ctx, GameService_AddSpectator_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gameServiceClient) RemoveSpectator(ctx context.Context, in *RemoveSpectatorRequest, opts ...grpc.CallOption) (*RemoveSpectatorResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RemoveSpectatorResponse)
+	err := c.cc.Invoke(ctx, GameService_RemoveSpectator_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *gameServiceClient) Health(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*HealthResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(HealthResponse)
@@ -263,6 +288,9 @@ type GameServiceServer interface {
 	// PTY streaming for terminal I/O
 	StreamGameIO(grpc.BidiStreamingServer[GameIORequest, GameIOResponse]) error
 	ResizeTerminal(context.Context, *ResizeTerminalRequest) (*ResizeTerminalResponse, error)
+	// Spectator management
+	AddSpectator(context.Context, *AddSpectatorRequest) (*AddSpectatorResponse, error)
+	RemoveSpectator(context.Context, *RemoveSpectatorRequest) (*RemoveSpectatorResponse, error)
 	// Health check
 	Health(context.Context, *emptypb.Empty) (*HealthResponse, error)
 	mustEmbedUnimplementedGameServiceServer()
@@ -319,6 +347,12 @@ func (UnimplementedGameServiceServer) StreamGameIO(grpc.BidiStreamingServer[Game
 }
 func (UnimplementedGameServiceServer) ResizeTerminal(context.Context, *ResizeTerminalRequest) (*ResizeTerminalResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ResizeTerminal not implemented")
+}
+func (UnimplementedGameServiceServer) AddSpectator(context.Context, *AddSpectatorRequest) (*AddSpectatorResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method AddSpectator not implemented")
+}
+func (UnimplementedGameServiceServer) RemoveSpectator(context.Context, *RemoveSpectatorRequest) (*RemoveSpectatorResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RemoveSpectator not implemented")
 }
 func (UnimplementedGameServiceServer) Health(context.Context, *emptypb.Empty) (*HealthResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Health not implemented")
@@ -603,6 +637,42 @@ func _GameService_ResizeTerminal_Handler(srv interface{}, ctx context.Context, d
 	return interceptor(ctx, in, info, handler)
 }
 
+func _GameService_AddSpectator_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AddSpectatorRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GameServiceServer).AddSpectator(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GameService_AddSpectator_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GameServiceServer).AddSpectator(ctx, req.(*AddSpectatorRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GameService_RemoveSpectator_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RemoveSpectatorRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GameServiceServer).RemoveSpectator(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GameService_RemoveSpectator_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GameServiceServer).RemoveSpectator(ctx, req.(*RemoveSpectatorRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _GameService_Health_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(emptypb.Empty)
 	if err := dec(in); err != nil {
@@ -685,6 +755,14 @@ var GameService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _GameService_ResizeTerminal_Handler,
 		},
 		{
+			MethodName: "AddSpectator",
+			Handler:    _GameService_AddSpectator_Handler,
+		},
+		{
+			MethodName: "RemoveSpectator",
+			Handler:    _GameService_RemoveSpectator_Handler,
+		},
+		{
 			MethodName: "Health",
 			Handler:    _GameService_Health_Handler,
 		},
@@ -697,5 +775,5 @@ var GameService_ServiceDesc = grpc.ServiceDesc{
 			ClientStreams: true,
 		},
 	},
-	Metadata: "games/game_service_v2.proto",
+	Metadata: "api/proto/games/game_service_v2.proto",
 }

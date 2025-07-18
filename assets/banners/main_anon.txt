@@ -4,7 +4,8 @@ Connected as: Anonymous
 Date: $DATE | Time: $TIME
 
 [L] Login
-[R] Register  
+[R] Register
+[W] Watch games
 [C] Credits
 [Q] Quit
 

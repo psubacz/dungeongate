@@ -53,6 +53,104 @@ func NewGameServiceServer(cfg *config.GameServiceConfig, gameService *applicatio
 	}
 }
 
+// AddSpectator adds a spectator to a game session
+func (s *GameServiceServer) AddSpectator(ctx context.Context, req *games_pb.AddSpectatorRequest) (*games_pb.AddSpectatorResponse, error) {
+	if req.SessionId == "" {
+		return &games_pb.AddSpectatorResponse{
+			Success: false,
+			Error:   "session_id is required",
+		}, status.Error(codes.InvalidArgument, "session_id is required")
+	}
+
+	if req.SpectatorUserId <= 0 {
+		return &games_pb.AddSpectatorResponse{
+			Success: false,
+			Error:   "spectator_user_id must be positive",
+		}, status.Error(codes.InvalidArgument, "spectator_user_id must be positive")
+	}
+
+	if req.SpectatorUsername == "" {
+		return &games_pb.AddSpectatorResponse{
+			Success: false,
+			Error:   "spectator_username is required",
+		}, status.Error(codes.InvalidArgument, "spectator_username is required")
+	}
+
+	// Add spectator through session service
+	err := s.sessionService.AddSpectator(ctx, req.SessionId, int(req.SpectatorUserId), req.SpectatorUsername)
+	if err != nil {
+		s.logger.Error("Failed to add spectator", "session_id", req.SessionId, "spectator_user_id", req.SpectatorUserId, "error", err)
+		return &games_pb.AddSpectatorResponse{
+			Success: false,
+			Error:   err.Error(),
+		}, status.Error(codes.Internal, "failed to add spectator")
+	}
+
+	// Get updated session info to return spectator details
+	session, err := s.sessionService.GetGameSession(ctx, req.SessionId)
+	if err != nil {
+		s.logger.Error("Failed to get session after adding spectator", "session_id", req.SessionId, "error", err)
+		return &games_pb.AddSpectatorResponse{
+			Success: false,
+			Error:   "failed to get updated session info",
+		}, status.Error(codes.Internal, "failed to get updated session info")
+	}
+
+	// Find the added spectator
+	var spectatorInfo *games_pb.SpectatorInfo
+	for _, spec := range session.Spectators() {
+		if spec.UserID.Int() == int(req.SpectatorUserId) {
+			spectatorInfo = &games_pb.SpectatorInfo{
+				UserId:   int32(spec.UserID.Int()),
+				Username: spec.Username,
+				JoinTime: timestamppb.New(spec.JoinTime),
+				IsActive: spec.IsActive,
+			}
+			break
+		}
+	}
+
+	s.logger.Info("Spectator added successfully", "session_id", req.SessionId, "spectator_user_id", req.SpectatorUserId, "spectator_username", req.SpectatorUsername)
+
+	return &games_pb.AddSpectatorResponse{
+		Success:   true,
+		Spectator: spectatorInfo,
+	}, nil
+}
+
+// RemoveSpectator removes a spectator from a game session
+func (s *GameServiceServer) RemoveSpectator(ctx context.Context, req *games_pb.RemoveSpectatorRequest) (*games_pb.RemoveSpectatorResponse, error) {
+	if req.SessionId == "" {
+		return &games_pb.RemoveSpectatorResponse{
+			Success: false,
+			Error:   "session_id is required",
+		}, status.Error(codes.InvalidArgument, "session_id is required")
+	}
+
+	if req.SpectatorUserId <= 0 {
+		return &games_pb.RemoveSpectatorResponse{
+			Success: false,
+			Error:   "spectator_user_id must be positive",
+		}, status.Error(codes.InvalidArgument, "spectator_user_id must be positive")
+	}
+
+	// Remove spectator through session service
+	err := s.sessionService.RemoveSpectator(ctx, req.SessionId, int(req.SpectatorUserId))
+	if err != nil {
+		s.logger.Error("Failed to remove spectator", "session_id", req.SessionId, "spectator_user_id", req.SpectatorUserId, "error", err)
+		return &games_pb.RemoveSpectatorResponse{
+			Success: false,
+			Error:   err.Error(),
+		}, status.Error(codes.Internal, "failed to remove spectator")
+	}
+
+	s.logger.Info("Spectator removed successfully", "session_id", req.SessionId, "spectator_user_id", req.SpectatorUserId)
+
+	return &games_pb.RemoveSpectatorResponse{
+		Success: true,
+	}, nil
+}
+
 // Health implements the health check endpoint
 func (s *GameServiceServer) Health(ctx context.Context, req *emptypb.Empty) (*games_pb.HealthResponse, error) {
 	return &games_pb.HealthResponse{
@@ -294,7 +392,36 @@ func (s *GameServiceServer) ListGameSessions(ctx context.Context, req *games_pb.
 		return nil, status.Error(codes.Unavailable, "session service not available")
 	}
 
-	return nil, status.Error(codes.Unimplemented, "method ListGameSessions not implemented")
+	// Get sessions from the session service
+	var sessions []*domain.GameSession
+	var err error
+
+	if req.Status == games_pb.SessionStatus_SESSION_STATUS_ACTIVE {
+		// Get active sessions
+		sessions, err = s.sessionService.ListActiveSessions(ctx)
+	} else if req.UserId != 0 {
+		// Get sessions for a specific user
+		sessions, err = s.sessionService.ListUserSessions(ctx, int(req.UserId))
+	} else {
+		// Get all sessions (could be limited by status filter)
+		sessions, err = s.sessionService.ListActiveSessions(ctx)
+	}
+
+	if err != nil {
+		s.logger.Error("Failed to list game sessions", "error", err)
+		return nil, status.Error(codes.Internal, "failed to list game sessions")
+	}
+
+	// Convert domain sessions to protobuf
+	pbSessions := make([]*games_pb.GameSession, len(sessions))
+	for i, session := range sessions {
+		pbSessions[i] = s.convertDomainSessionToProto(session)
+	}
+
+	return &games_pb.ListGameSessionsResponse{
+		Sessions:   pbSessions,
+		TotalCount: int32(len(pbSessions)),
+	}, nil
 }
 
 // SaveGame saves game data
@@ -468,4 +595,100 @@ func (s *GameServiceServer) ResizeTerminal(ctx context.Context, req *games_pb.Re
 	return &games_pb.ResizeTerminalResponse{
 		Success: true,
 	}, nil
+}
+
+// convertDomainSessionToProto converts a domain GameSession to protobuf format
+func (s *GameServiceServer) convertDomainSessionToProto(session *domain.GameSession) *games_pb.GameSession {
+	pbSession := &games_pb.GameSession{
+		Id:           session.ID().String(),
+		UserId:       int32(session.UserID().Int()),
+		Username:     session.Username(),
+		GameId:       session.GameID().String(),
+		Status:       s.convertSessionStatus(session.Status()),
+		StartTime:    timestamppb.New(session.StartTime()),
+		LastActivity: timestamppb.New(session.LastActivity()),
+		TerminalSize: &games_pb.TerminalSize{
+			Width:  int32(session.TerminalSize().Width),
+			Height: int32(session.TerminalSize().Height),
+		},
+		Encoding: session.Encoding(),
+	}
+
+	// Add end time if session has ended
+	if session.EndTime() != nil {
+		pbSession.EndTime = timestamppb.New(*session.EndTime())
+	}
+
+	// Convert process info
+	processInfo := session.ProcessInfo()
+	pbSession.ProcessInfo = &games_pb.ProcessInfo{
+		Pid:         int32(processInfo.PID),
+		ContainerId: processInfo.ContainerID,
+		PodName:     processInfo.PodName,
+	}
+
+	// Handle optional fields
+	if processInfo.ExitCode != nil {
+		pbSession.ProcessInfo.ExitCode = int32(*processInfo.ExitCode)
+	}
+	if processInfo.Signal != nil {
+		pbSession.ProcessInfo.Signal = *processInfo.Signal
+	}
+
+	// Convert recording info
+	if recordingInfo := session.RecordingInfo(); recordingInfo != nil {
+		pbSession.Recording = &games_pb.RecordingInfo{
+			Enabled:   recordingInfo.Enabled,
+			FilePath:  recordingInfo.FilePath,
+			Format:    recordingInfo.Format,
+			StartTime: timestamppb.New(recordingInfo.StartTime),
+			FileSize:  recordingInfo.FileSize,
+		}
+	}
+
+	// Convert streaming info
+	if streamingInfo := session.StreamingInfo(); streamingInfo != nil {
+		pbSession.Streaming = &games_pb.StreamingInfo{
+			Enabled:       streamingInfo.Enabled,
+			Protocol:      streamingInfo.Protocol,
+			Encrypted:     streamingInfo.Encrypted,
+			FrameCount:    streamingInfo.FrameCount,
+			BytesStreamed: streamingInfo.BytesStreamed,
+		}
+	}
+
+	// Convert spectators
+	spectators := session.Spectators()
+	pbSession.Spectators = make([]*games_pb.SpectatorInfo, len(spectators))
+	for i, spectator := range spectators {
+		pbSession.Spectators[i] = &games_pb.SpectatorInfo{
+			UserId:    int32(spectator.UserID.Int()),
+			Username:  spectator.Username,
+			JoinTime:  timestamppb.New(spectator.JoinTime),
+			BytesSent: spectator.BytesSent,
+			IsActive:  spectator.IsActive,
+		}
+	}
+
+	return pbSession
+}
+
+// convertSessionStatus converts domain session status to protobuf
+func (s *GameServiceServer) convertSessionStatus(status domain.SessionStatus) games_pb.SessionStatus {
+	switch status {
+	case domain.SessionStatusStarting:
+		return games_pb.SessionStatus_SESSION_STATUS_STARTING
+	case domain.SessionStatusActive:
+		return games_pb.SessionStatus_SESSION_STATUS_ACTIVE
+	case domain.SessionStatusPaused:
+		return games_pb.SessionStatus_SESSION_STATUS_PAUSED
+	case domain.SessionStatusEnding:
+		return games_pb.SessionStatus_SESSION_STATUS_ENDING
+	case domain.SessionStatusEnded:
+		return games_pb.SessionStatus_SESSION_STATUS_ENDED
+	case domain.SessionStatusFailed:
+		return games_pb.SessionStatus_SESSION_STATUS_FAILED
+	default:
+		return games_pb.SessionStatus_SESSION_STATUS_UNSPECIFIED
+	}
 }
