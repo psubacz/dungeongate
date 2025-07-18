@@ -15,6 +15,7 @@ import (
 	"github.com/creack/pty"
 	"github.com/dungeongate/internal/games/adapters"
 	"github.com/dungeongate/internal/games/domain"
+	"github.com/dungeongate/internal/games"
 )
 
 // PTYManager manages PTY instances for game sessions
@@ -27,20 +28,21 @@ type PTYManager struct {
 
 // PTYSession represents a PTY session for a game
 type PTYSession struct {
-	SessionID  string
-	PTY        *os.File
-	Cmd        *exec.Cmd
-	Size       *pty.Winsize
-	inputChan  chan []byte
-	outputChan chan []byte
-	errorChan  chan error
-	closeChan  chan struct{}
-	closeOnce  sync.Once
-	mu         sync.Mutex
-	adapter    adapters.GameAdapter
-	session    *domain.GameSession
-	onExit     ProcessExitCallback
-	logger     *slog.Logger
+	SessionID     string
+	PTY           *os.File
+	Cmd           *exec.Cmd
+	Size          *pty.Winsize
+	inputChan     chan []byte
+	outputChan    chan []byte
+	errorChan     chan error
+	closeChan     chan struct{}
+	closeOnce     sync.Once
+	mu            sync.Mutex
+	adapter       adapters.GameAdapter
+	session       *domain.GameSession
+	onExit        ProcessExitCallback
+	logger        *slog.Logger
+	streamManager *games.StreamManager
 }
 
 // NewPTYManager creates a new PTY manager
@@ -156,18 +158,19 @@ func (m *PTYManager) CreatePTYWithCallback(ctx context.Context, session *domain.
 
 	// Create PTY session
 	ptySession := &PTYSession{
-		SessionID:  sessionID,
-		PTY:        ptmx,
-		Cmd:        cmd,
-		Size:       size, // Use the size we already created
-		inputChan:  make(chan []byte, 100),
-		outputChan: make(chan []byte, 100),
-		errorChan:  make(chan error, 1),
-		closeChan:  make(chan struct{}),
-		adapter:    adapter,
-		session:    session,
-		onExit:     onExit,
-		logger:     m.logger.With(slog.String("session_id", sessionID)),
+		SessionID:     sessionID,
+		PTY:           ptmx,
+		Cmd:          cmd,
+		Size:         size, // Use the size we already created
+		inputChan:    make(chan []byte, 100),
+		outputChan:   make(chan []byte, 100),
+		errorChan:    make(chan error, 1),
+		closeChan:    make(chan struct{}),
+		adapter:      adapter,
+		session:      session,
+		onExit:       onExit,
+		logger:       m.logger.With(slog.String("session_id", sessionID)),
+		streamManager: games.NewStreamManagerWithSize(int(size.Rows), int(size.Cols)),
 	}
 
 	// Set initial terminal size
@@ -288,6 +291,11 @@ func (s *PTYSession) handleOutput() {
 
 			// Process output through adapter
 			processedData := s.adapter.ProcessOutput(rawData)
+
+			// Send to stream manager for spectating
+			if s.streamManager != nil {
+				s.streamManager.SendFrame(processedData)
+			}
 
 			select {
 			case s.outputChan <- processedData:
@@ -412,6 +420,11 @@ func (s *PTYSession) Close() {
 		close(s.outputChan)
 		close(s.errorChan)
 
+		// Stop the stream manager
+		if s.streamManager != nil {
+			s.streamManager.Stop()
+		}
+
 		s.logger.Debug("Close() completed for session - process and PTY kept alive", "session_id", s.SessionID)
 	})
 }
@@ -449,6 +462,11 @@ func (s *PTYSession) GetExitCode() (int, error) {
 	}
 
 	return s.Cmd.ProcessState.ExitCode(), nil
+}
+
+// GetStreamManager returns the stream manager for this PTY session
+func (s *PTYSession) GetStreamManager() *games.StreamManager {
+	return s.streamManager
 }
 
 // sendInitialInput sends any initial input required by the game

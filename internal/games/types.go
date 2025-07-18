@@ -2,6 +2,7 @@ package games
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -147,6 +148,12 @@ type StreamManager struct {
 	recentFramesLock sync.RWMutex
 	bufferSize       int
 	bufferIndex      int
+
+	// Full screen state buffer sized to terminal dimensions
+	screenBuffer     [][]byte // [row][col] - 2D array representing the screen
+	screenBufferLock sync.RWMutex
+	terminalRows     int
+	terminalCols     int
 }
 
 // NewStreamManager creates a new stream manager for a session
@@ -158,6 +165,35 @@ func NewStreamManager() *StreamManager {
 		bufferSize:   defaultBufferSize,
 		recentFrames: make([]*StreamFrame, defaultBufferSize),
 		bufferIndex:  0,
+		terminalRows: 24, // Default terminal size
+		terminalCols: 80,
+		screenBuffer: make([][]byte, 24), // Initialize with default size
+	}
+}
+
+// NewStreamManagerWithSize creates a new stream manager with specific terminal dimensions
+func NewStreamManagerWithSize(rows, cols int) *StreamManager {
+	const defaultBufferSize = 20 // Keep last 20 frames
+	
+	// Initialize screen buffer with terminal dimensions
+	screenBuffer := make([][]byte, rows)
+	for i := range screenBuffer {
+		screenBuffer[i] = make([]byte, cols)
+		// Initialize with spaces
+		for j := range screenBuffer[i] {
+			screenBuffer[i][j] = ' '
+		}
+	}
+	
+	return &StreamManager{
+		frameChannel: make(chan *StreamFrame, 1000), // Buffered channel for frames
+		stopChan:     make(chan struct{}),
+		bufferSize:   defaultBufferSize,
+		recentFrames: make([]*StreamFrame, defaultBufferSize),
+		bufferIndex:  0,
+		terminalRows: rows,
+		terminalCols: cols,
+		screenBuffer: screenBuffer,
 	}
 }
 
@@ -178,6 +214,9 @@ func (sm *StreamManager) SendFrame(data []byte) {
 	if len(data) == 0 {
 		return
 	}
+
+	// Update the screen buffer with the new data
+	sm.UpdateScreenBuffer(data)
 
 	frameID := sm.frameID.Add(1)
 	frame := NewStreamFrame(data, frameID)
@@ -210,6 +249,67 @@ func (sm *StreamManager) GetRecentFrames() []*StreamFrame {
 	}
 
 	return frames
+}
+
+// ClearRecentFrames clears the recent frames buffer
+func (sm *StreamManager) ClearRecentFrames() {
+	sm.recentFramesLock.Lock()
+	defer sm.recentFramesLock.Unlock()
+
+	// Clear all frames
+	for i := range sm.recentFrames {
+		sm.recentFrames[i] = nil
+	}
+	sm.bufferIndex = 0
+}
+
+// GetFullScreen returns the complete screen state as a single byte slice
+func (sm *StreamManager) GetFullScreen() []byte {
+	sm.screenBufferLock.RLock()
+	defer sm.screenBufferLock.RUnlock()
+
+	// For now, return empty - we'll rely on the redraw command to get current state
+	// This avoids the complexity of terminal emulation while still providing the interface
+	return []byte{}
+}
+
+// UpdateScreenBuffer processes terminal escape sequences and updates the screen buffer
+func (sm *StreamManager) UpdateScreenBuffer(data []byte) {
+	sm.screenBufferLock.Lock()
+	defer sm.screenBufferLock.Unlock()
+
+	// For now, implement a simple approach: 
+	// When we detect clear screen sequences, clear our buffer
+	// This ensures spectators don't see stale data
+	
+	dataStr := string(data)
+	
+	// Check for clear screen escape sequences
+	if strings.Contains(dataStr, "\x1b[2J") || strings.Contains(dataStr, "\x1b[H\x1b[2J") {
+		// Clear screen - reset our buffer
+		for row := 0; row < sm.terminalRows; row++ {
+			for col := 0; col < sm.terminalCols; col++ {
+				sm.screenBuffer[row][col] = ' '
+			}
+		}
+		return
+	}
+	
+	// Check for cursor home sequences
+	if strings.Contains(dataStr, "\x1b[H") || strings.Contains(dataStr, "\x1b[1;1H") {
+		// Cursor moved to home position - this often means screen refresh
+		// For games like NetHack, this typically means a full screen redraw
+		// Clear the buffer to avoid old data
+		for row := 0; row < sm.terminalRows; row++ {
+			for col := 0; col < sm.terminalCols; col++ {
+				sm.screenBuffer[row][col] = ' '
+			}
+		}
+	}
+	
+	// For now, don't try to parse complex escape sequences
+	// Just let the raw data through - the terminal emulator on the spectator side
+	// will handle the rendering. We mainly want to detect when to clear our buffer.
 }
 
 // streamLoop processes frames and distributes them to spectators

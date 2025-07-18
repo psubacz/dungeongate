@@ -1421,8 +1421,8 @@ func (h *Handler) startSpectating(ctx context.Context, channel ssh.Channel, user
 			Connect: &gamev2.ConnectPTYRequest{
 				SessionId: session.Id,
 				TerminalSize: &gamev2.TerminalSize{
-					Width:  80, // Default size, could be made dynamic
-					Height: 24,
+					Width:  session.TerminalSize.Width,   // Use actual game session terminal size
+					Height: session.TerminalSize.Height,
 				},
 				TermType: "xterm",
 			},
