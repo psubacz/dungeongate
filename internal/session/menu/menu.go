@@ -435,8 +435,8 @@ func parseGameChoice(input string, maxGames int) (int, error) {
 	return gameIndex - 1, nil // Convert to 0-based index
 }
 
-// ShowWatchMenu displays the formatted watch menu with active game sessions and live updates
-func (mh *MenuHandler) ShowWatchMenu(ctx context.Context, channel ssh.Channel, user *authv1.User) (*MenuChoice, error) {
+// ShowSpectateMenu displays the formatted spectate menu with active game sessions and live updates
+func (mh *MenuHandler) ShowSpectateMenu(ctx context.Context, channel ssh.Channel, user *authv1.User) (*MenuChoice, error) {
 	// Get initial active sessions available for spectating
 	sessions, err := mh.gameClient.GetActiveGameSessions(ctx)
 	if err != nil {
@@ -475,10 +475,10 @@ func (mh *MenuHandler) ShowWatchMenu(ctx context.Context, channel ssh.Channel, u
 	errorChan := make(chan error, 1)
 
 	// Start goroutine for handling input
-	go mh.handleWatchMenuInput(inputCtx, channel, inputChan, errorChan)
+	go mh.handleSpectateMenuInput(inputCtx, channel, inputChan, errorChan)
 
 	// Initial display
-	banner := mh.buildWatchMenuBanner(availableSessions)
+	banner := mh.buildSpectateMenuBanner(availableSessions)
 	if _, err := channel.Write([]byte(banner)); err != nil {
 		if err == io.EOF {
 			return &MenuChoice{Action: "quit", Value: ""}, nil
@@ -524,7 +524,7 @@ func (mh *MenuHandler) ShowWatchMenu(ctx context.Context, channel ssh.Channel, u
 				}
 
 				// Rebuild and redisplay the banner with updated idle times
-				newBanner := mh.buildWatchMenuBanner(availableSessions)
+				newBanner := mh.buildSpectateMenuBanner(availableSessions)
 				
 				// Only update if the banner actually changed or if idle times need updating
 				if newBanner != banner || mh.hasIdleTimeUpdates(availableSessions) {
@@ -558,8 +558,8 @@ type inputEvent struct {
 	keyCode   terminal.KeyCode
 }
 
-// handleWatchMenuInput handles user input in a separate goroutine
-func (mh *MenuHandler) handleWatchMenuInput(ctx context.Context, channel ssh.Channel, inputChan chan<- *inputEvent, errorChan chan<- error) {
+// handleSpectateMenuInput handles user input in a separate goroutine
+func (mh *MenuHandler) handleSpectateMenuInput(ctx context.Context, channel ssh.Channel, inputChan chan<- *inputEvent, errorChan chan<- error) {
 	inputHandler := terminal.NewInputHandler(channel)
 	
 	for {
@@ -604,13 +604,52 @@ func (mh *MenuHandler) processInputEvent(event *inputEvent, inputBuffer *strings
 
 		// Handle help
 		if char == '?' {
-			mh.showWatchHelp(channel)
+			mh.showSpectateHelp(channel)
 			return nil // Continue showing menu
 		}
 
-		// For letters a-z, handle session selection
-		if char >= 'a' && char <= 'z' {
-			sessionIndex := int(char - 'a')
+		// Handle random selection
+		if char == '*' {
+			if len(availableSessions) > 0 {
+				// Select a random session
+				randomIndex := int(time.Now().UnixNano()) % len(availableSessions)
+				selectedSession := availableSessions[randomIndex]
+				channel.Write([]byte(fmt.Sprintf("\r\nRandomly selected: %s\r\n", selectedSession.Username)))
+				return &MenuChoice{
+					Action: "spectate_session",
+					Value:  selectedSession.Id,
+				}
+			}
+		}
+
+		// Handle pagination (placeholder for now)
+		if char == '>' {
+			// TODO: Next page
+			channel.Write([]byte("\r\nNext page not yet implemented.\r\n"))
+			return nil
+		}
+		if char == '<' {
+			// TODO: Previous page
+			channel.Write([]byte("\r\nPrevious page not yet implemented.\r\n"))
+			return nil
+		}
+
+		// Handle sorting (placeholder for now)
+		if char == '.' || char == ',' {
+			// TODO: Change sorting method
+			channel.Write([]byte("\r\nSorting method change not yet implemented.\r\n"))
+			return nil
+		}
+
+		// For letters a-z and A-Z, handle session selection
+		if (char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z') {
+			var sessionIndex int
+			if char >= 'a' && char <= 'z' {
+				sessionIndex = int(char - 'a')
+			} else {
+				sessionIndex = int(char - 'A') + 26 // A-Z maps to sessions 26-51
+			}
+			
 			if sessionIndex < len(availableSessions) {
 				selectedSession := availableSessions[sessionIndex]
 				// Clear the line to remove echoed input
@@ -621,8 +660,14 @@ func (mh *MenuHandler) processInputEvent(event *inputEvent, inputBuffer *strings
 				}
 			} else {
 				// Invalid session selection
+				var maxLetter rune
+				if len(availableSessions) <= 26 {
+					maxLetter = 'a' + rune(len(availableSessions)-1)
+				} else {
+					maxLetter = 'Z'
+				}
 				errorMsg := fmt.Sprintf("\r\nInvalid choice '%c'. Valid options: a-%c, '?' for help, or 'q' to quit\r\n\r\n", 
-					char, 'a'+rune(len(availableSessions)-1))
+					char, maxLetter)
 				channel.Write([]byte(errorMsg))
 			}
 		}
@@ -724,8 +769,8 @@ func (mh *MenuHandler) hasIdleTimeUpdates(sessions []*gamev2.GameSession) bool {
 	return false
 }
 
-// buildWatchMenuBanner creates the formatted watch menu display
-func (mh *MenuHandler) buildWatchMenuBanner(sessions []*gamev2.GameSession) string {
+// buildSpectateMenuBanner creates the formatted spectate menu display
+func (mh *MenuHandler) buildSpectateMenuBanner(sessions []*gamev2.GameSession) string {
 	var banner strings.Builder
 	
 	banner.WriteString("The following games are in progress:\r\n\r\n")
@@ -735,8 +780,13 @@ func (mh *MenuHandler) buildWatchMenuBanner(sessions []*gamev2.GameSession) stri
 	
 	// Session entries
 	for i, session := range sessions {
-		// Convert session data to display format
-		letter := string('a' + rune(i))
+		// Convert session data to display format (a-z, then A-Z)
+		var letter string
+		if i < 26 {
+			letter = string('a' + rune(i))
+		} else {
+			letter = string('A' + rune(i-26))
+		}
 		username := session.Username
 		if len(username) > 15 {
 			username = username[:12] + "..."
@@ -770,7 +820,7 @@ func (mh *MenuHandler) buildWatchMenuBanner(sessions []*gamev2.GameSession) stri
 	
 	// Footer with pagination info and prompt
 	banner.WriteString(fmt.Sprintf("\r\n (1-%d of %d)\r\n\r\n", len(sessions), len(sessions)))
-	banner.WriteString(" Watch which game? ('?' for help) => ")
+	banner.WriteString(" Spectate which game? ('?' for help) => ")
 	
 	return banner.String()
 }
@@ -830,19 +880,25 @@ func (mh *MenuHandler) calculateIdleTime(session *gamev2.GameSession) string {
 	}
 }
 
-// showWatchHelp displays help information for the watch menu
-func (mh *MenuHandler) showWatchHelp(channel ssh.Channel) {
-	help := "\r\n=== Watch Menu Help ===\r\n\r\n"
-	help += "How to select a game to watch:\r\n"
-	help += "• Type the letter (a, b, c, etc.) for immediate selection\r\n"
-	help += "• Type the number (1, 2, 3, etc.) and press Enter\r\n"
-	help += "• Type 'q' to return to main menu\r\n"
-	help += "• Type '?' to show this help\r\n\r\n"
-	help += "Game display format:\r\n"
-	help += "• NH370 = NetHack 3.7.0\r\n"
-	help += "• DCSS = Dungeon Crawl Stone Soup\r\n"
-	help += "• Idle time shows time since last player activity\r\n"
-	help += "• Watchers shows current number of spectators\r\n\r\n"
+// showSpectateHelp displays help information for the spectate menu
+func (mh *MenuHandler) showSpectateHelp(channel ssh.Channel) {
+	help := "\r\n  Help for watching-menu\r\n"
+	help += "  ----------------------\r\n"
+	help += "  ?        show this help.\r\n"
+	help += "  > <      next/previous page.\r\n"
+	help += "  . ,      change sorting method.\r\n"
+	help += "  q Q      return to main menu.\r\n"
+	help += "  a-zA-Z   select a game to watch.\r\n"
+	help += "  *        start showing a randomly selected game.\r\n"
+	help += "  enter    start watching already selected game.\r\n"
+	help += "\r\n\r\n"
+	help += "  While watching a game\r\n"
+	help += "  ---------------------\r\n"
+	help += "  q        return back to the watching menu.\r\n"
+	help += "  m        send mail to the player (requires login).\r\n"
+	help += "  s        toggle charset stripping between DEC/IBM/none.\r\n"
+	help += "  r        resize your terminal to match the player's terminal.\r\n"
+	help += "\r\n\r\n"
 	help += "Press any key to continue...\r\n"
 	
 	channel.Write([]byte(help))

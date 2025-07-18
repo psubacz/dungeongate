@@ -706,20 +706,20 @@ func (h *Handler) handleMenuChoice(ctx context.Context, channel ssh.Channel, cho
 		return h.startSpectating(ctx, channel, userInfo, choice.Value)
 
 	case "watch":
-		// Show the new formatted watch menu
-		watchChoice, err := h.menuHandler.ShowWatchMenu(ctx, channel, userInfo)
+		// Show the new formatted spectate menu
+		spectateChoice, err := h.menuHandler.ShowSpectateMenu(ctx, channel, userInfo)
 		if err != nil {
-			h.logger.Error("Watch menu failed", "error", err)
+			h.logger.Error("Spectate menu failed", "error", err)
 			return err
 		}
 		
 		// If no choice was made (user quit), return to main menu
-		if watchChoice == nil {
+		if spectateChoice == nil {
 			return nil
 		}
 		
-		// Handle the watch menu choice
-		return h.handleMenuChoice(ctx, channel, watchChoice, userInfo, connID, username, terminalCols, terminalRows, sshConn)
+		// Handle the spectate menu choice
+		return h.handleMenuChoice(ctx, channel, spectateChoice, userInfo, connID, username, terminalCols, terminalRows, sshConn)
 
 	case "edit_profile":
 		channel.Write([]byte("Profile editing functionality not yet implemented.\r\n"))

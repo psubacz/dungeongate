@@ -2,6 +2,7 @@ package menu
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log/slog"
 	"os"
@@ -441,7 +442,7 @@ func BenchmarkShowAnonymousMenu(b *testing.B) {
 	}
 }
 
-func TestBuildWatchMenuBanner(t *testing.T) {
+func TestBuildSpectateMenuBanner(t *testing.T) {
 	bannerConfig := &banner.BannerConfig{}
 	bannerManager := banner.NewBannerManager(bannerConfig)
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
@@ -471,7 +472,7 @@ func TestBuildWatchMenuBanner(t *testing.T) {
 		},
 	}
 
-	banner := handler.buildWatchMenuBanner(sessions)
+	banner := handler.buildSpectateMenuBanner(sessions)
 
 	// Verify banner contains expected elements
 	assert.Contains(t, banner, "The following games are in progress:")
@@ -483,7 +484,7 @@ func TestBuildWatchMenuBanner(t *testing.T) {
 	assert.Contains(t, banner, "209x46")
 	assert.Contains(t, banner, "4m 16s") // Idle time for second session
 	assert.Contains(t, banner, "(1-2 of 2)")
-	assert.Contains(t, banner, "Watch which game? ('?' for help) =>")
+	assert.Contains(t, banner, "Spectate which game? ('?' for help) =>")
 }
 
 func TestFormatGameDisplay(t *testing.T) {
@@ -636,6 +637,42 @@ func TestFilterUserSessions(t *testing.T) {
 	user = &authv1.User{Id: "99", Username: "user99"}
 	result = handler.filterUserSessions(sessions, user)
 	assert.Len(t, result, 4)
+}
+
+func TestBuildSpectateMenuBannerWithManySessions(t *testing.T) {
+	bannerConfig := &banner.BannerConfig{}
+	bannerManager := banner.NewBannerManager(bannerConfig)
+	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
+
+	handler := NewMenuHandler(bannerManager, nil, nil, logger)
+
+	// Create 30 sessions to test a-z and A-Z lettering
+	sessions := make([]*gamev2.GameSession, 30)
+	now := time.Now()
+	for i := 0; i < 30; i++ {
+		sessions[i] = &gamev2.GameSession{
+			Id:           fmt.Sprintf("session%d", i+1),
+			Username:     fmt.Sprintf("user%d", i+1),
+			GameId:       "nethack",
+			TerminalSize: &gamev2.TerminalSize{Width: 80, Height: 24},
+			StartTime:    timestamppb.New(now.Add(-10 * time.Minute)),
+			LastActivity: timestamppb.New(now.Add(-5 * time.Second)),
+			Spectators:   []*gamev2.SpectatorInfo{},
+		}
+	}
+
+	banner := handler.buildSpectateMenuBanner(sessions)
+
+	// Verify it uses a-z for first 26 sessions
+	assert.Contains(t, banner, "a) user1")
+	assert.Contains(t, banner, "z) user26")
+	
+	// Verify it uses A-Z for sessions 27+
+	assert.Contains(t, banner, "A) user27")
+	assert.Contains(t, banner, "D) user30")
+	
+	// Verify pagination info
+	assert.Contains(t, banner, "(1-30 of 30)")
 }
 
 func BenchmarkBuildGameSelectionBanner(b *testing.B) {
