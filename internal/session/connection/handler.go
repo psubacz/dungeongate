@@ -692,10 +692,7 @@ func (h *Handler) handleMenuChoice(ctx context.Context, channel ssh.Channel, cho
 		}
 
 	case "watch":
-		channel.Write([]byte("Spectating functionality not yet implemented.\r\n"))
-		// Brief pause to let user read the message
-		time.Sleep(2 * time.Second)
-		return nil
+		return h.handleWatchMode(ctx, channel, user)
 
 	case "edit_profile":
 		channel.Write([]byte("Profile editing functionality not yet implemented.\r\n"))
