@@ -204,6 +204,7 @@ func loadOrGenerateHostKey(hostKeyPath string) (ssh.Signer, error) {
 	}
 
 	// Key file doesn't exist, generate a new one and save it
+	slog.Info("Generating new host key and saving to file", "path", hostKeyPath)
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate host key: %w", err)
