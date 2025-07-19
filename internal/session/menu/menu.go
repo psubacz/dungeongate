@@ -177,7 +177,12 @@ func (mh *MenuHandler) ShowAnonymousMenu(ctx context.Context, channel ssh.Channe
 }
 
 // ShowUserMenu displays the main menu for authenticated users and handles input
-func (mh *MenuHandler) ShowUserMenu(ctx context.Context, channel ssh.Channel, username string) (*MenuChoice, error) {
+func (mh *MenuHandler) ShowUserMenu(ctx context.Context, channel ssh.Channel, user *authv1.User) (*MenuChoice, error) {
+	// Check if user is admin to show appropriate menu
+	if user != nil && user.IsAdmin {
+		return mh.ShowAdminMenu(ctx, channel, user)
+	}
+
 	// Create input validator for user menu
 	validator := &InputValidator{
 		ValidOptions: []string{"[P]lay", "[W]atch", "[E]dit profile", "[L]ist games", "[R]ecordings", "[S]tatistics", "[C]redits", "[Q]uit"},
@@ -192,9 +197,9 @@ func (mh *MenuHandler) ShowUserMenu(ctx context.Context, channel ssh.Channel, us
 	}
 
 	// Render the user banner
-	banner, err := mh.bannerManager.RenderMainUser(username)
+	banner, err := mh.bannerManager.RenderMainUser(user.Username)
 	if err != nil {
-		mh.logger.Error("Failed to render user banner", "error", err, "username", username)
+		mh.logger.Error("Failed to render user banner", "error", err, "username", user.Username)
 		return nil, fmt.Errorf("failed to render banner: %w", err)
 	}
 
@@ -237,6 +242,86 @@ func (mh *MenuHandler) ShowUserMenu(ctx context.Context, channel ssh.Channel, us
 				return &MenuChoice{Action: "statistics", Value: ""}, nil
 			case "c":
 				return &MenuChoice{Action: "credit", Value: ""}, nil
+			case "q":
+				return handleCtrlD(), nil
+			default:
+				// Invalid choice - use validator for consistent error message
+				_, errorMsg := validator.ValidateInput(choice)
+				if err := mh.handleInvalidInput(channel, errorMsg, banner); err != nil {
+					if err == io.EOF {
+						return handleCtrlD(), nil
+					}
+					return nil, err
+				}
+			}
+		} else if event.Type == terminal.EventKey {
+			switch event.KeyCode {
+			case terminal.KeyCtrlC, terminal.KeyCtrlD:
+				return handleCtrlD(), nil
+			}
+		}
+	}
+}
+
+// ShowAdminMenu displays the admin menu for admin users and handles input
+func (mh *MenuHandler) ShowAdminMenu(ctx context.Context, channel ssh.Channel, user *authv1.User) (*MenuChoice, error) {
+	// Create input validator for admin menu
+	validator := &InputValidator{
+		ValidOptions: []string{"[U]nlock User", "[D]elete User", "[R]eset Password", "[P]romote User", "[S]erver Statistics", "[Q]uit"},
+		MenuName:     "Admin Menu",
+	}
+
+	// Clear screen and position cursor at top
+	if _, err := channel.Write([]byte("\033[2J\033[H")); err != nil {
+		if err == io.EOF {
+			return handleCtrlD(), nil
+		}
+	}
+
+	// Render the admin banner
+	banner, err := mh.bannerManager.RenderMainAdmin(user.Username)
+	if err != nil {
+		mh.logger.Error("Failed to render admin banner", "error", err, "username", user.Username)
+		return nil, fmt.Errorf("failed to render banner: %w", err)
+	}
+
+	// Display the banner
+	_, err = channel.Write([]byte(banner))
+	if err != nil {
+		if err == io.EOF {
+			return handleCtrlD(), nil
+		}
+		return nil, fmt.Errorf("failed to write banner: %w", err)
+	}
+
+	// Create terminal input handler for proper keyboard support
+	inputHandler := terminal.NewInputHandler(channel)
+
+	// Wait for user input
+	for {
+		event, err := inputHandler.ReadInput(ctx)
+		if err != nil {
+			if err.Error() == "user cancelled" {
+				return handleCtrlD(), nil
+			}
+			return nil, fmt.Errorf("failed to read user input: %w", err)
+		}
+
+		// Handle character input for menu choices
+		if event.Type == terminal.EventCharacter {
+			choice := string(event.Character)
+
+			switch strings.ToLower(choice) {
+			case "u":
+				return &MenuChoice{Action: "admin_unlock_user", Value: ""}, nil
+			case "d":
+				return &MenuChoice{Action: "admin_delete_user", Value: ""}, nil
+			case "r":
+				return &MenuChoice{Action: "admin_reset_password", Value: ""}, nil
+			case "p":
+				return &MenuChoice{Action: "admin_promote_user", Value: ""}, nil
+			case "s":
+				return &MenuChoice{Action: "admin_server_stats", Value: ""}, nil
 			case "q":
 				return handleCtrlD(), nil
 			default:

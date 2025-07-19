@@ -44,6 +44,7 @@ type SSHConfig struct {
 	AllowAnonymous           bool
 	BannerMainAnon           string
 	BannerMainUser           string
+	BannerMainAdmin          string
 	BannerWatchMenu          string
 	BannerIdleMode           string
 	BannerServiceUnavailable string
@@ -60,6 +61,7 @@ func NewSSHServer(config *SSHConfig, gameClient *client.GameClient, authClient *
 	bannerConfig := &banner.BannerConfig{
 		MainAnon:           config.BannerMainAnon,
 		MainUser:           config.BannerMainUser,
+		MainAdmin:          config.BannerMainAdmin,
 		WatchMenu:          config.BannerWatchMenu,
 		IdleMode:           config.BannerIdleMode,
 		ServiceUnavailable: config.BannerServiceUnavailable,

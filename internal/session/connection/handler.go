@@ -174,8 +174,8 @@ func (h *Handler) handleSessionChannel(ctx context.Context, newChannel ssh.NewCh
 					// Show anonymous menu
 					menuChoice, err = h.menuHandler.ShowAnonymousMenu(ctx, channel, sshConn.User())
 				} else {
-					// Show authenticated user menu
-					menuChoice, err = h.menuHandler.ShowUserMenu(ctx, channel, userInfo.Username)
+					// Show authenticated user menu (or admin menu if user is admin)
+					menuChoice, err = h.menuHandler.ShowUserMenu(ctx, channel, userInfo)
 				}
 
 				if err != nil {

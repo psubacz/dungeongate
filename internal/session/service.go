@@ -74,6 +74,7 @@ func New(cfg *Config, logger *slog.Logger, metricsRegistry *metrics.Registry) (*
 		AllowAnonymous:           cfg.SSH.AllowAnonymous,
 		BannerMainAnon:           cfg.Menu.Banners.MainAnon,
 		BannerMainUser:           cfg.Menu.Banners.MainUser,
+		BannerMainAdmin:          cfg.Menu.Banners.MainAdmin,
 		BannerWatchMenu:          cfg.Menu.Banners.WatchMenu,
 		BannerIdleMode:           cfg.Menu.Banners.IdleMode,
 		BannerServiceUnavailable: cfg.Menu.Banners.ServiceUnavailable,

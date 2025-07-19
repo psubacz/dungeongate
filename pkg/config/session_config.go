@@ -74,6 +74,7 @@ type MenuConfig struct {
 type BannersConfig struct {
 	MainAnon           string `yaml:"main_anon"`
 	MainUser           string `yaml:"main_user"`
+	MainAdmin          string `yaml:"main_admin"`
 	WatchMenu          string `yaml:"watch_menu"`
 	IdleMode           string `yaml:"idle_mode"`
 	ServiceUnavailable string `yaml:"service_unavailable"`
@@ -324,6 +325,7 @@ func applyDefaults(cfg *SessionServiceConfig) {
 			Banners: &BannersConfig{
 				MainAnon:           "./assets/banners/main_anon.txt",
 				MainUser:           "./assets/banners/main_user.txt",
+				MainAdmin:          "./assets/banners/main_admin.txt",
 				WatchMenu:          "./assets/banners/watch_menu.txt",
 				IdleMode:           "./assets/banners/idle_mode.txt",
 				ServiceUnavailable: "./assets/banners/service_unavailable.txt",
@@ -447,6 +449,7 @@ func (c *SessionServiceConfig) GetMenu() *MenuConfig {
 			Banners: &BannersConfig{
 				MainAnon:           "./assets/banners/main_anon.txt",
 				MainUser:           "./assets/banners/main_user.txt",
+				MainAdmin:          "./assets/banners/main_admin.txt",
 				WatchMenu:          "./assets/banners/watch_menu.txt",
 				IdleMode:           "./assets/banners/idle_mode.txt",
 				ServiceUnavailable: "./assets/banners/service_unavailable.txt",

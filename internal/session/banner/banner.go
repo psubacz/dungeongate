@@ -135,6 +135,7 @@ func DetectTerminalCapabilities() *TerminalDimensions {
 type BannerConfig struct {
 	MainAnon           string
 	MainUser           string
+	MainAdmin          string
 	WatchMenu          string
 	IdleMode           string
 	ServiceUnavailable string
@@ -225,6 +226,31 @@ func (bm *BannerManager) RenderMainUser(username string) (string, error) {
 
 	// Get footer
 	footer := bm.RenderFooter("user", variables)
+
+	// Combine header + banner + footer
+	result := header + banner + footer
+	return result, nil
+}
+
+// RenderMainAdmin renders the main admin menu banner for admin users
+func (bm *BannerManager) RenderMainAdmin(username string) (string, error) {
+	if bm.config.MainAdmin == "" {
+		return "", fmt.Errorf("main admin banner path is not configured (MainAdmin field is empty, config: %+v)", bm.config)
+	}
+
+	variables := bm.GetTemplateVariables(username)
+
+	// Get header
+	header := bm.RenderHeader("admin", variables)
+
+	// Get main banner content
+	banner, err := bm.renderBanner(bm.config.MainAdmin, variables)
+	if err != nil {
+		return "", err
+	}
+
+	// Get footer
+	footer := bm.RenderFooter("admin", variables)
 
 	// Combine header + banner + footer
 	result := header + banner + footer

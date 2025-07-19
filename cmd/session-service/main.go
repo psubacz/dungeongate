@@ -145,8 +145,10 @@ func main() {
 	if cfg.Menu != nil && cfg.Menu.Banners != nil {
 		sessionConfig.Menu.Banners.MainAnon = cfg.Menu.Banners.MainAnon
 		sessionConfig.Menu.Banners.MainUser = cfg.Menu.Banners.MainUser
+		sessionConfig.Menu.Banners.MainAdmin = cfg.Menu.Banners.MainAdmin
 		sessionConfig.Menu.Banners.WatchMenu = cfg.Menu.Banners.WatchMenu
 		sessionConfig.Menu.Banners.IdleMode = cfg.Menu.Banners.IdleMode
+		sessionConfig.Menu.Banners.ServiceUnavailable = cfg.Menu.Banners.ServiceUnavailable
 	}
 
 	// Create stateless session service

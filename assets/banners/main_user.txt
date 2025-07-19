@@ -3,12 +3,12 @@ DungeonGate
 Welcome, $USERNAME
 Date: $DATE | Time: $TIME
 
-[P] Play a game
-[W] Watch games
-[E] Edit profile
-[R] View recordings
-[S] Game Statistics
-[C] Credits
-[Q] Quit
+Menu Options:
+  [p] Play a game
+  [w] Watch games
+  [e] Edit profile
+  [g] Game Statistics
+  [c] Credits
+  [q] Quit
 
 Choice: 

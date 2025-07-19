@@ -201,6 +201,9 @@ menu:
     # Banner shown to authenticated users
     main_user: "./assets/banners/main_user.txt"
     
+    # Banner shown to admin users
+    main_admin: "./assets/banners/main_admin.txt"
+    
     # Banner for the game spectating menu
     watch_menu: "./assets/banners/watch_menu.txt"
     

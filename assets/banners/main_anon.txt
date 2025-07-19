@@ -3,10 +3,11 @@ DungeonGate
 Connected as: Anonymous
 Date: $DATE | Time: $TIME
 
-[L] Login
-[R] Register
-[W] Watch games
-[C] Credits
-[Q] Quit
+Menu Options:
+  [l] Login
+  [r] Register
+  [w] Watch games
+  [c] Credits
+  [q] Quit
 
 Choice: 
