@@ -49,6 +49,7 @@ type SSHAuthConfig struct {
 	PublicKeyAuth   bool   `yaml:"public_key_auth"`
 	AllowAnonymous  bool   `yaml:"allow_anonymous"`
 	AllowedUsername string `yaml:"allowed_username"` // Only allow connections from this username
+	SSHPassword     string `yaml:"ssh_password"`     // SSH password for the allowed username (SSH level auth)
 }
 
 // SSHTerminalConfig represents SSH terminal configuration

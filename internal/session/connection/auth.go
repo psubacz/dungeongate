@@ -16,63 +16,115 @@ import (
 
 // SSHAuthHandler provides SSH authentication callbacks
 type SSHAuthHandler struct {
-	authClient *client.AuthClient
-	logger     *slog.Logger
-	envVars    map[string]string // Store environment variables from SSH connection
+	authClient      *client.AuthClient
+	logger          *slog.Logger
+	envVars         map[string]string // Store environment variables from SSH connection
+	allowedUsername string            // Only allow connections from this username
+	sshPassword     string            // SSH password for the allowed username (config-based)
 }
 
 // NewSSHAuthHandler creates a new SSH auth handler
-func NewSSHAuthHandler(authClient *client.AuthClient, logger *slog.Logger) *SSHAuthHandler {
+func NewSSHAuthHandler(authClient *client.AuthClient, logger *slog.Logger, allowedUsername, sshPassword string) *SSHAuthHandler {
 	return &SSHAuthHandler{
-		authClient: authClient,
-		logger:     logger,
-		envVars:    make(map[string]string),
+		authClient:      authClient,
+		logger:          logger,
+		envVars:         make(map[string]string),
+		allowedUsername: allowedUsername,
+		sshPassword:     sshPassword,
 	}
+}
+
+// isUsernameAllowed checks if the username is allowed to connect
+func (a *SSHAuthHandler) isUsernameAllowed(username string) bool {
+	// If no allowed username is configured, allow all usernames
+	if a.allowedUsername == "" {
+		return true
+	}
+	// Otherwise, only allow the specific configured username
+	return username == a.allowedUsername
 }
 
 // PasswordCallback handles password authentication
 func (a *SSHAuthHandler) PasswordCallback(conn ssh.ConnMetadata, password []byte) (*ssh.Permissions, error) {
 	username := conn.User()
 
-	// Authenticate with auth service
+	// Check if username is allowed
+	if !a.isUsernameAllowed(username) {
+		a.logger.Warn("SSH connection rejected: username not allowed", 
+			"username", username, 
+			"allowed_username", a.allowedUsername,
+			"remote_addr", conn.RemoteAddr())
+		return nil, fmt.Errorf("authentication failed: username not allowed")
+	}
+
+	// If SSH password is configured and this is the allowed username, use config-based auth
+	if a.sshPassword != "" && username == a.allowedUsername {
+		if string(password) == a.sshPassword {
+			// SSH-level authentication successful - create minimal permissions
+			permissions := &ssh.Permissions{
+				Extensions: map[string]string{
+					"ssh_auth_method": "config_password",
+					"ssh_username":    username,
+				},
+			}
+			a.logger.Info("SSH authentication successful", "username", username, "method", "config_password")
+			return permissions, nil
+		} else {
+			a.logger.Warn("SSH authentication failed: incorrect password", "username", username)
+			return nil, fmt.Errorf("authentication failed")
+		}
+	}
+
+	// Fallback to DungeonGate auth service authentication
 	ctx := context.Background()
 	resp, err := a.authClient.Login(ctx, username, string(password))
 	if err != nil {
-		a.logger.Warn("Login failed", "username", username, "error", err)
+		a.logger.Warn("DungeonGate auth failed", "username", username, "error", err)
 		return nil, fmt.Errorf("authentication failed")
 	}
 
 	// Validate response
 	if resp == nil {
-		a.logger.Warn("Login failed: empty response", "username", username)
+		a.logger.Warn("DungeonGate auth failed: empty response", "username", username)
 		return nil, fmt.Errorf("authentication failed")
 	}
 	if resp.User == nil {
-		a.logger.Warn("Login failed: empty user in response", "username", username)
+		a.logger.Warn("DungeonGate auth failed: empty user in response", "username", username)
 		return nil, fmt.Errorf("authentication failed")
 	}
 
 	// Store user info in permissions
 	permissions := &ssh.Permissions{
 		Extensions: map[string]string{
-			"user_id":      resp.User.Id,
-			"username":     resp.User.Username,
-			"access_token": resp.AccessToken,
+			"user_id":         resp.User.Id,
+			"username":        resp.User.Username,
+			"access_token":    resp.AccessToken,
+			"ssh_auth_method": "dungeongate_auth",
 		},
 	}
 
-	a.logger.Info("Authentication successful", "username", username, "user_id", resp.User.Id)
+	a.logger.Info("DungeonGate authentication successful", "username", username, "user_id", resp.User.Id)
 	return permissions, nil
 }
 
 // PublicKeyCallback handles public key authentication
 func (a *SSHAuthHandler) PublicKeyCallback(conn ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
-	// For now, reject public key authentication
-	// In a real implementation, we'd validate the key against stored public keys
 	var username string
 	if conn != nil {
 		username = conn.User()
 	}
+
+	// Check if username is allowed
+	if !a.isUsernameAllowed(username) {
+		a.logger.Warn("SSH public key connection rejected: username not allowed", 
+			"username", username, 
+			"allowed_username", a.allowedUsername,
+			"remote_addr", conn.RemoteAddr())
+		return nil, fmt.Errorf("authentication failed: username not allowed")
+	}
+
+	// For now, reject public key authentication
+	// In a real implementation, we'd validate the key against stored public keys
 	a.logger.Debug("Public key authentication attempted", "username", username)
 	return nil, fmt.Errorf("public key authentication not supported")
 }

@@ -69,20 +69,26 @@ ssh:
   idle_timeout: "15m"
   
   # SSH Authentication Configuration
+  ## Technically speaking, dugeongate has two auth workflows. This config block effects number 1
+  ### 1. SSH Level: Currently validates against the DungeonGate auth service
+  ### 2. Application Level: Users authenticate with their DungeonGate credentials
   auth:
     # Enable password-based authentication
-    password_auth: false
+    password_auth: true
     
     # Enable public key authentication (requires key management setup)
     public_key_auth: false
     
-    # Allow anonymous connections (no username/password required)
-    # Useful for development and demo environments
-    allow_anonymous: true
+    # Allow anonymous connections - Useful for development, demo, and public environments
+    allow_anonymous: false
     
     # Only allow connections from this specific username (blank = allow all)
     # Blocks connections from any other SSH username
     allowed_username: "dungeongate"
+    
+    # SSH password for the dungeongate user (SSH level authentication)
+    # This is separate from DungeonGate application user passwords
+    ssh_password: "gate123"
     
   # SSH Keepalive Configuration
   keepalive:

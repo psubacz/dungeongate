@@ -18,13 +18,15 @@ type Config struct {
 
 	// Server configuration
 	SSH struct {
-		Address        string `yaml:"address" default:"0.0.0.0"`
-		Port           int    `yaml:"port" default:"2222"`
-		IdleTimeout    string `yaml:"idle_timeout" default:"1h"`
-		HostKey        string `yaml:"host_key" default:""`
-		PasswordAuth   bool   `yaml:"password_auth" default:"true"`
-		PublicKeyAuth  bool   `yaml:"public_key_auth" default:"false"`
-		AllowAnonymous bool   `yaml:"allow_anonymous" default:"true"`
+		Address         string `yaml:"address" default:"0.0.0.0"`
+		Port            int    `yaml:"port" default:"2222"`
+		IdleTimeout     string `yaml:"idle_timeout" default:"1h"`
+		HostKey         string `yaml:"host_key" default:""`
+		PasswordAuth    bool   `yaml:"password_auth" default:"true"`
+		PublicKeyAuth   bool   `yaml:"public_key_auth" default:"false"`
+		AllowAnonymous  bool   `yaml:"allow_anonymous" default:"true"`
+		AllowedUsername string `yaml:"allowed_username" default:"dungeongate"`
+		SSHPassword     string `yaml:"ssh_password" default:""`
 	} `yaml:"ssh"`
 
 	HTTP struct {

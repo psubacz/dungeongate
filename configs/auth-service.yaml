@@ -48,6 +48,9 @@ server:
 # Authentication Configuration
 # ============================================================================
 # Core authentication settings including JWT and security policies
+## Technically speaking, dugeongate has two auth workflows. This config block effects number 2
+### 1. SSH Level: Currently validates against the DungeonGate auth service
+### 2. Application Level: Users authenticate with their DungeonGate credentials
 auth:
   # Enable authentication service (should always be true for auth service)
   enabled: true
