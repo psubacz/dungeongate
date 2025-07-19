@@ -194,7 +194,7 @@ func loadOrGenerateHostKey(hostKeyPath string) (ssh.Signer, error) {
 			return nil, fmt.Errorf("failed to read host key file: %w", err)
 		}
 
-		// Parse the private key
+		// Parse the private key (supports both PEM and OpenSSH formats)
 		signer, err := ssh.ParsePrivateKey(keyBytes)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse host key: %w", err)
