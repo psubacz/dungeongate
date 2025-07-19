@@ -531,6 +531,43 @@ compose-down: ## Stop all services and remove containers
 compose-logs: ## Show logs from all services
 	@cd build/container && docker-compose logs -f
 
+##@ Skaffold (Kubernetes Development)
+
+.PHONY: skaffold-dev
+skaffold-dev: ## Start Skaffold development mode
+	@echo "$(GREEN)Starting Skaffold development mode...$(NC)"
+	@cd build/container && skaffold dev --port-forward
+
+.PHONY: skaffold-dev-local
+skaffold-dev-local: ## Start Skaffold with docker-compose profile
+	@echo "$(GREEN)Starting Skaffold local development...$(NC)"
+	@cd build/container && skaffold dev --profile local --port-forward
+
+.PHONY: skaffold-run
+skaffold-run: ## Deploy to Kubernetes using Skaffold
+	@echo "$(GREEN)Deploying to Kubernetes with Skaffold...$(NC)"
+	@cd build/container && skaffold run
+
+.PHONY: skaffold-run-prod
+skaffold-run-prod: ## Deploy to production using Skaffold
+	@echo "$(GREEN)Deploying to production with Skaffold...$(NC)"
+	@cd build/container && skaffold run --profile prod
+
+.PHONY: skaffold-delete
+skaffold-delete: ## Delete Skaffold deployments
+	@echo "$(GREEN)Deleting Skaffold deployments...$(NC)"
+	@cd build/container && skaffold delete
+
+.PHONY: skaffold-build
+skaffold-build: ## Build images using Skaffold
+	@echo "$(GREEN)Building images with Skaffold...$(NC)"
+	@cd build/container && skaffold build
+
+.PHONY: skaffold-debug
+skaffold-debug: ## Start Skaffold in debug mode
+	@echo "$(GREEN)Starting Skaffold debug mode...$(NC)"
+	@cd build/container && skaffold debug --port-forward
+
 ##@ Legacy Docker (deprecated - use container-* targets)
 
 .PHONY: docker-build-session

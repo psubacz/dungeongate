@@ -1,0 +1,122 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dungeongate-auth
+  namespace: default
+  labels:
+    app: dungeongate
+    service: auth
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: dungeongate
+      service: auth
+  template:
+    metadata:
+      labels:
+        app: dungeongate
+        service: auth
+    spec:
+      containers:
+      - name: auth-service
+        image: dungeongate-auth
+        ports:
+        - name: http
+          containerPort: 8081
+          protocol: TCP
+        - name: grpc
+          containerPort: 8082
+          protocol: TCP
+        - name: metrics
+          containerPort: 9091
+          protocol: TCP
+        env:
+        - name: LOG_LEVEL
+          value: "info"
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: dungeongate-secrets
+              key: jwt-secret
+        - name: DATABASE_URL
+          value: "sqlite:///app/data/sqlite/dungeongate.db"
+        volumeMounts:
+        - name: config
+          mountPath: /app/configs
+          readOnly: true
+        - name: data
+          mountPath: /app/data
+        - name: logs
+          mountPath: /app/logs
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8081
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8081
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "100m"
+          limits:
+            memory: "128Mi"
+            cpu: "200m"
+      volumes:
+      - name: config
+        configMap:
+          name: dungeongate-config
+      - name: data
+        persistentVolumeClaim:
+          claimName: dungeongate-data
+      - name: logs
+        emptyDir: {}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dungeongate-auth
+  namespace: default
+  labels:
+    app: dungeongate
+    service: auth
+spec:
+  selector:
+    app: dungeongate
+    service: auth
+  ports:
+  - name: http
+    port: 8081
+    targetPort: 8081
+    protocol: TCP
+  - name: grpc
+    port: 8082
+    targetPort: 8082
+    protocol: TCP
+  - name: metrics
+    port: 9091
+    targetPort: 9091
+    protocol: TCP
+  type: ClusterIP
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: dungeongate-data
+  namespace: default
+  labels:
+    app: dungeongate
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi

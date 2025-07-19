@@ -216,7 +216,13 @@ REGISTRY=myregistry.com ./scripts/build-container.sh all
 │   │   ├── Containerfile      # Multi-stage build (x86_64)
 │   │   ├── Containerfile.arm  # Multi-stage build (ARM64)
 │   │   ├── docker-compose.yml # Service orchestration
-│   │   └── CONTAINERS.md      # This documentation
+│   │   ├── skaffold.yaml      # Kubernetes development
+│   │   ├── k8s/               # Kubernetes manifests
+│   │   │   ├── *.yaml         # Service deployments
+│   │   │   ├── dev/           # Development manifests
+│   │   │   └── prod/          # Production manifests
+│   │   ├── CONTAINERS.md      # This documentation
+│   │   └── SKAFFOLD.md        # Kubernetes development guide
 │   ├── dungeongate-session-service  # Extracted binaries
 │   ├── dungeongate-auth-service
 │   └── dungeongate-game-service
@@ -252,6 +258,14 @@ make compose-up-dev         # Start development
 make compose-up-simple      # Start all-in-one
 make compose-down           # Stop and remove
 make compose-logs           # View logs
+
+# Skaffold (Kubernetes development)
+make skaffold-dev           # Development with hot-reload
+make skaffold-dev-local     # Local development with docker-compose
+make skaffold-run           # Deploy to Kubernetes
+make skaffold-run-prod      # Deploy to production
+make skaffold-delete        # Clean up deployments
+make skaffold-debug         # Debug mode
 
 # Legacy (deprecated)
 make docker-build-all       # Use container-production instead

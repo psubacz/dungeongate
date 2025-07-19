@@ -1,0 +1,126 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dungeongate-session
+  namespace: default
+  labels:
+    app: dungeongate
+    service: session
+spec:
+  replicas: 1  # SSH service typically runs as single instance
+  selector:
+    matchLabels:
+      app: dungeongate
+      service: session
+  template:
+    metadata:
+      labels:
+        app: dungeongate
+        service: session
+    spec:
+      containers:
+      - name: session-service
+        image: dungeongate-session
+        ports:
+        - name: ssh
+          containerPort: 2222
+          protocol: TCP
+        - name: http
+          containerPort: 8083
+          protocol: TCP
+        - name: grpc
+          containerPort: 9093
+          protocol: TCP
+        - name: metrics
+          containerPort: 8085
+          protocol: TCP
+        env:
+        - name: LOG_LEVEL
+          value: "info"
+        - name: AUTH_SERVICE_ADDRESS
+          value: "dungeongate-auth:8082"
+        - name: GAME_SERVICE_ADDRESS
+          value: "dungeongate-game:50051"
+        volumeMounts:
+        - name: config
+          mountPath: /app/configs
+          readOnly: true
+        - name: assets
+          mountPath: /app/assets
+          readOnly: true
+        - name: data
+          mountPath: /app/data
+        - name: logs
+          mountPath: /app/logs
+        - name: ssh-keys
+          mountPath: /app/configs/ssh_keys
+          readOnly: true
+        livenessProbe:
+          tcpSocket:
+            port: 2222
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8083
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "300m"
+      volumes:
+      - name: config
+        configMap:
+          name: dungeongate-config
+      - name: assets
+        configMap:
+          name: dungeongate-assets
+      - name: data
+        persistentVolumeClaim:
+          claimName: dungeongate-data
+      - name: logs
+        emptyDir: {}
+      - name: ssh-keys
+        secret:
+          secretName: dungeongate-secrets
+          items:
+          - key: ssh-host-key
+            path: dev_host_key
+            mode: 0600
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dungeongate-session
+  namespace: default
+  labels:
+    app: dungeongate
+    service: session
+spec:
+  selector:
+    app: dungeongate
+    service: session
+  ports:
+  - name: ssh
+    port: 2222
+    targetPort: 2222
+    protocol: TCP
+  - name: http
+    port: 8083
+    targetPort: 8083
+    protocol: TCP
+  - name: grpc
+    port: 9093
+    targetPort: 9093
+    protocol: TCP
+  - name: metrics
+    port: 8085
+    targetPort: 8085
+    protocol: TCP
+  type: LoadBalancer  # Expose SSH externally

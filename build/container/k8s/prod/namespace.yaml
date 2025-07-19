@@ -1,0 +1,40 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: dungeongate-prod
+  labels:
+    name: dungeongate-prod
+    environment: production
+
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: dungeongate-limits
+  namespace: dungeongate-prod
+spec:
+  limits:
+  - default:
+      cpu: "500m"
+      memory: "512Mi"
+    defaultRequest:
+      cpu: "100m"
+      memory: "128Mi"
+    type: Container
+
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: dungeongate-quota
+  namespace: dungeongate-prod
+spec:
+  hard:
+    requests.cpu: "2"
+    requests.memory: 4Gi
+    limits.cpu: "4"
+    limits.memory: 8Gi
+    persistentvolumeclaims: "3"
+    services: "10"
+    secrets: "5"
+    configmaps: "5"
