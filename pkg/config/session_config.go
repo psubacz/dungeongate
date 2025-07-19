@@ -45,9 +45,10 @@ type SSHConfig struct {
 
 // SSHAuthConfig represents SSH authentication configuration
 type SSHAuthConfig struct {
-	PasswordAuth   bool `yaml:"password_auth"`
-	PublicKeyAuth  bool `yaml:"public_key_auth"`
-	AllowAnonymous bool `yaml:"allow_anonymous"`
+	PasswordAuth    bool   `yaml:"password_auth"`
+	PublicKeyAuth   bool   `yaml:"public_key_auth"`
+	AllowAnonymous  bool   `yaml:"allow_anonymous"`
+	AllowedUsername string `yaml:"allowed_username"` // Only allow connections from this username
 }
 
 // SSHTerminalConfig represents SSH terminal configuration
@@ -235,9 +236,10 @@ func applyDefaults(cfg *SessionServiceConfig) {
 	}
 	if cfg.SSH.Auth == nil {
 		cfg.SSH.Auth = &SSHAuthConfig{
-			PasswordAuth:   true,
-			PublicKeyAuth:  false,
-			AllowAnonymous: true,
+			PasswordAuth:    true,
+			PublicKeyAuth:   false,
+			AllowAnonymous:  true,
+			AllowedUsername: "dungeongate",
 		}
 	}
 	if cfg.SSH.Keepalive == nil {
@@ -426,9 +428,10 @@ func (c *SessionServiceConfig) GetSSH() *SSHConfig {
 			SessionTimeout: "4h",
 			IdleTimeout:    "30m",
 			Auth: &SSHAuthConfig{
-				PasswordAuth:   true,
-				PublicKeyAuth:  false,
-				AllowAnonymous: true,
+				PasswordAuth:    true,
+				PublicKeyAuth:   false,
+				AllowAnonymous:  true,
+				AllowedUsername: "dungeongate",
 			},
 			Terminal: &SSHTerminalConfig{
 				DefaultSize:        "80x24",
@@ -648,9 +651,10 @@ func GetDefaultDevelopmentConfig() *SessionServiceConfig {
 			SessionTimeout: "1h",
 			IdleTimeout:    "15m",
 			Auth: &SSHAuthConfig{
-				PasswordAuth:   true,
-				PublicKeyAuth:  false,
-				AllowAnonymous: true,
+				PasswordAuth:    true,
+				PublicKeyAuth:   false,
+				AllowAnonymous:  true,
+				AllowedUsername: "dungeongate",
 			},
 			Terminal: &SSHTerminalConfig{
 				DefaultSize:        "80x24",

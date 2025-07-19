@@ -42,6 +42,7 @@ type SSHConfig struct {
 	PasswordAuth             bool
 	PublicKeyAuth            bool
 	AllowAnonymous           bool
+	AllowedUsername          string // Only allow connections from this username
 	BannerMainAnon           string
 	BannerMainUser           string
 	BannerMainAdmin          string
@@ -69,16 +70,16 @@ func NewSSHServer(config *SSHConfig, gameClient *client.GameClient, authClient *
 	// Create menu handler
 	menuHandler := menu.NewMenuHandler(bannerManager, gameClient, authClient, logger)
 
+	// Create auth handler (needed for environment variable handling)
+	authHandler := connection.NewSSHAuthHandler(authClient, logger)
+
 	// Create connection handler
-	handler := connection.NewHandler(connManager, gameClient, authClient, menuHandler, logger, config.IdleRetryInterval)
+	handler := connection.NewHandler(connManager, gameClient, authClient, menuHandler, logger, config.IdleRetryInterval, authHandler)
 
 	// Create SSH server config
 	sshConfig := &ssh.ServerConfig{
 		NoClientAuth: config.AllowAnonymous,
 	}
-
-	// Create auth handler
-	authHandler := connection.NewSSHAuthHandler(authClient, logger)
 
 	// Set authentication callbacks based on configuration
 	if config.PasswordAuth {

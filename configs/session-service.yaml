@@ -80,6 +80,10 @@ ssh:
     # Useful for development and demo environments
     allow_anonymous: true
     
+    # Only allow connections from this specific username (blank = allow all)
+    # Blocks connections from any other SSH username
+    allowed_username: "dungeongate"
+    
   # SSH Keepalive Configuration
   keepalive:
     # Enable SSH keepalive to prevent connection timeouts during idle periods

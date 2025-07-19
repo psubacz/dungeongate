@@ -18,6 +18,7 @@ import (
 type SSHAuthHandler struct {
 	authClient *client.AuthClient
 	logger     *slog.Logger
+	envVars    map[string]string // Store environment variables from SSH connection
 }
 
 // NewSSHAuthHandler creates a new SSH auth handler
@@ -25,6 +26,7 @@ func NewSSHAuthHandler(authClient *client.AuthClient, logger *slog.Logger) *SSHA
 	return &SSHAuthHandler{
 		authClient: authClient,
 		logger:     logger,
+		envVars:    make(map[string]string),
 	}
 }
 
@@ -73,6 +75,65 @@ func (a *SSHAuthHandler) PublicKeyCallback(conn ssh.ConnMetadata, key ssh.Public
 	}
 	a.logger.Debug("Public key authentication attempted", "username", username)
 	return nil, fmt.Errorf("public key authentication not supported")
+}
+
+// SetEnvironmentVariable stores an environment variable for this SSH connection
+func (a *SSHAuthHandler) SetEnvironmentVariable(name, value string) {
+	a.envVars[name] = value
+	a.logger.Debug("Environment variable set", "name", name, "value_length", len(value))
+}
+
+// authenticateWithDGAUTH attempts authentication using DGAUTH environment variable
+func (a *SSHAuthHandler) authenticateWithDGAUTH(ctx context.Context) (*ssh.Permissions, error) {
+	dgauth, exists := a.envVars["DGAUTH"]
+	if !exists {
+		return nil, fmt.Errorf("DGAUTH environment variable not found")
+	}
+
+	// Parse DGAUTH format: Username:Password
+	parts := strings.SplitN(dgauth, ":", 2)
+	if len(parts) != 2 {
+		a.logger.Warn("Invalid DGAUTH format", "format", "expected Username:Password")
+		return nil, fmt.Errorf("invalid DGAUTH format, expected Username:Password")
+	}
+
+	username := parts[0]
+	password := parts[1]
+
+	if username == "" || password == "" {
+		a.logger.Warn("Empty username or password in DGAUTH")
+		return nil, fmt.Errorf("username and password cannot be empty")
+	}
+
+	// Authenticate with auth service
+	resp, err := a.authClient.Login(ctx, username, password)
+	if err != nil {
+		a.logger.Warn("DGAUTH login failed", "username", username, "error", err)
+		return nil, fmt.Errorf("authentication failed")
+	}
+
+	// Validate response
+	if resp == nil {
+		a.logger.Warn("DGAUTH login failed: empty response", "username", username)
+		return nil, fmt.Errorf("authentication failed")
+	}
+	if resp.User == nil {
+		a.logger.Warn("DGAUTH login failed: empty user in response", "username", username)
+		return nil, fmt.Errorf("authentication failed")
+	}
+
+	// Store user info in permissions
+	permissions := &ssh.Permissions{
+		Extensions: map[string]string{
+			"user_id":      resp.User.Id,
+			"username":     resp.User.Username,
+			"access_token": resp.AccessToken,
+			"auth_method":  "dgauth",
+		},
+	}
+
+	a.logger.Info("DGAUTH authentication successful", "username", username, "user_id", resp.User.Id)
+	return permissions, nil
 }
 
 // UserAuthManager handles user authentication and account management
@@ -172,10 +233,10 @@ func (m *UserAuthManager) HandleLogin(ctx context.Context, channel ssh.Channel, 
 	sshConn.Permissions.Extensions["access_token"] = resp.AccessToken
 
 	m.logger.Info("User logged in successfully", "username", username, "user_id", resp.User.Id)
-	channel.Write([]byte("\r\nLogin successful! Welcome back to the gate, " + resp.User.Username + "\r\n"))
+	channel.Write([]byte("\r\nLogin successful! Welcome back to the gate, " + resp.User.Username + "...\r\n"))
 
 	// Brief pause to show success message
-	time.Sleep(1 * time.Second)
+	time.Sleep(3 * time.Second)
 
 	return nil
 }

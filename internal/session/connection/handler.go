@@ -21,12 +21,13 @@ type Handler struct {
 	menuChoiceProcessor  *MenuChoiceProcessor
 	serviceHealthChecker *ServiceHealthChecker
 	menuHandler          *menu.MenuHandler
+	authHandler          *SSHAuthHandler
 	logger               *slog.Logger
 	idleRetryInterval    time.Duration
 }
 
 // NewHandler creates a new connection handler
-func NewHandler(manager *Manager, gameClient *client.GameClient, authClient *client.AuthClient, menuHandler *menu.MenuHandler, logger *slog.Logger, idleRetryInterval time.Duration) *Handler {
+func NewHandler(manager *Manager, gameClient *client.GameClient, authClient *client.AuthClient, menuHandler *menu.MenuHandler, logger *slog.Logger, idleRetryInterval time.Duration, authHandler *SSHAuthHandler) *Handler {
 	// Create component handlers
 	authManager := NewUserAuthManager(authClient, logger)
 	gameIOHandler := NewGameIOHandler(gameClient, logger)
@@ -42,6 +43,7 @@ func NewHandler(manager *Manager, gameClient *client.GameClient, authClient *cli
 		menuChoiceProcessor:  menuChoiceProcessor,
 		serviceHealthChecker: serviceHealthChecker,
 		menuHandler:          menuHandler,
+		authHandler:          authHandler,
 		logger:               logger,
 		idleRetryInterval:    idleRetryInterval,
 	}
@@ -85,6 +87,12 @@ func (h *Handler) handleRequests(ctx context.Context, reqs <-chan *ssh.Request, 
 			if req.WantReply {
 				req.Reply(true, nil)
 			}
+		case "env":
+			// Handle environment variable setting
+			success := h.handleEnvironmentRequest(req.Payload, connID)
+			if req.WantReply {
+				req.Reply(success, nil)
+			}
 		default:
 			// Reject unknown requests
 			if req.WantReply {
@@ -92,6 +100,39 @@ func (h *Handler) handleRequests(ctx context.Context, reqs <-chan *ssh.Request, 
 			}
 		}
 	}
+}
+
+// handleEnvironmentRequest handles SSH environment variable requests
+func (h *Handler) handleEnvironmentRequest(payload []byte, connID string) bool {
+	if len(payload) < 8 {
+		h.logger.Warn("Invalid environment request payload", "connection_id", connID, "payload_length", len(payload))
+		return false
+	}
+
+	// Parse SSH env request format: 4 bytes name length + name + 4 bytes value length + value
+	nameLen := int(payload[0])<<24 | int(payload[1])<<16 | int(payload[2])<<8 | int(payload[3])
+	if len(payload) < 4+nameLen+4 {
+		h.logger.Warn("Invalid environment request: insufficient data for name", "connection_id", connID)
+		return false
+	}
+
+	name := string(payload[4 : 4+nameLen])
+	
+	valueStart := 4 + nameLen
+	valueLen := int(payload[valueStart])<<24 | int(payload[valueStart+1])<<16 | int(payload[valueStart+2])<<8 | int(payload[valueStart+3])
+	if len(payload) < valueStart+4+valueLen {
+		h.logger.Warn("Invalid environment request: insufficient data for value", "connection_id", connID)
+		return false
+	}
+
+	value := string(payload[valueStart+4 : valueStart+4+valueLen])
+
+	h.logger.Debug("Environment variable received", "connection_id", connID, "name", name, "value_length", len(value))
+
+	// Store the environment variable in the auth handler
+	h.authHandler.SetEnvironmentVariable(name, value)
+
+	return true
 }
 
 // handleChannels handles SSH channels
@@ -135,6 +176,13 @@ func (h *Handler) handleSessionChannel(ctx context.Context, newChannel ssh.NewCh
 			}
 			req.Reply(true, nil)
 
+		case "env":
+			// Handle environment variable setting
+			success := h.handleEnvironmentRequest(req.Payload, connID)
+			if req.WantReply {
+				req.Reply(success, nil)
+			}
+
 		case "shell":
 			// Start shell session
 			req.Reply(true, nil)
@@ -157,8 +205,30 @@ func (h *Handler) handleSessionChannel(ctx context.Context, newChannel ssh.NewCh
 			// Get user info from auth service
 			userInfo, err := h.authManager.GetUserInfo(ctx, sshConn)
 			if err != nil {
-				h.logger.Debug("No authenticated user info available, treating as anonymous", "error", err, "username", sshConn.User())
-				userInfo = nil // Treat as anonymous user
+				h.logger.Debug("No authenticated user info available, checking for DGAUTH", "error", err, "username", sshConn.User())
+				
+				// Try DGAUTH environment-based authentication if not already authenticated
+				permissions, dgauthErr := h.authHandler.authenticateWithDGAUTH(ctx)
+				if dgauthErr == nil && permissions != nil {
+					// DGAUTH authentication successful, update SSH connection permissions
+					if sshConn.Permissions == nil {
+						sshConn.Permissions = permissions
+					} else {
+						// Merge permissions
+						for k, v := range permissions.Extensions {
+							sshConn.Permissions.Extensions[k] = v
+						}
+					}
+					// Try to get user info again with the new auth
+					userInfo, err = h.authManager.GetUserInfo(ctx, sshConn)
+					if err != nil {
+						h.logger.Warn("Failed to get user info after DGAUTH", "error", err)
+						userInfo = nil
+					}
+				} else {
+					h.logger.Debug("DGAUTH authentication not available or failed", "error", dgauthErr)
+					userInfo = nil // Treat as anonymous user
+				}
 			}
 
 			// Main menu loop
