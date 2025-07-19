@@ -53,16 +53,23 @@ auth:
   enabled: true
 
   # At database initialization, enable root user to promote accounts to admins. Alternativelty, see admins
+  auth:
+  # Root admin user (created automatically if no admins exist)
   root_admin_user:
     enabled: true
-    one_time_password: password
-
-  # At database initialization, add admin user. Alternativelty, see admins
-  admin_users:
-    - name: user1
-      one_time_password: password
-      recovery_email: person@email.com
+    name: admin                    # Optional: defaults to "admin"
+    one_time_password: "secure123" # Required: strong password
+    recovery_email: admin@company.com
   
+  # Additional admin users
+  admin_users:
+    - name: alice
+      one_time_password: "temp456"
+      recovery_email: alice@company.com
+    - name: bob
+      one_time_password: "temp789"
+      recovery_email: bob@company.com
+
   # JWT secret for signing tokens (CRITICAL: change in production)
   # Should be a long, random string. Same across all services for token validation.
   jwt_secret: "dev-secret-please-change-in-production"
