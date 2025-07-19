@@ -50,6 +50,7 @@ type User struct {
 	LockedUntil         *time.Time             `json:"-" db:"locked_until"`
 	EmailVerified       bool                   `json:"email_verified" db:"email_verified"`
 	IsActive            bool                   `json:"is_active" db:"is_active"`
+	RequirePasswordChange bool                 `json:"require_password_change" db:"require_password_change"`
 	Profile             *UserProfile           `json:"profile,omitempty"`
 	Preferences         map[string]interface{} `json:"preferences,omitempty"`
 	Roles               []string               `json:"roles,omitempty"`
@@ -151,7 +152,8 @@ func (s *Service) initializeSchema() error {
 			account_locked BOOLEAN DEFAULT FALSE,
 			locked_until TIMESTAMP,
 			email_verified BOOLEAN DEFAULT FALSE,
-			is_active BOOLEAN DEFAULT TRUE
+			is_active BOOLEAN DEFAULT TRUE,
+			require_password_change BOOLEAN DEFAULT FALSE
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)`,
 		`CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)`,
@@ -214,13 +216,13 @@ func (s *Service) RegisterUser(ctx context.Context, req *RegistrationRequest) (*
 	// Insert user into database
 	query := `
 		INSERT INTO users (username, email, password_hash, salt, environment, flags, 
-						  created_at, updated_at, is_active, email_verified)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+						  created_at, updated_at, is_active, email_verified, require_password_change)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
 	result, err := s.db.ExecContext(ctx, query,
 		user.Username, user.Email, user.PasswordHash, user.Salt, user.Environment,
-		user.Flags, user.CreatedAt, user.UpdatedAt, user.IsActive, user.EmailVerified)
+		user.Flags, user.CreatedAt, user.UpdatedAt, user.IsActive, user.EmailVerified, user.RequirePasswordChange)
 	if err != nil {
 		return nil, fmt.Errorf("failed to insert user: %w", err)
 	}
@@ -405,7 +407,7 @@ func (s *Service) AuthenticateUser(ctx context.Context, username, password strin
 	query := `
 		SELECT id, username, email, password_hash, salt, environment, flags,
 			   created_at, updated_at, last_login, login_count, failed_login_attempts,
-			   account_locked, locked_until, email_verified, is_active
+			   account_locked, locked_until, email_verified, is_active, require_password_change
 		FROM users 
 		WHERE username = ? AND is_active = TRUE
 	`
@@ -417,7 +419,7 @@ func (s *Service) AuthenticateUser(ctx context.Context, username, password strin
 		&user.ID, &user.Username, &user.Email, &user.PasswordHash, &user.Salt,
 		&user.Environment, &user.Flags, &user.CreatedAt, &user.UpdatedAt,
 		&lastLogin, &user.LoginCount, &user.FailedLoginAttempts,
-		&user.AccountLocked, &lockedUntil, &user.EmailVerified, &user.IsActive,
+		&user.AccountLocked, &lockedUntil, &user.EmailVerified, &user.IsActive, &user.RequirePasswordChange,
 	)
 
 	if err != nil {
@@ -482,7 +484,7 @@ func (s *Service) GetUserByID(ctx context.Context, userID int) (*User, error) {
 	query := `
 		SELECT id, username, email, password_hash, salt, environment, flags,
 			   created_at, updated_at, last_login, login_count, failed_login_attempts,
-			   account_locked, locked_until, email_verified, is_active
+			   account_locked, locked_until, email_verified, is_active, require_password_change
 		FROM users 
 		WHERE id = ?
 	`
@@ -494,7 +496,7 @@ func (s *Service) GetUserByID(ctx context.Context, userID int) (*User, error) {
 		&user.ID, &user.Username, &user.Email, &user.PasswordHash, &user.Salt,
 		&user.Environment, &user.Flags, &user.CreatedAt, &user.UpdatedAt,
 		&lastLogin, &user.LoginCount, &user.FailedLoginAttempts,
-		&user.AccountLocked, &lockedUntil, &user.EmailVerified, &user.IsActive,
+		&user.AccountLocked, &lockedUntil, &user.EmailVerified, &user.IsActive, &user.RequirePasswordChange,
 	)
 
 	if err != nil {
@@ -553,7 +555,7 @@ func (s *Service) GetUserByUsername(ctx context.Context, username string) (*User
 	return &user, nil
 }
 
-// createDefaultAdminUser creates a default admin user if none exists
+// createDefaultAdminUser creates default admin users based on configuration
 func (s *Service) createDefaultAdminUser(ctx context.Context) error {
 	// Check if any admin user already exists
 	hasAdmin, err := s.hasAdminUser(ctx)
@@ -562,42 +564,131 @@ func (s *Service) createDefaultAdminUser(ctx context.Context) error {
 	}
 
 	if hasAdmin {
-		return nil // Admin user already exists
+		return nil // Admin user already exists - skip creation
 	}
 
-	// Create default admin user
-	defaultPassword := "admin123" // Should be changed on first login
+	var adminUsersCreated []string
+
+	// Create root admin user if configured
+	if s.config.Authentication != nil && 
+	   s.config.Authentication.RootAdminUser != nil && 
+	   s.config.Authentication.RootAdminUser.Enabled {
+		
+		username := s.config.Authentication.RootAdminUser.Name
+		if username == "" {
+			username = "admin" // Default username
+		}
+		
+		password := s.config.Authentication.RootAdminUser.OneTimePassword
+		if password == "" {
+			return fmt.Errorf("root admin user one_time_password is required when enabled")
+		}
+
+		if err := s.createAdminUser(ctx, username, password, s.config.Authentication.RootAdminUser.RecoveryEmail); err != nil {
+			return fmt.Errorf("failed to create root admin user: %w", err)
+		}
+		
+		adminUsersCreated = append(adminUsersCreated, username)
+		fmt.Printf("Root admin user created: username=%s\n", username)
+	}
+
+	// Create additional admin users if configured
+	if s.config.Authentication != nil && len(s.config.Authentication.AdminUsers) > 0 {
+		for _, adminConfig := range s.config.Authentication.AdminUsers {
+			if adminConfig.Name == "" {
+				fmt.Printf("Warning: Skipping admin user with empty name\n")
+				continue
+			}
+			
+			if adminConfig.OneTimePassword == "" {
+				fmt.Printf("Warning: Skipping admin user '%s' with empty one_time_password\n", adminConfig.Name)
+				continue
+			}
+
+			if err := s.createAdminUser(ctx, adminConfig.Name, adminConfig.OneTimePassword, adminConfig.RecoveryEmail); err != nil {
+				fmt.Printf("Warning: Failed to create admin user '%s': %v\n", adminConfig.Name, err)
+				continue
+			}
+			
+			adminUsersCreated = append(adminUsersCreated, adminConfig.Name)
+			fmt.Printf("Admin user created: username=%s\n", adminConfig.Name)
+		}
+	}
+
+	// Fallback: create default admin if no users were configured and none exist
+	if len(adminUsersCreated) == 0 {
+		defaultPassword := "admin123" // Basic fallback
+		if err := s.createAdminUser(ctx, "admin", defaultPassword, "admin@dungeongate.local"); err != nil {
+			return fmt.Errorf("failed to create fallback admin user: %w", err)
+		}
+		adminUsersCreated = append(adminUsersCreated, "admin")
+		fmt.Printf("Fallback admin user created: username=admin, password=%s\n", defaultPassword)
+	}
+
+	if len(adminUsersCreated) > 0 {
+		fmt.Println("IMPORTANT: Please change admin passwords immediately after first login!")
+		fmt.Println("SECURITY: One-time passwords are visible in logs - secure your log files!")
+	}
+
+	return nil
+}
+
+// createAdminUser creates a single admin user with the given credentials
+func (s *Service) createAdminUser(ctx context.Context, username, password, email string) error {
+	// Check if user already exists
+	existingUser, err := s.GetUserByUsername(ctx, username)
+	if err == nil {
+		// User exists - check if it's still using one-time password
+		if existingUser.RequirePasswordChange {
+			// User still has one-time password, we can reset it
+			if err := s.ResetUserPassword(ctx, username, password); err != nil {
+				return fmt.Errorf("failed to reset one-time password: %w", err)
+			}
+		}
+		
+		// Promote to admin if not already
+		if !existingUser.IsAdmin() {
+			if err := s.promoteUserToAdmin(ctx, username); err != nil {
+				return fmt.Errorf("failed to promote existing user to admin: %w", err)
+			}
+		}
+		
+		// If user already exists and has changed password, leave them alone
+		return nil
+	}
+
+	// Create new user with one-time password flag
 	req := &RegistrationRequest{
-		Username:        "admin",
-		Password:        defaultPassword,
-		PasswordConfirm: defaultPassword,
-		Email:           "admin@dungeongate.local",
+		Username:        username,
+		Password:        password,
+		PasswordConfirm: password,
+		Email:           email,
 		AcceptTerms:     true,
 		Source:          "system",
 	}
 
-	// Create the user first
 	resp, err := s.RegisterUser(ctx, req)
 	if err != nil {
-		return fmt.Errorf("failed to register default admin user: %w", err)
+		return fmt.Errorf("failed to register admin user: %w", err)
 	}
 
 	if !resp.Success {
-		// Check if user already exists
 		if len(resp.Errors) > 0 && resp.Errors[0].Code == "USERNAME_EXISTS" {
-			// User exists, just promote to admin
-			return s.promoteUserToAdmin(ctx, "admin")
+			// User was created between our check and now - promote to admin
+			return s.promoteUserToAdmin(ctx, username)
 		}
-		return fmt.Errorf("failed to create default admin user: %s", resp.Message)
+		return fmt.Errorf("failed to create admin user: %s", resp.Message)
 	}
 
 	// Promote user to admin
-	if err := s.promoteUserToAdmin(ctx, "admin"); err != nil {
-		return fmt.Errorf("failed to promote default user to admin: %w", err)
+	if err := s.promoteUserToAdmin(ctx, username); err != nil {
+		return fmt.Errorf("failed to promote user to admin: %w", err)
 	}
 
-	fmt.Printf("Default admin user created: username=admin, password=%s\n", defaultPassword)
-	fmt.Println("IMPORTANT: Please change the default admin password immediately!")
+	// Mark user as requiring password change (one-time password)
+	if err := s.setRequirePasswordChange(ctx, username, true); err != nil {
+		return fmt.Errorf("failed to set password change requirement: %w", err)
+	}
 
 	return nil
 }
@@ -784,4 +875,39 @@ func (s *Service) GetServerStatistics(ctx context.Context) (map[string]interface
 	stats["users_created_today"] = usersToday
 
 	return stats, nil
+}
+
+// setRequirePasswordChange sets or unsets the password change requirement for a user
+func (s *Service) setRequirePasswordChange(ctx context.Context, username string, required bool) error {
+	query := `
+		UPDATE users 
+		SET require_password_change = ?, 
+			updated_at = CURRENT_TIMESTAMP 
+		WHERE username = ?
+	`
+	result, err := s.db.ExecContext(ctx, query, required, username)
+	if err != nil {
+		return fmt.Errorf("failed to update password change requirement: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("user not found: %s", username)
+	}
+
+	return nil
+}
+
+// ClearPasswordChangeRequirement clears the password change requirement after successful password change
+func (s *Service) ClearPasswordChangeRequirement(ctx context.Context, username string) error {
+	return s.setRequirePasswordChange(ctx, username, false)
+}
+
+// RequiresPasswordChange checks if a user needs to change their password
+func (u *User) RequiresPasswordChange() bool {
+	return u.RequirePasswordChange
 }

@@ -893,7 +893,7 @@ func (s *Service) convertUserToProto(userObj *user.User) *proto.User {
 		lastLogin = timestampProto(*userObj.LastLogin)
 	}
 
-	return &proto.User{
+	protoUser := &proto.User{
 		Id:              strconv.Itoa(userObj.ID),
 		Username:        userObj.Username,
 		Email:           userObj.Email,
@@ -905,6 +905,14 @@ func (s *Service) convertUserToProto(userObj *user.User) *proto.User {
 		UpdatedAt:       timestampProto(userObj.UpdatedAt),
 		LastLogin:       lastLogin,
 	}
+
+	// Add password change requirement to metadata
+	if protoUser.Metadata == nil {
+		protoUser.Metadata = make(map[string]string)
+	}
+	protoUser.Metadata["require_password_change"] = strconv.FormatBool(userObj.RequirePasswordChange)
+
+	return protoUser
 }
 
 func (s *Service) incrementFailedLoginAttempts(ctx context.Context, username, clientIP string) {

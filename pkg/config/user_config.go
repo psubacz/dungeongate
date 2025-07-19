@@ -124,7 +124,7 @@ type UserServiceConfig struct {
 	Server         *ServerConfig       `yaml:"server"`
 	Database       *DatabaseConfig     `yaml:"database"`
 	Registration   *RegistrationConfig `yaml:"registration"`
-	Authentication *AuthConfig         `yaml:"authentication"`
+	Authentication *AuthConfig         `yaml:"auth"`
 	Validation     *ValidationConfig   `yaml:"validation"`
 	Security       *SecurityConfig     `yaml:"security"`
 	Logging        *LoggingConfig      `yaml:"logging"`
@@ -154,6 +154,16 @@ type AuthConfig struct {
 	RequirePasswordChange bool                 `yaml:"require_password_change"`
 	TwoFactorAuth         *TwoFactorConfig     `yaml:"two_factor_auth"`
 	LoginAttempts         *LoginAttemptsConfig `yaml:"login_attempts"`
+	RootAdminUser         *AdminUserConfig     `yaml:"root_admin_user"`
+	AdminUsers            []AdminUserConfig    `yaml:"admin_users"`
+}
+
+// AdminUserConfig represents configuration for creating admin users
+type AdminUserConfig struct {
+	Enabled         bool   `yaml:"enabled"`
+	Name            string `yaml:"name"`
+	OneTimePassword string `yaml:"one_time_password"`
+	RecoveryEmail   string `yaml:"recovery_email"`
 }
 
 // ValidationConfig represents validation configuration
@@ -654,6 +664,13 @@ func NewUserServiceConfig() *UserServiceConfig {
 				ResetWindow:  "1h",
 				Progressive:  true,
 			},
+			RootAdminUser: &AdminUserConfig{
+				Enabled:         false,
+				Name:            "admin",
+				OneTimePassword: "",
+				RecoveryEmail:   "",
+			},
+			AdminUsers: []AdminUserConfig{},
 		},
 		Validation: &ValidationConfig{
 			Username: &UsernameValidation{
