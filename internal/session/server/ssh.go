@@ -46,7 +46,6 @@ type SSHConfig struct {
 	BannerMainUser           string
 	BannerMainAdmin          string
 	BannerWatchMenu          string
-	BannerIdleMode           string
 	BannerServiceUnavailable string
 	IdleRetryInterval        time.Duration
 	Version                  string
@@ -63,7 +62,6 @@ func NewSSHServer(config *SSHConfig, gameClient *client.GameClient, authClient *
 		MainUser:           config.BannerMainUser,
 		MainAdmin:          config.BannerMainAdmin,
 		WatchMenu:          config.BannerWatchMenu,
-		IdleMode:           config.BannerIdleMode,
 		ServiceUnavailable: config.BannerServiceUnavailable,
 	}
 	bannerManager := banner.NewBannerManager(bannerConfig, config.Version)
@@ -80,7 +78,7 @@ func NewSSHServer(config *SSHConfig, gameClient *client.GameClient, authClient *
 	}
 
 	// Create auth handler
-	authHandler := connection.NewAuthHandler(authClient, logger)
+	authHandler := connection.NewSSHAuthHandler(authClient, logger)
 
 	// Set authentication callbacks based on configuration
 	if config.PasswordAuth {

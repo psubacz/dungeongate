@@ -7,14 +7,14 @@ Menu Options:
   [p] Play a game
   [w] Watch games
   [e] Edit profile
-  [r] View recordings
+  [v] View recordings
   [g] Game Statistics
 
   --- Admin Functions
   [u] Unlock User Account
   [d] Delete User Account
   [r] Reset User Account Password
-  [p] Promote User account to Admin
+  [a] Add Admin privileges to User
   [s] Server Statistics
   ---
   [c] Credits

@@ -147,7 +147,6 @@ func main() {
 		sessionConfig.Menu.Banners.MainUser = cfg.Menu.Banners.MainUser
 		sessionConfig.Menu.Banners.MainAdmin = cfg.Menu.Banners.MainAdmin
 		sessionConfig.Menu.Banners.WatchMenu = cfg.Menu.Banners.WatchMenu
-		sessionConfig.Menu.Banners.IdleMode = cfg.Menu.Banners.IdleMode
 		sessionConfig.Menu.Banners.ServiceUnavailable = cfg.Menu.Banners.ServiceUnavailable
 	}
 

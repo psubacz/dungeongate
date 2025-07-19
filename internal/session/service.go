@@ -76,7 +76,6 @@ func New(cfg *Config, logger *slog.Logger, metricsRegistry *metrics.Registry) (*
 		BannerMainUser:           cfg.Menu.Banners.MainUser,
 		BannerMainAdmin:          cfg.Menu.Banners.MainAdmin,
 		BannerWatchMenu:          cfg.Menu.Banners.WatchMenu,
-		BannerIdleMode:           cfg.Menu.Banners.IdleMode,
 		BannerServiceUnavailable: cfg.Menu.Banners.ServiceUnavailable,
 		IdleRetryInterval:        cfg.IdleRetryInterval,
 		Version:                  cfg.Version,

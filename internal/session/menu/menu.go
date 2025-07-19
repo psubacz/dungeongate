@@ -267,7 +267,7 @@ func (mh *MenuHandler) ShowUserMenu(ctx context.Context, channel ssh.Channel, us
 func (mh *MenuHandler) ShowAdminMenu(ctx context.Context, channel ssh.Channel, user *authv1.User) (*MenuChoice, error) {
 	// Create input validator for admin menu
 	validator := &InputValidator{
-		ValidOptions: []string{"[U]nlock User", "[D]elete User", "[R]eset Password", "[P]romote User", "[S]erver Statistics", "[Q]uit"},
+		ValidOptions: []string{"[P]lay", "[W]atch", "[E]dit profile", "[V]iew recordings", "[G]ame Stats", "[U]nlock User", "[D]elete User", "[R]eset Password", "[A]dd Admin", "[S]erver Statistics", "[C]redits", "[Q]uit"},
 		MenuName:     "Admin Menu",
 	}
 
@@ -312,13 +312,27 @@ func (mh *MenuHandler) ShowAdminMenu(ctx context.Context, channel ssh.Channel, u
 			choice := string(event.Character)
 
 			switch strings.ToLower(choice) {
+			// Regular user menu options (admins can use these too)
+			case "p":
+				return &MenuChoice{Action: "play", Value: ""}, nil
+			case "w":
+				return &MenuChoice{Action: "watch", Value: ""}, nil
+			case "e":
+				return &MenuChoice{Action: "edit_profile", Value: ""}, nil
+			case "v":
+				return &MenuChoice{Action: "view_recordings", Value: ""}, nil
+			case "g":
+				return &MenuChoice{Action: "statistics", Value: ""}, nil
+			case "c":
+				return &MenuChoice{Action: "credit", Value: ""}, nil
+			// Admin-specific functions
 			case "u":
 				return &MenuChoice{Action: "admin_unlock_user", Value: ""}, nil
 			case "d":
 				return &MenuChoice{Action: "admin_delete_user", Value: ""}, nil
 			case "r":
 				return &MenuChoice{Action: "admin_reset_password", Value: ""}, nil
-			case "p":
+			case "a":
 				return &MenuChoice{Action: "admin_promote_user", Value: ""}, nil
 			case "s":
 				return &MenuChoice{Action: "admin_server_stats", Value: ""}, nil
