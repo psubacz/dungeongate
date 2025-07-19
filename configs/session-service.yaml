@@ -74,13 +74,13 @@ ssh:
   ### 2. Application Level: Users authenticate with their DungeonGate credentials
   auth:
     # Enable password-based authentication
-    password_auth: true
+    password_auth: false
     
-    # Enable public key authentication (requires key management setup)
+    # Enable public key authentication (requires key management setup) | TODO -  not yet implemented
     public_key_auth: false
     
     # Allow anonymous connections - Useful for development, demo, and public environments
-    allow_anonymous: false
+    allow_anonymous: true
     
     # Only allow connections from this specific username (blank = allow all)
     # Blocks connections from any other SSH username
@@ -88,7 +88,7 @@ ssh:
     
     # SSH password for the dungeongate user (SSH level authentication)
     # This is separate from DungeonGate application user passwords
-    ssh_password: "gate123"
+    ssh_password: "HackToTheGate"
     
   # SSH Keepalive Configuration
   keepalive:
