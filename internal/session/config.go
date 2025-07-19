@@ -76,7 +76,6 @@ type Config struct {
 			MainUser           string `yaml:"main_user" default:"./assets/banners/main_user.txt"`
 			MainAdmin          string `yaml:"main_admin" default:"./assets/banners/main_admin.txt"`
 			WatchMenu          string `yaml:"watch_menu" default:"./assets/banners/watch_menu.txt"`
-			IdleMode           string `yaml:"idle_mode" default:"./assets/banners/idle_mode.txt"`
 			ServiceUnavailable string `yaml:"service_unavailable" default:"./assets/banners/service_unavailable.txt"`
 		} `yaml:"banners"`
 	} `yaml:"menu"`

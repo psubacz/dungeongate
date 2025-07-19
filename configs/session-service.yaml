@@ -207,9 +207,6 @@ menu:
     # Banner for the game spectating menu
     watch_menu: "./assets/banners/watch_menu.txt"
     
-    # Banner shown when game service is unavailable
-    idle_mode: "./assets/banners/idle_mode.txt"
-    
     # Banner shown when critical services are unavailable
     service_unavailable: "./assets/banners/service_unavailable.txt"
     

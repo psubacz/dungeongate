@@ -137,7 +137,6 @@ type BannerConfig struct {
 	MainUser           string
 	MainAdmin          string
 	WatchMenu          string
-	IdleMode           string
 	ServiceUnavailable string
 
 	// Header and footer configuration
@@ -461,7 +460,6 @@ func (bm *BannerManager) ValidateBannerFiles() error {
 		{"main_anon", bm.config.MainAnon},
 		{"main_user", bm.config.MainUser},
 		{"watch_menu", bm.config.WatchMenu},
-		{"idle_mode", bm.config.IdleMode},
 		{"service_unavailable", bm.config.ServiceUnavailable},
 	}
 
@@ -485,7 +483,6 @@ func (bm *BannerManager) GetBannerInfo() map[string]fs.FileInfo {
 		"main_anon":           bm.config.MainAnon,
 		"main_user":           bm.config.MainUser,
 		"watch_menu":          bm.config.WatchMenu,
-		"idle_mode":           bm.config.IdleMode,
 		"service_unavailable": bm.config.ServiceUnavailable,
 	}
 
