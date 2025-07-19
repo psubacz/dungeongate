@@ -384,25 +384,166 @@ db-reset: ## Reset database (DESTRUCTIVE)
 		echo "$(YELLOW)Database reset cancelled.$(NC)"; \
 	fi
 
-##@ Docker
+##@ Container Builds
+
+.PHONY: container-binaries
+container-binaries: ## Extract compiled binaries to ./build using containers
+	@./scripts/build-container.sh binaries
+
+.PHONY: container-development
+container-development: ## Build development image with full toolchain
+	@./scripts/build-container.sh development
+
+.PHONY: container-production
+container-production: ## Build all production images
+	@./scripts/build-container.sh production
+
+.PHONY: container-session
+container-session: ## Build session service production image
+	@./scripts/build-container.sh session
+
+.PHONY: container-auth
+container-auth: ## Build auth service production image
+	@./scripts/build-container.sh auth
+
+.PHONY: container-game
+container-game: ## Build game service production image
+	@./scripts/build-container.sh game
+
+.PHONY: container-all
+container-all: ## Build everything (binaries + all images)
+	@./scripts/build-container.sh all
+
+##@ Container Run (Podman/Docker)
+
+.PHONY: container-run-dev
+container-run-dev: ## Run development container with volume mount
+	@echo "$(GREEN)Running development container...$(NC)"
+	@CONTAINER_CMD=$$(command -v podman || command -v docker); \
+	$$CONTAINER_CMD run -it --rm \
+		--name dungeongate-dev \
+		-v $(PWD):/app \
+		-p 2222:2222 \
+		-p 8081:8081 \
+		-p 8082:8082 \
+		-p 8083:8083 \
+		-p 8085:8085 \
+		-p 9090:9090 \
+		-p 9091:9091 \
+		-p 9093:9093 \
+		-p 50051:50051 \
+		localhost/dungeongate:dev-$(VERSION)
+
+.PHONY: container-run-session
+container-run-session: ## Run session service container
+	@echo "$(GREEN)Running session service container...$(NC)"
+	@CONTAINER_CMD=$$(command -v podman || command -v docker); \
+	$$CONTAINER_CMD run -d \
+		--name dungeongate-session \
+		-p 2222:2222 \
+		-p 8083:8083 \
+		-p 9093:9093 \
+		-v $(PWD)/configs:/app/configs:ro \
+		-v $(PWD)/assets:/app/assets:ro \
+		-v $(PWD)/data:/app/data \
+		-v $(PWD)/logs:/app/logs \
+		localhost/dungeongate-session:$(VERSION)
+
+.PHONY: container-run-auth
+container-run-auth: ## Run auth service container
+	@echo "$(GREEN)Running auth service container...$(NC)"
+	@CONTAINER_CMD=$$(command -v podman || command -v docker); \
+	$$CONTAINER_CMD run -d \
+		--name dungeongate-auth \
+		-p 8081:8081 \
+		-p 8082:8082 \
+		-p 9091:9091 \
+		-v $(PWD)/configs:/app/configs:ro \
+		-v $(PWD)/data:/app/data \
+		-v $(PWD)/logs:/app/logs \
+		localhost/dungeongate-auth:$(VERSION)
+
+.PHONY: container-run-game
+container-run-game: ## Run game service container
+	@echo "$(GREEN)Running game service container...$(NC)"
+	@CONTAINER_CMD=$$(command -v podman || command -v docker); \
+	$$CONTAINER_CMD run -d \
+		--name dungeongate-game \
+		-p 8085:8085 \
+		-p 50051:50051 \
+		-p 9090:9090 \
+		-v $(PWD)/configs:/app/configs:ro \
+		-v $(PWD)/data:/app/data \
+		-v $(PWD)/logs:/app/logs \
+		localhost/dungeongate-game:$(VERSION)
+
+.PHONY: container-run-all
+container-run-all: ## Run all-in-one container
+	@echo "$(GREEN)Running all-in-one container...$(NC)"
+	@CONTAINER_CMD=$$(command -v podman || command -v docker); \
+	$$CONTAINER_CMD run -d \
+		--name dungeongate-all \
+		-p 2222:2222 \
+		-p 8081:8081 \
+		-p 8082:8082 \
+		-p 8083:8083 \
+		-p 8085:8085 \
+		-p 9090:9090 \
+		-p 9091:9091 \
+		-p 9093:9093 \
+		-p 50051:50051 \
+		-v $(PWD)/configs:/app/configs:ro \
+		-v $(PWD)/assets:/app/assets:ro \
+		-v $(PWD)/data:/app/data \
+		-v $(PWD)/logs:/app/logs \
+		localhost/dungeongate:$(VERSION)
+
+.PHONY: container-stop
+container-stop: ## Stop and remove all DungeonGate containers
+	@echo "$(GREEN)Stopping all DungeonGate containers...$(NC)"
+	@CONTAINER_CMD=$$(command -v podman || command -v docker); \
+	$$CONTAINER_CMD stop dungeongate-dev dungeongate-session dungeongate-auth dungeongate-game dungeongate-all 2>/dev/null || true; \
+	$$CONTAINER_CMD rm dungeongate-dev dungeongate-session dungeongate-auth dungeongate-game dungeongate-all 2>/dev/null || true
+
+##@ Container Compose
+
+.PHONY: compose-up
+compose-up: ## Start all services using docker-compose
+	@echo "$(GREEN)Starting services with docker-compose...$(NC)"
+	@cd build/container && docker-compose up -d
+
+.PHONY: compose-up-dev
+compose-up-dev: ## Start development environment
+	@echo "$(GREEN)Starting development environment...$(NC)"
+	@cd build/container && docker-compose --profile dev up -d
+
+.PHONY: compose-up-simple
+compose-up-simple: ## Start all-in-one production service
+	@echo "$(GREEN)Starting all-in-one service...$(NC)"
+	@cd build/container && docker-compose --profile simple up -d
+
+.PHONY: compose-down
+compose-down: ## Stop all services and remove containers
+	@echo "$(GREEN)Stopping services and removing containers...$(NC)"
+	@cd build/container && docker-compose down
+
+.PHONY: compose-logs
+compose-logs: ## Show logs from all services
+	@cd build/container && docker-compose logs -f
+
+##@ Legacy Docker (deprecated - use container-* targets)
 
 .PHONY: docker-build-session
-docker-build-session: ## Build session service Docker image
-	@echo "$(GREEN)Building session service Docker image...$(NC)"
-	docker build -f Dockerfile.session-service -t dungeongate/session-service:$(VERSION) .
+docker-build-session: container-session ## Build session service Docker image (deprecated)
 
 .PHONY: docker-build-auth
-docker-build-auth: ## Build auth service Docker image
-	@echo "$(GREEN)Building auth service Docker image...$(NC)"
-	docker build -f Dockerfile.auth-service -t dungeongate/auth-service:$(VERSION) .
+docker-build-auth: container-auth ## Build auth service Docker image (deprecated)
 
 .PHONY: docker-build-game
-docker-build-game: ## Build game service Docker image
-	@echo "$(GREEN)Building game service Docker image...$(NC)"
-	docker build -f Dockerfile.game-service -t dungeongate/game-service:$(VERSION) .
+docker-build-game: container-game ## Build game service Docker image (deprecated)
 
 .PHONY: docker-build-all
-docker-build-all: docker-build-session docker-build-auth docker-build-game ## Build all Docker images
+docker-build-all: container-production ## Build all Docker images (deprecated)
 
 .PHONY: docker-compose-up
 docker-compose-up: ## Start all services with docker-compose

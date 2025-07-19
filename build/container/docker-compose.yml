@@ -1,0 +1,229 @@
+version: '3.8'
+
+# DungeonGate Services Compose Configuration
+# Provides both development and production deployment options
+
+services:
+  # ==============================================================================
+  # Auth Service - Central authentication and authorization
+  # ==============================================================================
+  auth-service:
+    image: ${REGISTRY:-localhost}/dungeongate-auth:${VERSION:-latest}
+    container_name: dungeongate-auth
+    ports:
+      - "8081:8081"  # HTTP API
+      - "8082:8082"  # gRPC API
+      - "9091:9091"  # Metrics
+    volumes:
+      - ../../configs:/app/configs:ro
+      - ../../data:/app/data
+      - ../../logs:/app/logs
+    environment:
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - JWT_SECRET=${JWT_SECRET:-}
+      - DATABASE_URL=${DATABASE_URL:-sqlite:///app/data/sqlite/dungeongate.db}
+    healthcheck:
+      test: ["CMD", "/app/bin/dungeongate-auth-service", "-health-check"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - dungeongate
+
+  # ==============================================================================
+  # Game Service - Game management and session orchestration  
+  # ==============================================================================
+  game-service:
+    image: ${REGISTRY:-localhost}/dungeongate-game:${VERSION:-latest}
+    container_name: dungeongate-game
+    ports:
+      - "8085:8085"  # HTTP API
+      - "50051:50051"  # gRPC API
+      - "9090:9090"  # Metrics
+    volumes:
+      - ../../configs:/app/configs:ro
+      - ../../data:/app/data
+      - ../../logs:/app/logs
+    environment:
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - DATABASE_URL=${DATABASE_URL:-sqlite:///app/data/sqlite/dungeongate.db}
+    healthcheck:
+      test: ["CMD", "/app/bin/dungeongate-game-service", "-health-check"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+    depends_on:
+      auth-service:
+        condition: service_healthy
+    networks:
+      - dungeongate
+
+  # ==============================================================================
+  # Session Service - SSH server and terminal session management
+  # ==============================================================================
+  session-service:
+    image: ${REGISTRY:-localhost}/dungeongate-session:${VERSION:-latest}
+    container_name: dungeongate-session
+    ports:
+      - "2222:2222"  # SSH
+      - "8083:8083"  # HTTP API
+      - "9093:9093"  # gRPC API
+      - "8085:8085"  # Metrics (note: conflicts with game service in all-in-one)
+    volumes:
+      - ./configs:/app/configs:ro
+      - ../../assets:/app/assets:ro
+      - ./data:/app/data
+      - ./logs:/app/logs
+    environment:
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - AUTH_SERVICE_ADDRESS=auth-service:8082
+      - GAME_SERVICE_ADDRESS=game-service:50051
+    healthcheck:
+      test: ["CMD", "/app/bin/dungeongate-session-service", "-health-check"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      game-service:
+        condition: service_healthy
+    networks:
+      - dungeongate
+
+  # ==============================================================================
+  # Development Service - Full toolchain for development
+  # ==============================================================================
+  development:
+    image: ${REGISTRY:-localhost}/dungeongate:dev-${VERSION:-latest}
+    container_name: dungeongate-dev
+    profiles: ["dev"]  # Only start with --profile dev
+    ports:
+      - "8081:8081"   # Auth HTTP
+      - "8082:8082"   # Auth gRPC  
+      - "8083:8083"   # Session HTTP
+      - "8085:8085"   # Game HTTP
+      - "9090:9090"   # Game Metrics
+      - "9091:9091"   # Auth Metrics
+      - "9093:9093"   # Session gRPC
+      - "2222:2222"   # SSH
+      - "50051:50051" # Game gRPC
+    volumes:
+      - ../..:/app:cached
+      - go-cache:/home/developer/.cache
+    environment:
+      - LOG_LEVEL=${LOG_LEVEL:-debug}
+      - JWT_SECRET=${JWT_SECRET:-dev-secret-key}
+      - DATABASE_URL=${DATABASE_URL:-sqlite:///app/data/sqlite/dungeongate-dev.db}
+    working_dir: /app
+    command: ["make", "run-all"]
+    networks:
+      - dungeongate
+
+  # ==============================================================================
+  # All-in-One Production - Single container for simple deployments
+  # ==============================================================================
+  all-in-one:
+    image: ${REGISTRY:-localhost}/dungeongate:${VERSION:-latest}
+    container_name: dungeongate-all
+    profiles: ["simple"]  # Only start with --profile simple
+    ports:
+      - "8081:8081"   # Auth HTTP
+      - "8082:8082"   # Auth gRPC
+      - "8083:8083"   # Session HTTP
+      - "8085:8085"   # Game HTTP / Session Metrics
+      - "9090:9090"   # Game Metrics
+      - "9091:9091"   # Auth Metrics
+      - "9093:9093"   # Session gRPC
+      - "2222:2222"   # SSH
+      - "50051:50051" # Game gRPC
+    volumes:
+      - ./configs:/app/configs:ro
+      - ../../assets:/app/assets:ro
+      - ./data:/app/data
+      - ./logs:/app/logs
+    environment:
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - JWT_SECRET=${JWT_SECRET:-}
+      - DATABASE_URL=${DATABASE_URL:-sqlite:///app/data/sqlite/dungeongate.db}
+    healthcheck:
+      test: ["CMD", "pgrep", "-f", "dungeongate"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+    networks:
+      - dungeongate
+
+  # ==============================================================================
+  # Optional: Database (PostgreSQL for production)
+  # ==============================================================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: dungeongate-db
+    profiles: ["postgres"]  # Only start with --profile postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./migrations:/docker-entrypoint-initdb.d:ro
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-dungeongate}
+      - POSTGRES_USER=${POSTGRES_USER:-dungeongate}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-dungeongate}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-dungeongate}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - dungeongate
+
+  # ==============================================================================
+  # Optional: Monitoring (Prometheus + Grafana)
+  # ==============================================================================
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: dungeongate-prometheus
+    profiles: ["monitoring"]  # Only start with --profile monitoring
+    ports:
+      - "9090:9090"
+    volumes:
+      - ../../monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    restart: unless-stopped
+    networks:
+      - dungeongate
+
+# ==============================================================================
+# Networks
+# ==============================================================================
+networks:
+  dungeongate:
+    driver: bridge
+    name: dungeongate
+
+# ==============================================================================
+# Volumes
+# ==============================================================================
+volumes:
+  postgres-data:
+    name: dungeongate-postgres-data
+  prometheus-data:
+    name: dungeongate-prometheus-data
+  go-cache:
+    name: dungeongate-go-cache

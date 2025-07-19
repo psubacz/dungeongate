@@ -1,0 +1,229 @@
+# Multi-stage Containerfile for DungeonGate services
+# Creates development, production, and binary export images
+
+# ==============================================================================
+# Builder Stage - Compiles all services
+# ==============================================================================
+FROM golang:1.24-alpine AS builder
+
+# Install build dependencies
+RUN apk add --no-cache \
+    git \
+    make \
+    gcc \
+    musl-dev \
+    ca-certificates \
+    tzdata
+
+# Set working directory
+WORKDIR /app
+
+# Copy go mod files first for better layer caching
+COPY go.mod go.sum ./
+
+# Download dependencies
+RUN go mod download && go mod verify
+
+# Copy source code
+COPY . .
+
+# Build arguments
+ARG VERSION=container-build
+ARG BUILD_TIME
+ARG GIT_COMMIT=unknown
+ARG TARGETARCH=arm64
+
+# Set build flags
+ENV LDFLAGS="-s -w -X main.version=${VERSION} -X main.buildTime=${BUILD_TIME} -X main.gitCommit=${GIT_COMMIT}"
+
+# Create build directory
+RUN mkdir -p build
+
+# Build all three services with optimizations
+RUN CGO_ENABLED=1 GOOS=linux GOARCH=${TARGETARCH} go build ${LDFLAGS} -o build/dungeongate-session-service ./cmd/session-service && \
+    CGO_ENABLED=1 GOOS=linux GOARCH=${TARGETARCH} go build ${LDFLAGS} -o build/dungeongate-auth-service ./cmd/auth-service && \
+    CGO_ENABLED=1 GOOS=linux GOARCH=${TARGETARCH} go build ${LDFLAGS} -o build/dungeongate-game-service ./cmd/game-service
+
+# Make binaries executable and verify
+RUN chmod +x build/dungeongate-* && \
+    ls -la build/ && \
+    file build/dungeongate-*
+
+# ==============================================================================
+# Development Image - Full toolchain for development
+# ==============================================================================
+FROM golang:1.24-alpine AS development
+
+# Install development tools
+RUN apk add --no-cache \
+    git \
+    make \
+    gcc \
+    musl-dev \
+    bash \
+    curl \
+    ca-certificates \
+    tzdata \
+    openssh-client \
+    vim \
+    htop \
+    tree
+
+# Install Go development tools
+RUN go install github.com/air-verse/air@latest && \
+    go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+
+# Create development user
+RUN addgroup -g 1001 developer && \
+    adduser -u 1001 -G developer -s /bin/bash -D developer
+
+# Create directories with proper permissions
+RUN mkdir -p /app /home/developer/.cache && \
+    chown -R developer:developer /app /home/developer
+
+# Copy source code
+COPY --chown=developer:developer . /app/
+
+# Set working directory
+WORKDIR /app
+
+# Switch to development user
+USER developer
+
+# Expose common development ports
+EXPOSE 8081 8082 8083 8085 9090 9091 9093 2222
+
+# Default command for development
+CMD ["make", "run-all"]
+
+# ==============================================================================
+# Production Base - Minimal runtime environment
+# ==============================================================================
+FROM alpine:latest AS production-base
+
+# Install only essential runtime dependencies
+RUN apk add --no-cache \
+    ca-certificates \
+    tzdata \
+    && rm -rf /var/cache/apk/*
+
+# Create non-root user for security
+RUN addgroup -g 1001 dungeongate && \
+    adduser -u 1001 -G dungeongate -s /bin/sh -D dungeongate
+
+# Create application directories
+RUN mkdir -p /app/bin /app/configs /app/data /app/logs /app/assets && \
+    chown -R dungeongate:dungeongate /app
+
+# ==============================================================================
+# Production Session Service
+# ==============================================================================
+FROM production-base AS session-service
+
+# Copy session service binary
+COPY --from=builder --chown=dungeongate:dungeongate /app/build/dungeongate-session-service /app/bin/
+
+# Copy required configurations and assets
+COPY --chown=dungeongate:dungeongate configs/ /app/configs/
+COPY --chown=dungeongate:dungeongate assets/ /app/assets/
+
+# Switch to non-root user
+USER dungeongate
+WORKDIR /app
+
+# Expose ports
+EXPOSE 8083 9093 2222
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD /app/bin/dungeongate-session-service -health-check || exit 1
+
+# Run session service
+CMD ["/app/bin/dungeongate-session-service", "-config=/app/configs/session-service.yaml"]
+
+# ==============================================================================
+# Production Auth Service  
+# ==============================================================================
+FROM production-base AS auth-service
+
+# Copy auth service binary
+COPY --from=builder --chown=dungeongate:dungeongate /app/build/dungeongate-auth-service /app/bin/
+
+# Copy required configurations
+COPY --chown=dungeongate:dungeongate configs/ /app/configs/
+
+# Switch to non-root user
+USER dungeongate
+WORKDIR /app
+
+# Expose ports
+EXPOSE 8081 8082
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD /app/bin/dungeongate-auth-service -health-check || exit 1
+
+# Run auth service
+CMD ["/app/bin/dungeongate-auth-service", "-config=/app/configs/auth-service.yaml"]
+
+# ==============================================================================
+# Production Game Service
+# ==============================================================================
+FROM production-base AS game-service
+
+# Copy game service binary
+COPY --from=builder --chown=dungeongate:dungeongate /app/build/dungeongate-game-service /app/bin/
+
+# Copy required configurations
+COPY --chown=dungeongate:dungeongate configs/ /app/configs/
+
+# Switch to non-root user
+USER dungeongate
+WORKDIR /app
+
+# Expose ports
+EXPOSE 8085 50051
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD /app/bin/dungeongate-game-service -health-check || exit 1
+
+# Run game service
+CMD ["/app/bin/dungeongate-game-service", "-config=/app/configs/game-service.yaml"]
+
+# ==============================================================================
+# All-in-One Production Image (for testing/simple deployments)
+# ==============================================================================
+FROM production-base AS production
+
+# Copy all service binaries
+COPY --from=builder --chown=dungeongate:dungeongate /app/build/ /app/bin/
+
+# Copy configurations and assets
+COPY --chown=dungeongate:dungeongate configs/ /app/configs/
+COPY --chown=dungeongate:dungeongate assets/ /app/assets/
+
+# Copy startup script
+COPY --chown=dungeongate:dungeongate scripts/start-all-services.sh /app/bin/
+
+# Switch to non-root user
+USER dungeongate
+WORKDIR /app
+
+# Expose all service ports
+EXPOSE 8081 8082 8083 8085 9090 9091 9093 2222 50051
+
+# Health check for all services
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD pgrep -f dungeongate || exit 1
+
+# Default: run all services (for development/testing)
+CMD ["/app/bin/start-all-services.sh"]
+
+# ==============================================================================
+# Export Stage - For extracting binaries to host
+# ==============================================================================
+FROM scratch AS export
+
+# Copy built binaries to be extracted to host ./build directory
+COPY --from=builder /app/build/ /
