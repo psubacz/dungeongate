@@ -174,6 +174,21 @@ func (h *Handler) handleSessionChannel(ctx context.Context, newChannel ssh.NewCh
 					// Show anonymous menu
 					menuChoice, err = h.menuHandler.ShowAnonymousMenu(ctx, channel, sshConn.User())
 				} else {
+					// Check if user needs to change password (one-time password)
+					if userInfo.Metadata != nil && userInfo.Metadata["require_password_change"] == "true" {
+						// Force password change for one-time passwords
+						menuChoice, err = h.handleRequiredPasswordChange(ctx, channel, userInfo, sshConn)
+						if err != nil {
+							h.logger.Error("Error handling required password change", "error", err, "username", userInfo.Username)
+							continue // Return to menu
+						}
+						if menuChoice != nil && menuChoice.Action == "quit" {
+							return // User chose to quit
+						}
+						// Password changed successfully, refresh user info and continue
+						continue
+					}
+					
 					// Show authenticated user menu (or admin menu if user is admin)
 					menuChoice, err = h.menuHandler.ShowUserMenu(ctx, channel, userInfo)
 				}
@@ -1638,4 +1653,98 @@ func (h *Handler) handleSpectatingStream(ctx context.Context, stream gamev2.Game
 	// Wait for either goroutine to finish
 	<-done
 	return nil
+}
+
+// handleRequiredPasswordChange handles the forced password change for one-time passwords
+func (h *Handler) handleRequiredPasswordChange(ctx context.Context, channel ssh.Channel, user *authv1.User, sshConn *ssh.ServerConn) (*menu.MenuChoice, error) {
+	// Clear screen and display password change prompt
+	channel.Write([]byte("\033[2J\033[H"))
+	channel.Write([]byte("\r\n=== PASSWORD CHANGE REQUIRED ===\r\n\r\n"))
+	channel.Write([]byte("Your account is using a one-time password and must be changed before you can access the system.\r\n\r\n"))
+
+	// Flush any pending input
+	h.flushInput(channel)
+
+	for {
+		// Get current password
+		channel.Write([]byte("Enter your current password: "))
+		currentPassword, err := h.readPasswordWithTerminal(ctx, channel)
+		if err != nil {
+			if err.Error() == "user cancelled" {
+				return &menu.MenuChoice{Action: "quit", Value: ""}, nil
+			}
+			return nil, err
+		}
+
+		// Get new password
+		channel.Write([]byte("Enter your new password: "))
+		newPassword, err := h.readPasswordWithTerminal(ctx, channel)
+		if err != nil {
+			if err.Error() == "user cancelled" {
+				return &menu.MenuChoice{Action: "quit", Value: ""}, nil
+			}
+			return nil, err
+		}
+
+		// Confirm new password
+		channel.Write([]byte("Confirm your new password: "))
+		confirmPassword, err := h.readPasswordWithTerminal(ctx, channel)
+		if err != nil {
+			if err.Error() == "user cancelled" {
+				return &menu.MenuChoice{Action: "quit", Value: ""}, nil
+			}
+			return nil, err
+		}
+
+		// Check if new passwords match
+		if newPassword != confirmPassword {
+			channel.Write([]byte("\r\nError: New passwords do not match. Please try again.\r\n\r\n"))
+			continue
+		}
+
+		// Check if new password is different from current
+		if newPassword == currentPassword {
+			channel.Write([]byte("\r\nError: New password must be different from current password. Please try again.\r\n\r\n"))
+			continue
+		}
+
+		// Get access token for API call
+		permissions := sshConn.Permissions
+		if permissions == nil || permissions.Extensions == nil {
+			return nil, fmt.Errorf("no authentication token available")
+		}
+
+		accessToken, ok := permissions.Extensions["access_token"]
+		if !ok || accessToken == "" {
+			return nil, fmt.Errorf("no access token in session")
+		}
+
+		// Call auth service to change password
+		changeReq := &authv1.ChangePasswordRequest{
+			AccessToken:     accessToken,
+			CurrentPassword: currentPassword,
+			NewPassword:     newPassword,
+		}
+
+		changeResp, err := h.authClient.ChangePassword(ctx, changeReq)
+		if err != nil {
+			h.logger.Error("Password change failed", "error", err, "username", user.Username)
+			channel.Write([]byte("\r\nError: Failed to change password. Please try again.\r\n\r\n"))
+			continue
+		}
+
+		if !changeResp.Success {
+			channel.Write([]byte(fmt.Sprintf("\r\nError: %s\r\n\r\n", changeResp.Error)))
+			continue
+		}
+
+		// Password changed successfully
+		channel.Write([]byte("\r\nPassword changed successfully! You can now access the system.\r\n"))
+		h.logger.Info("Password changed successfully for one-time password user", "username", user.Username)
+		
+		// Brief pause to show success message
+		time.Sleep(2 * time.Second)
+		
+		return nil, nil // Return to main menu loop to refresh user info
+	}
 }

@@ -52,8 +52,6 @@ auth:
   # Enable authentication service (should always be true for auth service)
   enabled: true
 
-  # At database initialization, enable root user to promote accounts to admins. Alternativelty, see admins
-  auth:
   # Root admin user (created automatically if no admins exist)
   root_admin_user:
     enabled: true

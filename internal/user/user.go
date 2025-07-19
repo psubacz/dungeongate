@@ -911,3 +911,55 @@ func (s *Service) ClearPasswordChangeRequirement(ctx context.Context, username s
 func (u *User) RequiresPasswordChange() bool {
 	return u.RequirePasswordChange
 }
+
+// ChangePassword changes a user's password after verifying their current password
+func (s *Service) ChangePassword(ctx context.Context, username, currentPassword, newPassword string) error {
+	// First authenticate with current password
+	user, err := s.AuthenticateUser(ctx, username, currentPassword)
+	if err != nil {
+		return fmt.Errorf("current password verification failed: %w", err)
+	}
+
+	// Validate new password
+	if errors := s.validatePassword(newPassword); len(errors) > 0 {
+		return fmt.Errorf("invalid new password: %s", errors[0].Message)
+	}
+
+	// Hash new password
+	passwordHash, salt, err := s.hashPassword(newPassword)
+	if err != nil {
+		return fmt.Errorf("failed to hash new password: %w", err)
+	}
+
+	// Update password in database
+	query := `
+		UPDATE users 
+		SET password_hash = ?, 
+			salt = ?, 
+			require_password_change = FALSE,
+			updated_at = CURRENT_TIMESTAMP 
+		WHERE username = ?
+	`
+	result, err := s.db.ExecContext(ctx, query, passwordHash, salt, username)
+	if err != nil {
+		return fmt.Errorf("failed to update password: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("user not found: %s", username)
+	}
+
+	// Clear the require_password_change flag (for one-time passwords)
+	// This is already handled in the query above, but we also reset failed login attempts
+	if err := s.resetFailedLoginAttempts(ctx, user.ID); err != nil {
+		// Log error but don't fail the password change
+		fmt.Printf("Warning: Failed to reset failed login attempts after password change: %v\n", err)
+	}
+
+	return nil
+}

@@ -330,17 +330,18 @@ func (s *Service) ChangePassword(ctx context.Context, req *proto.ChangePasswordR
 		}, nil
 	}
 
-	// Verify current password
-	_, err = s.userSvc.AuthenticateUser(ctx, validateResp.User.Username, req.CurrentPassword)
+	// Change password using user service
+	err = s.userSvc.ChangePassword(ctx, validateResp.User.Username, req.CurrentPassword, req.NewPassword)
 	if err != nil {
+		s.logger.Error("Password change failed", "error", err, "username", validateResp.User.Username)
 		return &proto.ChangePasswordResponse{
 			Success: false,
-			Error:   "Current password is incorrect",
+			Error:   "Password change failed: " + err.Error(),
 		}, nil
 	}
 
-	// Update password - Note: This would need to be implemented in user service
-	// For now, return success
+	s.logger.Info("Password changed successfully", "username", validateResp.User.Username)
+	
 	return &proto.ChangePasswordResponse{
 		Success: true,
 	}, nil

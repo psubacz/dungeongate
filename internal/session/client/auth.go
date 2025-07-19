@@ -101,6 +101,16 @@ func (c *AuthClient) Register(ctx context.Context, username, password, email str
 	return resp, nil
 }
 
+// ChangePassword changes a user's password
+func (c *AuthClient) ChangePassword(ctx context.Context, req *authv1.ChangePasswordRequest) (*authv1.ChangePasswordResponse, error) {
+	resp, err := c.client.ChangePassword(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to change password: %w", err)
+	}
+
+	return resp, nil
+}
+
 // IsHealthy checks if the auth service is available and healthy
 func (c *AuthClient) IsHealthy(ctx context.Context) bool {
 	// Use a simple ping mechanism - try to call an endpoint that should always be available
