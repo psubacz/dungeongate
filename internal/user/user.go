@@ -34,26 +34,26 @@ const (
 
 // Enhanced User model
 type User struct {
-	ID                  int                    `json:"id" db:"id"`
-	Username            string                 `json:"username" db:"username"`
-	Email               string                 `json:"email,omitempty" db:"email"`
-	PasswordHash        string                 `json:"-" db:"password_hash"`
-	Salt                string                 `json:"-" db:"salt"`
-	Environment         string                 `json:"environment,omitempty" db:"environment"`
-	Flags               UserFlags              `json:"flags" db:"flags"`
-	CreatedAt           time.Time              `json:"created_at" db:"created_at"`
-	UpdatedAt           time.Time              `json:"updated_at" db:"updated_at"`
-	LastLogin           *time.Time             `json:"last_login,omitempty" db:"last_login"`
-	LoginCount          int                    `json:"login_count" db:"login_count"`
-	FailedLoginAttempts int                    `json:"-" db:"failed_login_attempts"`
-	AccountLocked       bool                   `json:"account_locked" db:"account_locked"`
-	LockedUntil         *time.Time             `json:"-" db:"locked_until"`
-	EmailVerified       bool                   `json:"email_verified" db:"email_verified"`
-	IsActive            bool                   `json:"is_active" db:"is_active"`
-	RequirePasswordChange bool                 `json:"require_password_change" db:"require_password_change"`
-	Profile             *UserProfile           `json:"profile,omitempty"`
-	Preferences         map[string]interface{} `json:"preferences,omitempty"`
-	Roles               []string               `json:"roles,omitempty"`
+	ID                    int                    `json:"id" db:"id"`
+	Username              string                 `json:"username" db:"username"`
+	Email                 string                 `json:"email,omitempty" db:"email"`
+	PasswordHash          string                 `json:"-" db:"password_hash"`
+	Salt                  string                 `json:"-" db:"salt"`
+	Environment           string                 `json:"environment,omitempty" db:"environment"`
+	Flags                 UserFlags              `json:"flags" db:"flags"`
+	CreatedAt             time.Time              `json:"created_at" db:"created_at"`
+	UpdatedAt             time.Time              `json:"updated_at" db:"updated_at"`
+	LastLogin             *time.Time             `json:"last_login,omitempty" db:"last_login"`
+	LoginCount            int                    `json:"login_count" db:"login_count"`
+	FailedLoginAttempts   int                    `json:"-" db:"failed_login_attempts"`
+	AccountLocked         bool                   `json:"account_locked" db:"account_locked"`
+	LockedUntil           *time.Time             `json:"-" db:"locked_until"`
+	EmailVerified         bool                   `json:"email_verified" db:"email_verified"`
+	IsActive              bool                   `json:"is_active" db:"is_active"`
+	RequirePasswordChange bool                   `json:"require_password_change" db:"require_password_change"`
+	Profile               *UserProfile           `json:"profile,omitempty"`
+	Preferences           map[string]interface{} `json:"preferences,omitempty"`
+	Roles                 []string               `json:"roles,omitempty"`
 }
 
 // UserProfile represents extended user profile information
@@ -570,15 +570,15 @@ func (s *Service) createDefaultAdminUser(ctx context.Context) error {
 	var adminUsersCreated []string
 
 	// Create root admin user if configured
-	if s.config.Authentication != nil && 
-	   s.config.Authentication.RootAdminUser != nil && 
-	   s.config.Authentication.RootAdminUser.Enabled {
-		
+	if s.config.Authentication != nil &&
+		s.config.Authentication.RootAdminUser != nil &&
+		s.config.Authentication.RootAdminUser.Enabled {
+
 		username := s.config.Authentication.RootAdminUser.Name
 		if username == "" {
 			username = "admin" // Default username
 		}
-		
+
 		password := s.config.Authentication.RootAdminUser.OneTimePassword
 		if password == "" {
 			return fmt.Errorf("root admin user one_time_password is required when enabled")
@@ -587,7 +587,7 @@ func (s *Service) createDefaultAdminUser(ctx context.Context) error {
 		if err := s.createAdminUser(ctx, username, password, s.config.Authentication.RootAdminUser.RecoveryEmail); err != nil {
 			return fmt.Errorf("failed to create root admin user: %w", err)
 		}
-		
+
 		adminUsersCreated = append(adminUsersCreated, username)
 		fmt.Printf("Root admin user created: username=%s\n", username)
 	}
@@ -599,7 +599,7 @@ func (s *Service) createDefaultAdminUser(ctx context.Context) error {
 				fmt.Printf("Warning: Skipping admin user with empty name\n")
 				continue
 			}
-			
+
 			if adminConfig.OneTimePassword == "" {
 				fmt.Printf("Warning: Skipping admin user '%s' with empty one_time_password\n", adminConfig.Name)
 				continue
@@ -609,7 +609,7 @@ func (s *Service) createDefaultAdminUser(ctx context.Context) error {
 				fmt.Printf("Warning: Failed to create admin user '%s': %v\n", adminConfig.Name, err)
 				continue
 			}
-			
+
 			adminUsersCreated = append(adminUsersCreated, adminConfig.Name)
 			fmt.Printf("Admin user created: username=%s\n", adminConfig.Name)
 		}
@@ -645,14 +645,14 @@ func (s *Service) createAdminUser(ctx context.Context, username, password, email
 				return fmt.Errorf("failed to reset one-time password: %w", err)
 			}
 		}
-		
+
 		// Promote to admin if not already
 		if !existingUser.IsAdmin() {
 			if err := s.promoteUserToAdmin(ctx, username); err != nil {
 				return fmt.Errorf("failed to promote existing user to admin: %w", err)
 			}
 		}
-		
+
 		// If user already exists and has changed password, leave them alone
 		return nil
 	}

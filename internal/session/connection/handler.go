@@ -14,15 +14,15 @@ import (
 
 // Handler handles SSH connections in a stateless manner
 type Handler struct {
-	manager               *Manager
-	authManager           *UserAuthManager
-	gameIOHandler         *GameIOHandler
-	spectatingHandler     *SpectatingHandler
-	menuChoiceProcessor   *MenuChoiceProcessor
-	serviceHealthChecker  *ServiceHealthChecker
-	menuHandler           *menu.MenuHandler
-	logger                *slog.Logger
-	idleRetryInterval     time.Duration
+	manager              *Manager
+	authManager          *UserAuthManager
+	gameIOHandler        *GameIOHandler
+	spectatingHandler    *SpectatingHandler
+	menuChoiceProcessor  *MenuChoiceProcessor
+	serviceHealthChecker *ServiceHealthChecker
+	menuHandler          *menu.MenuHandler
+	logger               *slog.Logger
+	idleRetryInterval    time.Duration
 }
 
 // NewHandler creates a new connection handler
@@ -189,7 +189,7 @@ func (h *Handler) handleSessionChannel(ctx context.Context, newChannel ssh.NewCh
 						// Password changed successfully, refresh user info and continue
 						continue
 					}
-					
+
 					// Show authenticated user menu (or admin menu if user is admin)
 					menuChoice, err = h.menuHandler.ShowUserMenu(ctx, channel, userInfo)
 				}

@@ -555,7 +555,7 @@ func (mh *MenuHandler) ShowSpectateMenu(ctx context.Context, channel ssh.Channel
 	if len(availableSessions) == 0 {
 		// Clear screen and show informative message
 		channel.Write([]byte("\033[2J\033[H"))
-		
+
 		if user == nil {
 			// Message for anonymous users
 			channel.Write([]byte("=== No Games Available to Watch ===\r\n\r\n"))
@@ -573,7 +573,7 @@ func (mh *MenuHandler) ShowSpectateMenu(ctx context.Context, channel ssh.Channel
 			channel.Write([]byte("• Wait for other players to start games\r\n\r\n"))
 			channel.Write([]byte("Press any key to return to the main menu...\r\n"))
 		}
-		
+
 		// Wait for any key press to return
 		buffer := make([]byte, 1)
 		channel.Read(buffer)

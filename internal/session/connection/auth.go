@@ -360,14 +360,13 @@ func (m *UserAuthManager) HandleRequiredPasswordChange(ctx context.Context, chan
 		// Password changed successfully
 		channel.Write([]byte("\r\nPassword changed successfully! You can now access the system.\r\n"))
 		m.logger.Info("Password changed successfully for one-time password user", "username", user.Username)
-		
+
 		// Brief pause to show success message
 		time.Sleep(2 * time.Second)
-		
+
 		return nil, nil // Return to main menu loop to refresh user info
 	}
 }
-
 
 // getDetailedValidationMessage provides specific validation feedback
 func (m *UserAuthManager) getDetailedValidationMessage(errorCode, errorMessage string) string {

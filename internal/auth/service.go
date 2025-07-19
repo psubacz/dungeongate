@@ -341,7 +341,7 @@ func (s *Service) ChangePassword(ctx context.Context, req *proto.ChangePasswordR
 	}
 
 	s.logger.Info("Password changed successfully", "username", validateResp.User.Username)
-	
+
 	return &proto.ChangePasswordResponse{
 		Success: true,
 	}, nil
@@ -538,7 +538,7 @@ func (s *Service) UnlockUserAccount(ctx context.Context, req *proto.AdminActionR
 		}, nil
 	}
 
-	s.logger.Info("User account unlocked by admin", 
+	s.logger.Info("User account unlocked by admin",
 		"admin_user", adminUser.Username,
 		"target_user", req.TargetUsername,
 	)
@@ -602,7 +602,7 @@ func (s *Service) DeleteUserAccount(ctx context.Context, req *proto.AdminActionR
 		}, nil
 	}
 
-	s.logger.Info("User account deleted by admin", 
+	s.logger.Info("User account deleted by admin",
 		"admin_user", adminUser.Username,
 		"target_user", req.TargetUsername,
 	)
@@ -666,7 +666,7 @@ func (s *Service) ResetUserPassword(ctx context.Context, req *proto.ResetPasswor
 		}, nil
 	}
 
-	s.logger.Info("User password reset by admin", 
+	s.logger.Info("User password reset by admin",
 		"admin_user", adminUser.Username,
 		"target_user", req.TargetUsername,
 	)
@@ -730,7 +730,7 @@ func (s *Service) PromoteUserToAdmin(ctx context.Context, req *proto.AdminAction
 		}, nil
 	}
 
-	s.logger.Info("User promoted to admin", 
+	s.logger.Info("User promoted to admin",
 		"admin_user", adminUser.Username,
 		"target_user", req.TargetUsername,
 	)
