@@ -1,0 +1,77 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dungeongate-config
+  namespace: default
+  labels:
+    app: dungeongate
+data:
+  # Auth Service Configuration
+  auth-service.yaml: |
+    server:
+      grpc_port: 8082
+      http_port: 8081
+      host: "0.0.0.0"
+    
+    database:
+      type: "sqlite"
+      sqlite:
+        path: "/app/data/sqlite/dungeongate.db"
+    
+    jwt:
+      access_token_expiry: "15m"
+      refresh_token_expiry: "168h"
+    
+    logging:
+      level: "info"
+      format: "json"
+    
+    metrics:
+      enabled: true
+      port: 9091
+
+  # Game Service Configuration
+  game-service.yaml: |
+    server:
+      grpc_port: 50051
+      http_port: 8085
+      host: "0.0.0.0"
+    
+    database:
+      type: "sqlite"
+      sqlite:
+        path: "/app/data/sqlite/dungeongate.db"
+    
+    logging:
+      level: "info"
+      format: "json"
+    
+    metrics:
+      enabled: true
+      port: 9090
+
+  # Session Service Configuration
+  session-service.yaml: |
+    server:
+      ssh_port: 2222
+      grpc_port: 9093
+      http_port: 8083
+      host: "0.0.0.0"
+    
+    auth_service:
+      address: "dungeongate-auth:8082"
+    
+    game_service:
+      address: "dungeongate-game:50051"
+    
+    ssh:
+      host_key_path: "/app/configs/ssh_keys/dev_host_key"
+      max_connections: 100
+    
+    logging:
+      level: "info"
+      format: "json"
+    
+    metrics:
+      enabled: true
+      port: 8085

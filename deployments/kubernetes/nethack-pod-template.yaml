@@ -1,0 +1,350 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nethack-pod-template
+  namespace: dungeongate
+data:
+  pod-template.yaml: |
+    apiVersion: v1
+    kind: Pod
+    metadata:
+      name: "nethack-${SESSION_ID}"
+      namespace: dungeongate
+      labels:
+        app: nethack
+        game: nethack
+        session-id: "${SESSION_ID}"
+        user-id: "${USER_ID}"
+        username: "${USERNAME}"
+        managed-by: dungeongate-game-service
+      annotations:
+        dungeongate.io/game: "nethack"
+        dungeongate.io/version: "3.7.0"
+        dungeongate.io/session-id: "${SESSION_ID}"
+        dungeongate.io/user-id: "${USER_ID}"
+        dungeongate.io/username: "${USERNAME}"
+        dungeongate.io/created-at: "${CREATED_AT}"
+        dungeongate.io/max-session-duration: "4h"
+        dungeongate.io/recording-enabled: "${RECORDING_ENABLED}"
+    spec:
+      restartPolicy: Never
+      terminationGracePeriodSeconds: 30
+      serviceAccountName: dungeongate-nethack-pod
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: nethack
+        image: "dungeongate/nethack:3.7.0"
+        imagePullPolicy: IfNotPresent
+        command: ["/usr/games/nethack"]
+        args: ["-u", "${USERNAME}"]
+        env:
+        - name: USERNAME
+          value: "${USERNAME}"
+        - name: USER_ID
+          value: "${USER_ID}"
+        - name: SESSION_ID
+          value: "${SESSION_ID}"
+        - name: NETHACKOPTIONS
+          value: "@/var/games/nethack/config/${USERNAME}.nethackrc"
+        - name: HACKDIR
+          value: "/var/games/nethack"
+        - name: TERM
+          value: "xterm-256color"
+        - name: USER
+          value: "${USERNAME}"
+        - name: HOME
+          value: "/var/games/nethack/users/${USERNAME}"
+        - name: SHELL
+          value: "/bin/sh"
+        - name: MAXNROFPLAYERS
+          value: "50"
+        - name: SEDLEVEL
+          value: "5"
+        - name: DUMPLOG
+          value: "1"
+        - name: LIVELOG
+          value: "1"
+        - name: XLOGFILE
+          value: "/var/games/nethack/xlogfile"
+        - name: LIVELOGFILE
+          value: "/var/games/nethack/livelog"
+        workingDir: "/var/games/nethack"
+        volumeMounts:
+        - name: nethack-data
+          mountPath: /var/games/nethack
+          readOnly: false
+        - name: nethack-saves
+          mountPath: /var/games/nethack/save
+          readOnly: false
+        - name: user-config
+          mountPath: "/var/games/nethack/config"
+          readOnly: false
+        - name: user-home
+          mountPath: "/var/games/nethack/users/${USERNAME}"
+          readOnly: false
+        - name: ttyrec-storage
+          mountPath: /var/log/ttyrec
+          readOnly: false
+        - name: tmp-storage
+          mountPath: /tmp
+          readOnly: false
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "100m"
+            ephemeral-storage: "100Mi"
+          limits:
+            memory: "256Mi"
+            cpu: "500m"
+            ephemeral-storage: "1Gi"
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false  # NetHack needs to write to various files
+          runAsNonRoot: true
+          runAsUser: 1000
+          runAsGroup: 1000
+          capabilities:
+            drop:
+            - ALL
+            add:
+            - CHOWN      # Needed for file ownership changes
+            - DAC_OVERRIDE  # Needed for file access
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - "pgrep -f 'nethack.*${USERNAME}' || exit 1"
+          initialDelaySeconds: 10
+          periodSeconds: 30
+          timeoutSeconds: 5
+          failureThreshold: 3
+        lifecycle:
+          preStop:
+            exec:
+              command:
+              - /bin/sh
+              - -c
+              - |
+                # Gracefully save and exit NetHack
+                if pgrep -f "nethack.*${USERNAME}"; then
+                  pkill -TERM -f "nethack.*${USERNAME}"
+                  sleep 5
+                  pkill -KILL -f "nethack.*${USERNAME}" 2>/dev/null || true
+                fi
+      volumes:
+      - name: nethack-data
+        persistentVolumeClaim:
+          claimName: nethack-data-pvc
+      - name: nethack-saves
+        persistentVolumeClaim:
+          claimName: nethack-saves-pvc
+      - name: user-config
+        emptyDir:
+          sizeLimit: "10Mi"
+      - name: user-home
+        emptyDir:
+          sizeLimit: "100Mi"
+      - name: ttyrec-storage
+        persistentVolumeClaim:
+          claimName: ttyrec-storage-pvc
+      - name: tmp-storage
+        emptyDir:
+          sizeLimit: "100Mi"
+      nodeSelector:
+        dungeongate.io/game-node: "true"
+        kubernetes.io/arch: amd64
+      tolerations:
+      - key: "dungeongate.io/game-workload"
+        operator: "Equal"
+        value: "true"
+        effect: "NoSchedule"
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            preference:
+              matchExpressions:
+              - key: "dungeongate.io/game-optimized"
+                operator: In
+                values: ["true"]
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 50
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: username
+                  operator: In
+                  values: ["${USERNAME}"]
+              topologyKey: kubernetes.io/hostname
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: dungeongate-nethack-pod
+  namespace: dungeongate
+  labels:
+    app: nethack
+    component: game-pod
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: dungeongate
+  name: dungeongate-nethack-pod-role
+rules:
+- apiGroups: [""]
+  resources: ["pods/log"]
+  verbs: ["get", "list"]
+- apiGroups: [""]
+  resources: ["configmaps"]
+  verbs: ["get", "list"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: dungeongate-nethack-pod-binding
+  namespace: dungeongate
+subjects:
+- kind: ServiceAccount
+  name: dungeongate-nethack-pod
+  namespace: dungeongate
+roleRef:
+  kind: Role
+  name: dungeongate-nethack-pod-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ttyrec-storage-pvc
+  namespace: dungeongate
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 100Gi
+  storageClassName: fast-ssd
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: nethack-pod-netpol
+  namespace: dungeongate
+spec:
+  podSelector:
+    matchLabels:
+      app: nethack
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: dungeongate
+    - podSelector:
+        matchLabels:
+          app: dungeongate-game-service
+  egress:
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 53
+    - protocol: UDP
+      port: 53
+  # Block all other egress traffic for security
+
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: nethack-pod-limits
+  namespace: dungeongate
+spec:
+  limits:
+  - type: Container
+    default:
+      memory: "256Mi"
+      cpu: "500m"
+      ephemeral-storage: "1Gi"
+    defaultRequest:
+      memory: "64Mi"
+      cpu: "100m"
+      ephemeral-storage: "100Mi"
+    max:
+      memory: "512Mi"
+      cpu: "1000m"
+      ephemeral-storage: "2Gi"
+    min:
+      memory: "32Mi"
+      cpu: "50m"
+      ephemeral-storage: "50Mi"
+    
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: nethack-games-quota
+  namespace: dungeongate
+spec:
+  hard:
+    requests.cpu: "50"     # Total CPU requests for all NetHack pods
+    requests.memory: "50Gi" # Total memory requests for all NetHack pods
+    limits.cpu: "100"       # Total CPU limits for all NetHack pods
+    limits.memory: "100Gi"  # Total memory limits for all NetHack pods
+    requests.ephemeral-storage: "50Gi"
+    limits.ephemeral-storage: "100Gi"
+    pods: "200"             # Maximum number of NetHack pods
+    persistentvolumeclaims: "10"
+  scopes:
+  - NotTerminating
+
+---
+apiVersion: policy/v1
+kind: PodSecurityPolicy
+metadata:
+  name: nethack-pod-psp
+spec:
+  privileged: false
+  allowPrivilegeEscalation: false
+  requiredDropCapabilities:
+    - ALL
+  allowedCapabilities:
+    - CHOWN
+    - DAC_OVERRIDE
+  volumes:
+    - 'emptyDir'
+    - 'persistentVolumeClaim'
+    - 'secret'
+    - 'configMap'
+  runAsUser:
+    rule: 'MustRunAs'
+    ranges:
+      - min: 1000
+        max: 1000
+  runAsGroup:
+    rule: 'MustRunAs'
+    ranges:
+      - min: 1000
+        max: 1000
+  seLinux:
+    rule: 'RunAsAny'
+  fsGroup:
+    rule: 'MustRunAs'
+    ranges:
+      - min: 1000
+        max: 1000

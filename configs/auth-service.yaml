@@ -1,0 +1,201 @@
+# ============================================================================
+# DungeonGate Authentication Service Configuration
+# ============================================================================
+# This configuration file controls the centralized authentication service
+# that handles user authentication, JWT token management, and authorization
+# for all other services in the DungeonGate microservices architecture.
+#
+# This configuration inherits common settings from common.yaml and overrides
+# service-specific values as needed.
+# ============================================================================
+
+# Configuration file format version
+
+# ============================================================================
+# Common Configuration Import
+# ============================================================================
+# NOTE: This section indicates that this config inherits from common.yaml
+# The actual import mechanism would be implemented in the configuration loader
+inherit_from: "common.yaml"
+
+# ============================================================================
+# HTTP/gRPC Server Configuration
+# ============================================================================
+# Controls the auth service HTTP API and gRPC endpoints
+server:
+  # HTTP API server port (health checks, admin endpoints)
+  port: 8081          
+  
+  # gRPC server port (authentication requests from other services)
+  grpc_port: 8082     
+  
+  # Bind address (localhost for development, 0.0.0.0 for production)
+  host: "localhost"
+  
+  # Request timeout for HTTP/gRPC operations
+  timeout: "30s"
+  
+  # Maximum concurrent connections
+  max_connections: 50
+
+# ============================================================================
+# Database Configuration
+# ============================================================================
+# Database configuration is inherited from common.yaml
+# All services share the same database configuration in development
+
+# ============================================================================
+# Authentication Configuration
+# ============================================================================
+# Core authentication settings including JWT and security policies
+## Technically speaking, dugeongate has two auth workflows. This config block effects number 2
+### 1. SSH Level: Currently validates against the DungeonGate auth service
+### 2. Application Level: Users authenticate with their DungeonGate credentials
+auth:
+  # Enable authentication service (should always be true for auth service)
+  enabled: true
+
+  # Root admin user (created automatically if no admins exist)
+  root_admin_user:
+    enabled: true
+    name: admin                    # Optional: defaults to "admin"
+    one_time_password: "secure123" # Required: strong password
+    recovery_email: admin@company.com
+  
+  # Additional admin users
+  admin_users:
+    - name: alice
+      one_time_password: "temp456"
+      recovery_email: alice@company.com
+    - name: bob
+      one_time_password: "temp789"
+      recovery_email: bob@company.com
+
+  # JWT secret for signing tokens (CRITICAL: change in production)
+  # Should be a long, random string. Same across all services for token validation.
+  jwt_secret: "dev-secret-please-change-in-production"
+  
+  # JWT issuer name (identifies this auth service)
+  jwt_issuer: "dungeongate"
+  
+  # How long access tokens are valid (short for security)
+  access_token_expiration: "15m"
+  
+  # How long refresh tokens are valid (longer for user convenience)
+  refresh_token_expiration: "168h"  # 7 days
+  
+  # Maximum failed login attempts before account lockout
+  max_login_attempts: 3
+  
+  # How long to lock out users after max failed attempts
+  lockout_duration: "15m"
+  
+  # Require JWT tokens for API access (should be true in production)
+  require_token_for_api: false
+  
+  # Require JWT tokens for SSH access (should be true in production)
+  require_token_for_ssh: false
+
+# ============================================================================
+# Encryption Configuration
+# ============================================================================
+# Controls encryption for sensitive data like passwords and tokens
+encryption:
+  # Enable encryption (should be true for auth service)
+  enabled: true
+  
+  # Encryption algorithm for sensitive data
+  algorithm: "AES-256-GCM"
+  
+  # How often to rotate encryption keys (important for security)
+  key_rotation_interval: "24h"
+
+# ============================================================================
+# Logging Configuration Overrides
+# ============================================================================
+# Auth service logging overrides (inherits base config from common.yaml)
+logging:
+  # Service-specific log file name
+  file:
+    filename: "auth-service.log"
+  
+  # Service-specific journald configuration
+  journald:
+    identifier: "dungeongate-auth"
+    fields:
+      service: "auth-service"
+      component: "dungeongate"
+
+
+# ============================================================================
+# SMTP Integrations and Configuration
+# ============================================================================
+# Allows for automatic user account password resets with email
+email:
+  enabled: true
+  server: 
+    domain: email@host.com
+    credentials:
+      username: user
+      password: password
+
+
+# ============================================================================
+# Health Check Configuration
+# ============================================================================
+# Health monitoring for the auth service (critical service)
+health:
+  # Enable health check endpoint
+  enabled: true
+  
+  # Health check endpoint path
+  path: "/health"
+
+# ============================================================================
+# Security Configuration
+# ============================================================================
+# Security features for the auth service (most critical service)
+security:
+  # Rate limiting configuration (essential for auth service)
+  rate_limiting:
+    # Enable rate limiting (should be true in production)
+    enabled: false
+    
+    # Maximum connections per IP address (prevent brute force)
+    max_connections_per_ip: 100
+    
+    # Time window for connection counting
+    connection_window: "1m"
+    
+  # Brute force protection (critical for auth service)
+  brute_force_protection:
+    # Enable brute force protection (should be true in production)
+    enabled: false
+    
+    # Maximum failed attempts before blocking IP
+    max_failed_attempts: 10
+    
+    # How long to block IP after max attempts
+    lockout_duration: "1m"
+    
+  # Session security settings
+  session_security:
+    # Require encryption for session data (should be true)
+    require_encryption: true
+    
+    # Length of session tokens (longer = more secure)
+    session_token_length: 32
+    
+    # Use cryptographically secure random for tokens
+    secure_random: true
+
+# ============================================================================
+# Metrics and Monitoring
+# ============================================================================
+# Prometheus metrics and health monitoring for auth service
+metrics:
+  # Enable Prometheus metrics collection
+  enabled: true
+  
+  # Port for metrics endpoint (/metrics)
+  port: 9091

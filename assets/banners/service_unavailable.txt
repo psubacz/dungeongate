@@ -1,0 +1,23 @@
+Welcome to $SERVERID
+Connected as: $USERNAME
+Date: $DATE | Time: $TIME
+
+┌─────────────────────────────────────────────────────
+│                  MAINTENANCE NOTICE                
+├─────────────────────────────────────────────────────
+│ Required services are currently unavailable:       
+│                                                     
+│ $SERVICE_STATUS                                     
+│                                                     
+│ This may be due to scheduled maintenance or         
+│ temporary service disruption.                       
+│                                                     
+│ Please try again in a few minutes.                 
+│                                                     
+│ Connection will automatically close in: $COUNTDOWN 
+│                                                     
+│ Press [q] to quit immediately 
+│ 
+│ Thank you for your patience!
+└────────────────────────────────────────────────────
+

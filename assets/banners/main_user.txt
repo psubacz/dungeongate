@@ -1,0 +1,14 @@
+DungeonGate
+
+Welcome, $USERNAME
+Date: $DATE | Time: $TIME
+
+Menu Options:
+  [p] Play a game
+  [w] Watch games
+  [e] Edit profile
+  [g] Game Statistics
+  [c] Credits
+  [q] Quit
+
+Choice: 

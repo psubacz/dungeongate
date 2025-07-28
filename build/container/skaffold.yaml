@@ -1,0 +1,206 @@
+apiVersion: skaffold/v4beta11
+kind: Config
+metadata:
+  name: dungeongate
+
+# Build configuration
+build:
+  # Use local Docker/Podman for building
+  local:
+    push: false
+    useDockerCLI: true
+    useBuildkit: true
+  
+  # Build artifacts for each service
+  artifacts:
+    # Session Service
+    - image: dungeongate-session
+      context: ../..
+      docker:
+        dockerfile: build/container/Containerfile.arm
+        target: session-service
+        buildArgs:
+          VERSION: "{{.IMAGE_TAG}}"
+          BUILD_TIME: "{{.BUILD_TIME}}"
+          GIT_COMMIT: "{{.GIT_COMMIT}}"
+      sync:
+        manual:
+          - src: "cmd/session-service/**/*"
+            dest: /app/cmd/session-service
+          - src: "internal/session/**/*"
+            dest: /app/internal/session
+          - src: "configs/**/*"
+            dest: /app/configs
+    
+    # Auth Service
+    - image: dungeongate-auth
+      context: ../..
+      docker:
+        dockerfile: build/container/Containerfile.arm
+        target: auth-service
+        buildArgs:
+          VERSION: "{{.IMAGE_TAG}}"
+          BUILD_TIME: "{{.BUILD_TIME}}"
+          GIT_COMMIT: "{{.GIT_COMMIT}}"
+      sync:
+        manual:
+          - src: "cmd/auth-service/**/*"
+            dest: /app/cmd/auth-service
+          - src: "internal/auth/**/*"
+            dest: /app/internal/auth
+          - src: "configs/**/*"
+            dest: /app/configs
+    
+    # Game Service
+    - image: dungeongate-game
+      context: ../..
+      docker:
+        dockerfile: build/container/Containerfile.arm
+        target: game-service
+        buildArgs:
+          VERSION: "{{.IMAGE_TAG}}"
+          BUILD_TIME: "{{.BUILD_TIME}}"
+          GIT_COMMIT: "{{.GIT_COMMIT}}"
+      sync:
+        manual:
+          - src: "cmd/game-service/**/*"
+            dest: /app/cmd/game-service
+          - src: "internal/games/**/*"
+            dest: /app/internal/games
+          - src: "configs/**/*"
+            dest: /app/configs
+
+# Test configuration
+test:
+  - image: dungeongate-session
+    command: make test-session
+  - image: dungeongate-auth
+    command: make test-auth
+  - image: dungeongate-game
+    command: make test
+
+# Deploy configuration
+deploy:
+  kubectl:
+    manifests:
+      - k8s/auth-service.yaml
+      - k8s/game-service.yaml
+      - k8s/session-service.yaml
+      - k8s/configmap.yaml
+      - k8s/secrets.yaml
+      - k8s/ingress.yaml
+
+# Port forwarding for development
+portForward:
+  - resourceType: service
+    resourceName: dungeongate-session
+    namespace: default
+    port: 2222
+    localPort: 2222
+  - resourceType: service
+    resourceName: dungeongate-session
+    namespace: default
+    port: 8083
+    localPort: 8083
+  - resourceType: service
+    resourceName: dungeongate-auth
+    namespace: default
+    port: 8081
+    localPort: 8081
+  - resourceType: service
+    resourceName: dungeongate-auth
+    namespace: default
+    port: 8082
+    localPort: 8082
+  - resourceType: service
+    resourceName: dungeongate-game
+    namespace: default
+    port: 8085
+    localPort: 8085
+  - resourceType: service
+    resourceName: dungeongate-game
+    namespace: default
+    port: 50051
+    localPort: 50051
+
+# File watcher patterns
+watch:
+  - paths: ["**/*.go"]
+    ignore: ["vendor/**/*"]
+
+# Profiles for different environments
+profiles:
+  # Development profile
+  - name: dev
+    build:
+      artifacts:
+        - image: dungeongate-session
+          context: ../..
+          docker:
+            dockerfile: build/container/Containerfile.arm
+            target: development
+        - image: dungeongate-auth
+          context: ../..
+          docker:
+            dockerfile: build/container/Containerfile.arm
+            target: development
+        - image: dungeongate-game
+          context: ../..
+          docker:
+            dockerfile: build/container/Containerfile.arm
+            target: development
+    deploy:
+      kubectl:
+        manifests:
+          - k8s/dev/*.yaml
+    portForward:
+      - resourceType: service
+        resourceName: dungeongate-dev
+        namespace: default
+        port: 2222
+        localPort: 2222
+      - resourceType: service
+        resourceName: dungeongate-dev
+        namespace: default
+        port: 8081
+        localPort: 8081
+
+  # Production profile
+  - name: prod
+    build:
+      local:
+        push: true
+      tagPolicy:
+        gitCommit: {}
+    deploy:
+      kubectl:
+        manifests:
+          - k8s/prod/*.yaml
+
+  # Local development with hot reload
+  - name: local
+    build:
+      artifacts:
+        - image: dungeongate-session
+          context: ../..
+          docker:
+            dockerfile: build/container/Containerfile.arm
+            target: development
+          sync:
+            manual:
+              - src: "**/*.go"
+                dest: /app
+                strip: ""
+    deploy:
+      docker:
+        useCompose: true
+        composeFile: docker-compose.yml
+
+# Resource requirements for better performance
+resourceSelector:
+  allow:
+    - groupKind: Deployment.apps
+    - groupKind: Service.v1
+    - groupKind: Ingress.networking.k8s.io
+    - groupKind: ConfigMap.v1
+    - groupKind: Secret.v1

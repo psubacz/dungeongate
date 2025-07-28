@@ -1,0 +1,626 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: game-service-config
+  namespace: dungeongate
+data:
+  config.yaml: |
+    version: "0.0.2"
+    server:
+      port: 8084
+      grpc_port: 9094
+      host: "0.0.0.0"
+      timeout: "60s"
+      max_connections: 1000
+    
+    game_engine:
+      mode: "kubernetes"
+      container_runtime:
+        runtime: "kubernetes"
+        network_mode: "bridge"
+      
+      isolation:
+        namespaces:
+          pid: true
+          network: true
+          mount: true
+          uts: true
+          ipc: true
+          user: false
+        capabilities:
+          drop: ["ALL"]
+          add: ["CHOWN", "SETUID", "SETGID"]
+      
+      resources:
+        cpu_limit: "1000m"
+        memory_limit: "512Mi"
+        cpu_request: "100m"
+        memory_request: "128Mi"
+        pids_limit: 100
+      
+      monitoring:
+        enabled: true
+        health_check_interval: "30s"
+        metrics_interval: "15s"
+        log_level: "info"
+    
+    kubernetes:
+      enabled: true
+      namespace: "dungeongate"
+      service_account: "dungeongate-game-service"
+      config_map_name: "dungeongate-game-config"
+      storage_class: "fast-ssd"
+    
+    games:
+      - id: "nethack"
+        name: "NetHack"
+        short_name: "nh"
+        version: "3.7.0"
+        enabled: true
+        binary:
+          path: "/usr/games/nethack"
+          args: ["-u", "${USERNAME}"]
+          working_directory: "/var/games/nethack"
+          user: "games"
+          group: "games"
+          permissions: "0755"
+        files:
+          data_directory: "/var/games/nethack"
+          save_directory: "/var/games/nethack/save"
+          config_directory: "/var/games/nethack/config"
+          log_directory: "/var/log/nethack"
+          temp_directory: "/tmp/nethack"
+          shared_files: ["nhdat", "license", "recover"]
+          user_files: ["${USERNAME}.nh", "${USERNAME}.0", "${USERNAME}.bak"]
+          permissions:
+            data_directory: "0755"
+            save_directory: "0755"
+            user_files: "0644"
+            log_files: "0644"
+        settings:
+          max_players: 50
+          max_session_duration: "4h"
+          idle_timeout: "30m"
+          save_interval: "5m"
+          auto_save: true
+          spectating:
+            enabled: true
+            max_spectators_per_session: 5
+            spectator_timeout: "2h"
+          recording:
+            enabled: true
+            format: "ttyrec"
+            compression: "gzip"
+            max_file_size: "100MB"
+            retention_days: 30
+            auto_cleanup: true
+          options:
+            MAXNROFPLAYERS: "50"
+            SEDLEVEL: "5"
+            DUMPLOG: "1"
+            LIVELOG: "1"
+            XLOGFILE: "/var/games/nethack/xlogfile"
+            LIVELOGFILE: "/var/games/nethack/livelog"
+        environment:
+          NETHACKOPTIONS: "@/var/games/nethack/config/${USERNAME}.nethackrc"
+          HACKDIR: "/var/games/nethack"
+          TERM: "xterm-256color"
+          USER: "${USERNAME}"
+          HOME: "/var/games/nethack/users/${USERNAME}"
+          SHELL: "/bin/sh"
+        resources:
+          cpu_limit: "500m"
+          memory_limit: "256Mi"
+          cpu_request: "100m"
+          memory_request: "64Mi"
+          disk_limit: "1Gi"
+          pids_limit: 50
+        container:
+          image: "dungeongate/nethack"
+          tag: "3.7.0"
+          registry: "ghcr.io"
+          pull_policy: "IfNotPresent"
+          volumes:
+            - name: "nethack-data"
+              host_path: "/var/games/nethack"
+              mount_path: "/var/games/nethack"
+              read_only: false
+            - name: "nethack-saves"
+              host_path: "/var/games/nethack/save"
+              mount_path: "/var/games/nethack/save"
+              read_only: false
+          environment:
+            GAME: "nethack"
+            USERNAME: "${USERNAME}"
+            TERM: "xterm-256color"
+          security_context:
+            run_as_user: 1000
+            run_as_group: 1000
+            read_only_root_filesystem: true
+            privileged: false
+          network_mode: "none"
+        networking:
+          mode: "isolated"
+    
+    storage:
+      game_data_path: "/var/lib/dungeongate/games"
+      user_data_path: "/var/lib/dungeongate/users"
+      log_path: "/var/log/dungeongate/games"
+      temp_path: "/tmp/dungeongate/games"
+      backup_path: "/var/backups/dungeongate"
+      
+      backup:
+        enabled: true
+        interval: "24h"
+        retention_days: 30
+        compress_backups: true
+      
+      cleanup:
+        enabled: true
+        interval: "1h"
+        max_age: "7d"
+        delete_empty_dirs: true
+        preserve_recordings: true
+    
+    security:
+      sandboxing:
+        enabled: true
+        allowed_paths:
+          - "/usr/games"
+          - "/var/games"
+          - "/tmp"
+          - "/dev/null"
+          - "/dev/zero"
+          - "/dev/random"
+          - "/dev/urandom"
+        blocked_paths:
+          - "/etc/shadow"
+          - "/etc/sudoers"
+          - "/etc/ssh"
+          - "/root"
+          - "/home"
+      
+      access_control:
+        enabled: true
+        require_authentication: true
+        max_concurrent_sessions: 10
+      
+      rate_limiting:
+        enabled: true
+        max_connections_per_ip: 5
+        connection_window: "1m"
+      
+      monitoring:
+        enabled: true
+        log_security_events: true
+        alert_on_suspicious_activity: true
+        monitor_file_access: true
+        monitor_network_access: true
+    
+    database:
+      mode: "external"
+      postgresql:
+        primary:
+          host: "postgres-primary"
+          port: 5432
+          database: "dungeongate"
+          username: "dungeongate"
+          password: "${POSTGRES_PASSWORD}"
+          ssl_mode: "require"
+        replica:
+          host: "postgres-replica"
+          port: 5432
+          database: "dungeongate"
+          username: "dungeongate_read"
+          password: "${POSTGRES_READ_PASSWORD}"
+          ssl_mode: "require"
+    
+    logging:
+      level: "info"
+      format: "json"
+      output: "stdout"
+    
+    metrics:
+      enabled: true
+      port: 8085
+    
+    health:
+      enabled: true
+      path: "/health"
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: dungeongate-game-service
+  namespace: dungeongate
+  labels:
+    app: dungeongate-game-service
+    component: game-service
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: dungeongate
+  name: dungeongate-game-service-role
+rules:
+- apiGroups: [""]
+  resources: ["pods", "pods/log", "pods/exec"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: [""]
+  resources: ["configmaps", "secrets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["persistentvolumeclaims"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "replicasets"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: dungeongate-game-service-binding
+  namespace: dungeongate
+subjects:
+- kind: ServiceAccount
+  name: dungeongate-game-service
+  namespace: dungeongate
+roleRef:
+  kind: Role
+  name: dungeongate-game-service-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: dungeongate-game-service-secrets
+  namespace: dungeongate
+type: Opaque
+data:
+  postgres-password: cGFzc3dvcmQ= # base64 encoded "password"
+  postgres-read-password: cmVhZHBhc3N3b3Jk # base64 encoded "readpassword"
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: nethack-data-pvc
+  namespace: dungeongate
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: fast-ssd
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: nethack-saves-pvc
+  namespace: dungeongate
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 50Gi
+  storageClassName: fast-ssd
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dungeongate-game-service
+  namespace: dungeongate
+  labels:
+    app: dungeongate-game-service
+    component: game-service
+    version: "0.0.2"
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: dungeongate-game-service
+  template:
+    metadata:
+      labels:
+        app: dungeongate-game-service
+        component: game-service
+        version: "0.0.2"
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8085"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: dungeongate-game-service
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      containers:
+      - name: game-service
+        image: dungeongate/game-service:0.0.2
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: http
+          containerPort: 8084
+          protocol: TCP
+        - name: grpc
+          containerPort: 9094
+          protocol: TCP
+        - name: metrics
+          containerPort: 8085
+          protocol: TCP
+        env:
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: dungeongate-game-service-secrets
+              key: postgres-password
+        - name: POSTGRES_READ_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: dungeongate-game-service-secrets
+              key: postgres-read-password
+        - name: CONFIG_PATH
+          value: "/etc/dungeongate/config.yaml"
+        - name: LOG_LEVEL
+          value: "info"
+        - name: KUBERNETES_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        volumeMounts:
+        - name: config
+          mountPath: /etc/dungeongate
+          readOnly: true
+        - name: nethack-data
+          mountPath: /var/games/nethack
+        - name: nethack-saves
+          mountPath: /var/games/nethack/save
+        - name: game-logs
+          mountPath: /var/log/dungeongate/games
+        - name: temp-storage
+          mountPath: /tmp/dungeongate/games
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "200m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 1000
+          runAsGroup: 1000
+          capabilities:
+            drop:
+            - ALL
+            add:
+            - NET_BIND_SERVICE
+      volumes:
+      - name: config
+        configMap:
+          name: game-service-config
+      - name: nethack-data
+        persistentVolumeClaim:
+          claimName: nethack-data-pvc
+      - name: nethack-saves
+        persistentVolumeClaim:
+          claimName: nethack-saves-pvc
+      - name: game-logs
+        emptyDir: {}
+      - name: temp-storage
+        emptyDir: {}
+      nodeSelector:
+        kubernetes.io/arch: amd64
+      tolerations:
+      - key: "dungeongate.io/game-node"
+        operator: "Equal"
+        value: "true"
+        effect: "NoSchedule"
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - dungeongate-game-service
+              topologyKey: kubernetes.io/hostname
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dungeongate-game-service
+  namespace: dungeongate
+  labels:
+    app: dungeongate-game-service
+    component: game-service
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 8084
+    targetPort: http
+    protocol: TCP
+  - name: grpc
+    port: 9094
+    targetPort: grpc
+    protocol: TCP
+  - name: metrics
+    port: 8085
+    targetPort: metrics
+    protocol: TCP
+  selector:
+    app: dungeongate-game-service
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dungeongate-game-service-headless
+  namespace: dungeongate
+  labels:
+    app: dungeongate-game-service
+    component: game-service
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+  - name: http
+    port: 8084
+    targetPort: http
+    protocol: TCP
+  - name: grpc
+    port: 9094
+    targetPort: grpc
+    protocol: TCP
+  selector:
+    app: dungeongate-game-service
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: dungeongate-game-service-hpa
+  namespace: dungeongate
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: dungeongate-game-service
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 10
+        periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 60
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: dungeongate-game-service-pdb
+  namespace: dungeongate
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: dungeongate-game-service
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: dungeongate-game-service-netpol
+  namespace: dungeongate
+spec:
+  podSelector:
+    matchLabels:
+      app: dungeongate-game-service
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: dungeongate
+    - podSelector:
+        matchLabels:
+          app: dungeongate-session-service
+    ports:
+    - protocol: TCP
+      port: 8084
+    - protocol: TCP
+      port: 9094
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    ports:
+    - protocol: TCP
+      port: 8085
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: dungeongate
+    - podSelector:
+        matchLabels:
+          app: postgres
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 53
+    - protocol: UDP
+      port: 53
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443

@@ -1,0 +1,24 @@
+WARNING: Admin Menu
+
+Authenticated User: $USERNAME
+Date: $DATE | Time: $TIME
+
+Menu Options:
+  [p] Play a game
+  [w] Watch games
+  [e] Edit profile
+  [v] View recordings
+  [g] Game Statistics
+
+  --- Admin Functions
+  
+  [u] Unlock User Account
+  [d] Delete User Account
+  [r] Reset User Account Password
+  [a] Add Admin privileges to User
+  [s] Server Statistics
+
+  ---
+
+  [c] Credits
+  [q] Quit

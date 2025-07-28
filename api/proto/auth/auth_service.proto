@@ -1,0 +1,302 @@
+syntax = "proto3";
+
+package dungeongate.auth.v1;
+
+option go_package = "github.com/dungeongate/pkg/api/auth/v1";
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+
+// AuthService provides authentication and authorization operations
+service AuthService {
+  // Register creates a new user account
+  rpc Register(RegisterRequest) returns (RegisterResponse);
+  
+  // Login authenticates a user and returns tokens
+  rpc Login(LoginRequest) returns (LoginResponse);
+  
+  // Logout invalidates a user's session
+  rpc Logout(LogoutRequest) returns (LogoutResponse);
+  
+  // RefreshToken refreshes an access token using a refresh token
+  rpc RefreshToken(RefreshTokenRequest) returns (RefreshTokenResponse);
+  
+  // ValidateToken validates an access token and returns user info
+  rpc ValidateToken(ValidateTokenRequest) returns (ValidateTokenResponse);
+  
+  // GetUserInfo gets user information from a valid token
+  rpc GetUserInfo(GetUserInfoRequest) returns (GetUserInfoResponse);
+  
+  // ChangePassword changes a user's password
+  rpc ChangePassword(ChangePasswordRequest) returns (ChangePasswordResponse);
+  
+  // ResetPassword initiates password reset flow
+  rpc ResetPassword(ResetPasswordRequest) returns (ResetPasswordResponse);
+  
+  // VerifyPasswordReset verifies and completes password reset
+  rpc VerifyPasswordReset(VerifyPasswordResetRequest) returns (VerifyPasswordResetResponse);
+  
+  // GetLoginAttempts gets login attempt info for a user
+  rpc GetLoginAttempts(GetLoginAttemptsRequest) returns (GetLoginAttemptsResponse);
+  
+  // Health check
+  rpc Health(google.protobuf.Empty) returns (HealthResponse);
+  
+  // Admin Operations
+  
+  // UnlockUserAccount unlocks a user account (admin only)
+  rpc UnlockUserAccount(AdminActionRequest) returns (AdminActionResponse);
+  
+  // DeleteUserAccount deletes a user account (admin only)
+  rpc DeleteUserAccount(AdminActionRequest) returns (AdminActionResponse);
+  
+  // ResetUserPassword resets a user's password (admin only)
+  rpc ResetUserPassword(ResetPasswordAdminRequest) returns (AdminActionResponse);
+  
+  // PromoteUserToAdmin promotes a user to admin status (admin only)
+  rpc PromoteUserToAdmin(AdminActionRequest) returns (AdminActionResponse);
+  
+  // GetServerStatistics returns server statistics (admin only)
+  rpc GetServerStatistics(ServerStatsRequest) returns (ServerStatsResponse);
+}
+
+// RegisterRequest represents a user registration request
+message RegisterRequest {
+  string username = 1;
+  string password = 2;
+  string email = 3;
+  string client_id = 4;
+  string client_ip = 5;
+  string user_agent = 6;
+  map<string, string> metadata = 7;
+}
+
+// RegisterResponse represents a user registration response
+message RegisterResponse {
+  bool success = 1;
+  string error = 2;
+  string error_code = 3; // "username_taken", "email_taken", "invalid_password", etc.
+  
+  // Tokens (present on successful registration)
+  string access_token = 4;
+  string refresh_token = 5;
+  int64 access_token_expires_at = 6;
+  int64 refresh_token_expires_at = 7;
+  
+  // User info (present on successful registration)
+  User user = 8;
+}
+
+// LoginRequest represents a login request
+message LoginRequest {
+  string username = 1;
+  string password = 2;
+  string client_id = 3;
+  string client_ip = 4;
+  string user_agent = 5;
+  map<string, string> metadata = 6;
+}
+
+// LoginResponse represents a login response
+message LoginResponse {
+  bool success = 1;
+  string error = 2;
+  string error_code = 3; // "invalid_credentials", "account_locked", "user_not_found", etc.
+  
+  // Tokens (only present on successful login)
+  string access_token = 4;
+  string refresh_token = 5;
+  int64 access_token_expires_at = 6;
+  int64 refresh_token_expires_at = 7;
+  
+  // User info (only present on successful login)
+  User user = 8;
+  
+  // Rate limiting info
+  int32 remaining_attempts = 9;
+  int64 retry_after_seconds = 10;
+}
+
+// LogoutRequest represents a logout request
+message LogoutRequest {
+  string access_token = 1;
+  string refresh_token = 2;
+  string user_id = 3;
+  bool invalidate_all_sessions = 4;
+}
+
+// LogoutResponse represents a logout response
+message LogoutResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+// RefreshTokenRequest represents a token refresh request
+message RefreshTokenRequest {
+  string refresh_token = 1;
+  string client_id = 2;
+}
+
+// RefreshTokenResponse represents a token refresh response
+message RefreshTokenResponse {
+  bool success = 1;
+  string error = 2;
+  string access_token = 3;
+  string refresh_token = 4;
+  int64 access_token_expires_at = 5;
+  int64 refresh_token_expires_at = 6;
+}
+
+// ValidateTokenRequest represents a token validation request
+message ValidateTokenRequest {
+  string access_token = 1;
+  repeated string required_permissions = 2;
+}
+
+// ValidateTokenResponse represents a token validation response
+message ValidateTokenResponse {
+  bool valid = 1;
+  string error = 2;
+  User user = 3;
+  repeated string permissions = 4;
+  int64 expires_at = 5;
+}
+
+// GetUserInfoRequest represents a request to get user info
+message GetUserInfoRequest {
+  string access_token = 1;
+}
+
+// GetUserInfoResponse represents a response with user info
+message GetUserInfoResponse {
+  bool success = 1;
+  string error = 2;
+  User user = 3;
+}
+
+// ChangePasswordRequest represents a password change request
+message ChangePasswordRequest {
+  string access_token = 1;
+  string current_password = 2;
+  string new_password = 3;
+}
+
+// ChangePasswordResponse represents a password change response
+message ChangePasswordResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+// ResetPasswordRequest represents a password reset request
+message ResetPasswordRequest {
+  string username_or_email = 1;
+  string client_ip = 2;
+}
+
+// ResetPasswordResponse represents a password reset response
+message ResetPasswordResponse {
+  bool success = 1;
+  string error = 2;
+  string message = 3;
+}
+
+// VerifyPasswordResetRequest represents a password reset verification request
+message VerifyPasswordResetRequest {
+  string reset_token = 1;
+  string new_password = 2;
+}
+
+// VerifyPasswordResetResponse represents a password reset verification response
+message VerifyPasswordResetResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+// GetLoginAttemptsRequest represents a request to get login attempts
+message GetLoginAttemptsRequest {
+  string username = 1;
+  string client_ip = 2;
+}
+
+// GetLoginAttemptsResponse represents a response with login attempts
+message GetLoginAttemptsResponse {
+  int32 failed_attempts = 1;
+  bool account_locked = 2;
+  int64 locked_until = 3;
+  int32 remaining_attempts = 4;
+}
+
+// HealthResponse represents the health check response
+message HealthResponse {
+  string status = 1; // "healthy", "unhealthy", "degraded"
+  map<string, string> details = 2;
+  google.protobuf.Timestamp timestamp = 3;
+}
+
+// User represents user information
+message User {
+  string id = 1;
+  string username = 2;
+  string email = 3;
+  bool is_active = 4;
+  bool is_admin = 5;
+  bool is_authenticated = 6;
+  bool email_verified = 7;
+  google.protobuf.Timestamp created_at = 8;
+  google.protobuf.Timestamp updated_at = 9;
+  google.protobuf.Timestamp last_login = 10;
+  repeated string roles = 11;
+  repeated string permissions = 12;
+  map<string, string> metadata = 13;
+}
+
+// TokenClaims represents JWT token claims
+message TokenClaims {
+  string user_id = 1;
+  string username = 2;
+  string email = 3;
+  repeated string roles = 4;
+  repeated string permissions = 5;
+  string client_id = 6;
+  string session_id = 7;
+  int64 issued_at = 8;
+  int64 expires_at = 9;
+  int64 not_before = 10;
+  string issuer = 11;
+  string audience = 12;
+  map<string, string> metadata = 13;
+}
+
+// Admin API Messages
+
+// AdminActionRequest represents a generic admin action request
+message AdminActionRequest {
+  string admin_token = 1;
+  string target_username = 2;
+}
+
+// AdminActionResponse represents a generic admin action response
+message AdminActionResponse {
+  bool success = 1;
+  string error = 2;
+  string message = 3;
+}
+
+// ResetPasswordAdminRequest represents an admin password reset request
+message ResetPasswordAdminRequest {
+  string admin_token = 1;
+  string target_username = 2;
+  string new_password = 3;
+}
+
+// ServerStatsRequest represents a server statistics request
+message ServerStatsRequest {
+  string admin_token = 1;
+}
+
+// ServerStatsResponse represents a server statistics response
+message ServerStatsResponse {
+  bool success = 1;
+  string error = 2;
+  map<string, string> stats = 3;
+}

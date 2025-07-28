@@ -1,0 +1,112 @@
+groups:
+  - name: dungeongate_alerts
+    rules:
+      # Service Health Alerts
+      - alert: ServiceDown
+        expr: up == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.job }} service is down"
+          description: "{{ $labels.job }} has been down for more than 30 seconds."
+
+      # SSH Connection Alerts
+      - alert: HighSSHConnections
+        expr: dungeongate_ssh_active_connections > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High SSH connection count"
+          description: "SSH connections are at {{ $value }}, approaching the limit."
+
+      - alert: SSHConnectionsAtLimit
+        expr: dungeongate_ssh_active_connections >= 100
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "SSH connections at limit"
+          description: "SSH connections have reached the maximum limit of {{ $value }}."
+
+      # Authentication Alerts
+      - alert: HighAuthFailureRate
+        expr: rate(dungeongate_auth_failures_total[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High authentication failure rate"
+          description: "Authentication failure rate is {{ $value }} failures per second."
+
+      - alert: AuthServiceDown
+        expr: up{job="dungeongate-auth-service"} == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Auth service is down"
+          description: "Authentication service has been down for more than 30 seconds."
+
+      # Database Alerts
+      - alert: DatabaseConnectionsHigh
+        expr: dungeongate_database_active_connections > 20
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High database connection count"
+          description: "Database connections are at {{ $value }}, approaching the limit."
+
+      # Memory Alerts
+      - alert: HighMemoryUsage
+        expr: (process_resident_memory_bytes / 1024 / 1024) > 500
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage"
+          description: "Process memory usage is {{ $value }}MB."
+
+      # Game Session Alerts
+      - alert: HighActiveGameSessions
+        expr: dungeongate_active_game_sessions > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High number of active game sessions"
+          description: "Active game sessions are at {{ $value }}, approaching the limit."
+
+      # TTY Recording Alerts
+      - alert: TTYRecordingErrors
+        expr: rate(dungeongate_ttyrec_errors_total[5m]) > 0.01
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "TTY recording errors detected"
+          description: "TTY recording error rate is {{ $value }} errors per second."
+
+      # Performance Alerts
+      - alert: SlowResponseTime
+        expr: histogram_quantile(0.95, rate(dungeongate_request_duration_seconds_bucket[5m])) > 1.0
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Slow response times"
+          description: "95th percentile response time is {{ $value }} seconds."
+
+  - name: dungeongate_infrastructure
+    rules:
+      # Derived metrics
+      - record: dungeongate:ssh_connection_utilization
+        expr: dungeongate_ssh_active_connections / dungeongate_ssh_max_connections
+
+      - record: dungeongate:auth_success_rate
+        expr: rate(dungeongate_auth_attempts_total[5m]) - rate(dungeongate_auth_failures_total[5m])
+
+      - record: dungeongate:database_connection_utilization
+        expr: dungeongate_database_active_connections / dungeongate_database_max_connections

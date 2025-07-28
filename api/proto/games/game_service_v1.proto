@@ -1,0 +1,368 @@
+syntax = "proto3";
+
+package dungeongate.games.v1;
+
+option go_package = "github.com/dungeongate/pkg/api/games/v1";
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+
+// GameService provides game management operations
+service GameService {
+  // StartGame starts a new game session
+  rpc StartGame(StartGameRequest) returns (StartGameResponse);
+  
+  // StopGame stops an active game session
+  rpc StopGame(StopGameRequest) returns (StopGameResponse);
+  
+  // GetGameSession gets information about a game session
+  rpc GetGameSession(GetGameSessionRequest) returns (GetGameSessionResponse);
+  
+  // ListActiveSessions lists all active game sessions
+  rpc ListActiveSessions(ListActiveSessionsRequest) returns (ListActiveSessionsResponse);
+  
+  // ListAvailableGames lists all available games
+  rpc ListAvailableGames(google.protobuf.Empty) returns (ListAvailableGamesResponse);
+  
+  // GetGameInfo gets information about a specific game
+  rpc GetGameInfo(GetGameInfoRequest) returns (GetGameInfoResponse);
+  
+  // StreamGameEvents streams game events (for monitoring and spectating)
+  rpc StreamGameEvents(StreamGameEventsRequest) returns (stream GameEvent);
+  
+  // AttachToGame attaches to an existing game session for spectating
+  rpc AttachToGame(AttachToGameRequest) returns (stream GameData);
+  
+  // SendGameInput sends input to a game session
+  rpc SendGameInput(SendGameInputRequest) returns (SendGameInputResponse);
+  
+  // Health check
+  rpc Health(google.protobuf.Empty) returns (HealthResponse);
+}
+
+// StartGameRequest represents a request to start a game
+message StartGameRequest {
+  string user_id = 1;
+  string username = 2;
+  string game_id = 3;
+  string session_id = 4;
+  map<string, string> environment = 5;
+  GameResourceLimits resource_limits = 6;
+  repeated string spectator_ids = 7;
+  bool enable_recording = 8;
+}
+
+// StartGameResponse represents the response to starting a game
+message StartGameResponse {
+  GameSession session = 1;
+  string error = 2;
+}
+
+// StopGameRequest represents a request to stop a game
+message StopGameRequest {
+  string session_id = 1;
+  string user_id = 2;
+  bool force = 3;
+  string reason = 4;
+}
+
+// StopGameResponse represents the response to stopping a game
+message StopGameResponse {
+  bool success = 1;
+  string error = 2;
+  GameSessionStats final_stats = 3;
+}
+
+// GetGameSessionRequest represents a request to get game session info
+message GetGameSessionRequest {
+  string session_id = 1;
+}
+
+// GetGameSessionResponse represents the response with game session info
+message GetGameSessionResponse {
+  GameSession session = 1;
+  string error = 2;
+}
+
+// ListActiveSessionsRequest represents a request to list active sessions
+message ListActiveSessionsRequest {
+  string user_id = 1; // Optional: filter by user
+  string game_id = 2; // Optional: filter by game
+  int32 limit = 3;    // Optional: limit results
+  int32 offset = 4;   // Optional: offset for pagination
+}
+
+// ListActiveSessionsResponse represents the response with active sessions
+message ListActiveSessionsResponse {
+  repeated GameSession sessions = 1;
+  int32 total_count = 2;
+  string error = 3;
+}
+
+// ListAvailableGamesResponse represents the response with available games
+message ListAvailableGamesResponse {
+  repeated Game games = 1;
+  string error = 2;
+}
+
+// GetGameInfoRequest represents a request to get game info
+message GetGameInfoRequest {
+  string game_id = 1;
+}
+
+// GetGameInfoResponse represents the response with game info
+message GetGameInfoResponse {
+  Game game = 1;
+  GameStats stats = 2;
+  string error = 3;
+}
+
+// StreamGameEventsRequest represents a request to stream game events
+message StreamGameEventsRequest {
+  string session_id = 1;
+  repeated string event_types = 2; // Optional: filter by event types
+}
+
+// AttachToGameRequest represents a request to attach to a game for spectating
+message AttachToGameRequest {
+  string session_id = 1;
+  string spectator_id = 2;
+  string spectator_username = 3;
+  bool receive_input = 4; // Whether to receive input events
+  bool receive_output = 5; // Whether to receive output events
+}
+
+// SendGameInputRequest represents a request to send input to a game
+message SendGameInputRequest {
+  string session_id = 1;
+  string user_id = 2;
+  bytes input_data = 3;
+  string input_type = 4; // "keyboard", "mouse", "special"
+  google.protobuf.Timestamp timestamp = 5;
+}
+
+// SendGameInputResponse represents the response to sending input
+message SendGameInputResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+// HealthResponse represents the health check response
+message HealthResponse {
+  string status = 1; // "healthy", "unhealthy", "degraded"
+  map<string, string> details = 2;
+  google.protobuf.Timestamp timestamp = 3;
+}
+
+// GameSession represents an active game session
+message GameSession {
+  string id = 1;
+  string user_id = 2;
+  string username = 3;
+  string game_id = 4;
+  GameSessionStatus status = 5;
+  google.protobuf.Timestamp start_time = 6;
+  google.protobuf.Timestamp last_activity = 7;
+  string container_id = 8;
+  string pod_name = 9;
+  GameResourceUsage resource_usage = 10;
+  repeated string spectators = 11;
+  bool recording_enabled = 12;
+  string recording_path = 13;
+  map<string, string> metadata = 14;
+}
+
+// GameSessionStatus represents the status of a game session
+enum GameSessionStatus {
+  UNKNOWN = 0;
+  STARTING = 1;
+  RUNNING = 2;
+  PAUSED = 3;
+  STOPPING = 4;
+  STOPPED = 5;
+  ERROR = 6;
+}
+
+// Game represents a game configuration
+message Game {
+  string id = 1;
+  string name = 2;
+  string short_name = 3;
+  string version = 4;
+  bool enabled = 5;
+  string description = 6;
+  repeated string categories = 7;
+  GameBinary binary = 8;
+  GameFiles files = 9;
+  GameSettings settings = 10;
+  map<string, string> environment = 11;
+  GameResourceLimits resource_limits = 12;
+  GameContainer container = 13;
+  GameNetworking networking = 14;
+}
+
+// GameBinary represents binary configuration
+message GameBinary {
+  string path = 1;
+  repeated string args = 2;
+  string working_directory = 3;
+  string user = 4;
+  string group = 5;
+  string permissions = 6;
+}
+
+// GameFiles represents file configuration
+message GameFiles {
+  string data_directory = 1;
+  string save_directory = 2;
+  string config_directory = 3;
+  string log_directory = 4;
+  string temp_directory = 5;
+  repeated string shared_files = 6;
+  repeated string user_files = 7;
+  GamePermissions permissions = 8;
+}
+
+// GamePermissions represents file permissions
+message GamePermissions {
+  string data_directory = 1;
+  string save_directory = 2;
+  string user_files = 3;
+  string log_files = 4;
+}
+
+// GameSettings represents game-specific settings
+message GameSettings {
+  int32 max_players = 1;
+  int64 max_session_duration_seconds = 2;
+  int64 idle_timeout_seconds = 3;
+  int64 save_interval_seconds = 4;
+  bool auto_save = 5;
+  GameSpectating spectating = 6;
+  GameRecording recording = 7;
+  map<string, string> options = 8;
+}
+
+// GameSpectating represents spectating configuration
+message GameSpectating {
+  bool enabled = 1;
+  int32 max_spectators_per_session = 2;
+  int64 spectator_timeout_seconds = 3;
+}
+
+// GameRecording represents recording configuration
+message GameRecording {
+  bool enabled = 1;
+  string format = 2;
+  string compression = 3;
+  int64 max_file_size_bytes = 4;
+  int32 retention_days = 5;
+  bool auto_cleanup = 6;
+}
+
+// GameResourceLimits represents resource limits
+message GameResourceLimits {
+  string cpu_limit = 1;
+  string memory_limit = 2;
+  string cpu_request = 3;
+  string memory_request = 4;
+  string disk_limit = 5;
+  string network_limit = 6;
+  int32 pids_limit = 7;
+}
+
+// GameResourceUsage represents current resource usage
+message GameResourceUsage {
+  double cpu_usage_percent = 1;
+  int64 memory_usage_bytes = 2;
+  int64 disk_usage_bytes = 3;
+  int64 network_rx_bytes = 4;
+  int64 network_tx_bytes = 5;
+  int32 pids_count = 6;
+  google.protobuf.Timestamp timestamp = 7;
+}
+
+// GameContainer represents container configuration
+message GameContainer {
+  string image = 1;
+  string tag = 2;
+  string registry = 3;
+  string pull_policy = 4;
+  repeated GameVolume volumes = 5;
+  map<string, string> environment = 6;
+  GameSecurityContext security_context = 7;
+  string network_mode = 8;
+}
+
+// GameVolume represents volume configuration
+message GameVolume {
+  string name = 1;
+  string host_path = 2;
+  string mount_path = 3;
+  bool read_only = 4;
+  string volume_type = 5;
+}
+
+// GameSecurityContext represents security context
+message GameSecurityContext {
+  int32 run_as_user = 1;
+  int32 run_as_group = 2;
+  int32 fs_group = 3;
+  bool privileged = 4;
+  bool read_only_root_filesystem = 5;
+}
+
+// GameNetworking represents networking configuration
+message GameNetworking {
+  string mode = 1;
+  repeated GamePort ports = 2;
+  repeated string exposed_ports = 3;
+  repeated string network_aliases = 4;
+}
+
+// GamePort represents port configuration
+message GamePort {
+  int32 container_port = 1;
+  int32 host_port = 2;
+  string protocol = 3;
+}
+
+// GameStats represents game statistics
+message GameStats {
+  int32 total_sessions = 1;
+  int32 active_sessions = 2;
+  int64 total_playtime_seconds = 3;
+  int64 average_session_duration_seconds = 4;
+  int32 unique_players = 5;
+  google.protobuf.Timestamp last_played = 6;
+  map<string, int64> daily_stats = 7;
+}
+
+// GameSessionStats represents session statistics
+message GameSessionStats {
+  int64 duration_seconds = 1;
+  int64 bytes_transferred = 2;
+  int32 commands_executed = 3;
+  int32 spectators_count = 4;
+  map<string, string> game_specific_stats = 5;
+}
+
+// GameEvent represents a game event
+message GameEvent {
+  string event_id = 1;
+  string session_id = 2;
+  string event_type = 3; // "session_start", "session_end", "input", "output", "error", "state_change"
+  bytes event_data = 4;
+  map<string, string> metadata = 5;
+  google.protobuf.Timestamp timestamp = 6;
+}
+
+// GameData represents game data (for streaming)
+message GameData {
+  string session_id = 1;
+  string data_type = 2; // "output", "input", "state", "metadata"
+  bytes data = 3;
+  int64 sequence_number = 4;
+  google.protobuf.Timestamp timestamp = 5;
+  map<string, string> metadata = 6;
+}

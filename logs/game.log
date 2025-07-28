@@ -1,0 +1,11 @@
+time=2025-07-19T11:07:20.399-04:00 level=INFO msg="Starting Game Service" service=game-service version=9d6b0cd-dirty
+time=2025-07-19T11:07:20.399-04:00 level=INFO msg="Metrics server starting" service=game-service port=9090
+time=2025-07-19T11:07:20.399-04:00 level=INFO msg="Starting metrics server" service=game-service port=9090
+time=2025-07-19T11:07:20.400-04:00 level=INFO msg="HTTP server starting" service=game-service address=:8086
+time=2025-07-19T11:07:20.401-04:00 level=INFO msg="gRPC server starting" service=game-service address=:50051
+time=2025-07-19T12:10:40.405-04:00 level=INFO msg="Shutdown signal received, starting graceful shutdown..." service=game-service
+time=2025-07-19T12:10:40.405-04:00 level=INFO msg="Stopping metrics server" service=game-service
+time=2025-07-19T12:10:40.405-04:00 level=INFO msg="Shutting down gRPC server..." service=game-service
+time=2025-07-19T12:10:40.405-04:00 level=INFO msg="Shutting down HTTP server..." service=game-service
+time=2025-07-19T12:10:40.405-04:00 level=ERROR msg="Failed to start metrics server" service=game-service error="http: Server closed"
+time=2025-07-19T12:10:42.406-04:00 level=INFO msg="Game service shutdown complete" service=game-service

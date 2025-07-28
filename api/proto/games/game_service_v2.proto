@@ -1,0 +1,476 @@
+syntax = "proto3";
+
+package dungeongate.games.v2;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+
+option go_package = "github.com/dungeongate/pkg/api/games/v2";
+
+// GameService provides game management operations
+service GameService {
+  // Game management
+  rpc ListGames(ListGamesRequest) returns (ListGamesResponse);
+  rpc GetGame(GetGameRequest) returns (GetGameResponse);
+  rpc CreateGame(CreateGameRequest) returns (CreateGameResponse);
+  rpc UpdateGame(UpdateGameRequest) returns (UpdateGameResponse);
+  rpc DeleteGame(DeleteGameRequest) returns (DeleteGameResponse);
+
+  // Session management
+  rpc StartGameSession(StartGameSessionRequest) returns (StartGameSessionResponse);
+  rpc StopGameSession(StopGameSessionRequest) returns (StopGameSessionResponse);
+  rpc GetGameSession(GetGameSessionRequest) returns (GetGameSessionResponse);
+  rpc ListGameSessions(ListGameSessionsRequest) returns (ListGameSessionsResponse);
+
+  // Save management
+  rpc SaveGame(SaveGameRequest) returns (SaveGameResponse);
+  rpc LoadGame(LoadGameRequest) returns (LoadGameResponse);
+  rpc DeleteSave(DeleteSaveRequest) returns (DeleteSaveResponse);
+  rpc ListSaves(ListSavesRequest) returns (ListSavesResponse);
+
+  // PTY streaming for terminal I/O
+  rpc StreamGameIO(stream GameIORequest) returns (stream GameIOResponse);
+  rpc ResizeTerminal(ResizeTerminalRequest) returns (ResizeTerminalResponse);
+
+  // Spectator management
+  rpc AddSpectator(AddSpectatorRequest) returns (AddSpectatorResponse);
+  rpc RemoveSpectator(RemoveSpectatorRequest) returns (RemoveSpectatorResponse);
+
+  // Health check
+  rpc Health(google.protobuf.Empty) returns (HealthResponse);
+}
+
+// Game represents a game configuration
+message Game {
+  string id = 1;
+  string name = 2;
+  string short_name = 3;
+  string description = 4;
+  string category = 5;
+  repeated string tags = 6;
+  string version = 7;
+  int32 difficulty = 8;
+  GameStatus status = 9;
+  BinaryConfig binary = 10;
+  map<string, string> environment = 11;
+  ResourceConfig resources = 12;
+  SecurityConfig security = 13;
+  NetworkConfig networking = 14;
+  GameStatistics statistics = 15;
+  google.protobuf.Timestamp created_at = 16;
+  google.protobuf.Timestamp updated_at = 17;
+}
+
+// GameStatus represents the status of a game
+enum GameStatus {
+  GAME_STATUS_UNSPECIFIED = 0;
+  GAME_STATUS_ENABLED = 1;
+  GAME_STATUS_DISABLED = 2;
+  GAME_STATUS_MAINTENANCE = 3;
+  GAME_STATUS_DEPRECATED = 4;
+}
+
+// BinaryConfig defines how to execute a game binary
+message BinaryConfig {
+  string path = 1;
+  repeated string args = 2;
+  string working_directory = 3;
+}
+
+// ResourceConfig defines resource limits for a game
+message ResourceConfig {
+  string cpu_limit = 1;
+  string memory_limit = 2;
+  string disk_limit = 3;
+  int32 timeout_seconds = 4;
+}
+
+// SecurityConfig defines security settings for a game
+message SecurityConfig {
+  uint32 run_as_user = 1;
+  uint32 run_as_group = 2;
+  bool read_only_root_filesystem = 3;
+  bool allow_privilege_escalation = 4;
+  repeated string capabilities = 5;
+}
+
+// NetworkConfig defines networking settings for a game
+message NetworkConfig {
+  bool isolated = 1;
+  repeated int32 allowed_ports = 2;
+  repeated string allowed_domains = 3;
+  bool block_internet = 4;
+}
+
+// GameStatistics tracks usage statistics for a game
+message GameStatistics {
+  int32 total_sessions = 1;
+  int32 active_sessions = 2;
+  int64 total_play_time_seconds = 3;
+  int64 average_session_time_seconds = 4;
+  int32 unique_users = 5;
+  google.protobuf.Timestamp last_played = 6;
+  int32 popularity_rank = 7;
+  float rating = 8;
+}
+
+// GameSession represents an active game session
+message GameSession {
+  string id = 1;
+  int32 user_id = 2;
+  string username = 3;
+  string game_id = 4;
+  SessionStatus status = 5;
+  google.protobuf.Timestamp start_time = 6;
+  google.protobuf.Timestamp end_time = 7;
+  google.protobuf.Timestamp last_activity = 8;
+  TerminalSize terminal_size = 9;
+  string encoding = 10;
+  ProcessInfo process_info = 11;
+  RecordingInfo recording = 12;
+  StreamingInfo streaming = 13;
+  repeated SpectatorInfo spectators = 14;
+}
+
+// SessionStatus represents the status of a game session
+enum SessionStatus {
+  SESSION_STATUS_UNSPECIFIED = 0;
+  SESSION_STATUS_STARTING = 1;
+  SESSION_STATUS_ACTIVE = 2;
+  SESSION_STATUS_PAUSED = 3;
+  SESSION_STATUS_ENDING = 4;
+  SESSION_STATUS_ENDED = 5;
+  SESSION_STATUS_FAILED = 6;
+}
+
+// TerminalSize represents terminal dimensions
+message TerminalSize {
+  int32 width = 1;
+  int32 height = 2;
+}
+
+// ProcessInfo contains information about a game process
+message ProcessInfo {
+  int32 pid = 1;
+  string container_id = 2;
+  string pod_name = 3;
+  int32 exit_code = 4;
+  string signal = 5;
+}
+
+// RecordingInfo contains session recording information
+message RecordingInfo {
+  bool enabled = 1;
+  string file_path = 2;
+  string format = 3;
+  google.protobuf.Timestamp start_time = 4;
+  int64 file_size = 5;
+  bool compressed = 6;
+}
+
+// StreamingInfo contains session streaming information
+message StreamingInfo {
+  bool enabled = 1;
+  string protocol = 2;
+  bool encrypted = 3;
+  uint64 frame_count = 4;
+  int64 bytes_streamed = 5;
+}
+
+// SpectatorInfo contains information about a spectator
+message SpectatorInfo {
+  int32 user_id = 1;
+  string username = 2;
+  google.protobuf.Timestamp join_time = 3;
+  int64 bytes_sent = 4;
+  bool is_active = 5;
+}
+
+// GameSave represents a game save file
+message GameSave {
+  string id = 1;
+  int32 user_id = 2;
+  string game_id = 3;
+  SaveStatus status = 4;
+  bytes data = 5;
+  SaveMetadata metadata = 6;
+  string checksum = 7;
+  string file_path = 8;
+  int64 file_size = 9;
+  repeated SaveBackup backups = 10;
+  google.protobuf.Timestamp created_at = 11;
+  google.protobuf.Timestamp updated_at = 12;
+}
+
+// SaveStatus represents the status of a save file
+enum SaveStatus {
+  SAVE_STATUS_UNSPECIFIED = 0;
+  SAVE_STATUS_ACTIVE = 1;
+  SAVE_STATUS_CORRUPT = 2;
+  SAVE_STATUS_ARCHIVED = 3;
+  SAVE_STATUS_DELETED = 4;
+}
+
+// SaveMetadata contains metadata about a save file
+message SaveMetadata {
+  string game_version = 1;
+  string character = 2;
+  int32 level = 3;
+  int32 score = 4;
+  int64 play_time_seconds = 5;
+  string location = 6;
+  map<string, string> custom_fields = 7;
+}
+
+// SaveBackup represents a backup of a save file
+message SaveBackup {
+  string id = 1;
+  string file_path = 2;
+  google.protobuf.Timestamp created_at = 3;
+  int64 file_size = 4;
+  string checksum = 5;
+}
+
+// Request/Response messages
+
+// Game management requests/responses
+message ListGamesRequest {
+  string category = 1;
+  string tag = 2;
+  GameStatus status = 3;
+  bool enabled_only = 4;
+  int32 limit = 5;
+  int32 offset = 6;
+}
+
+message ListGamesResponse {
+  repeated Game games = 1;
+  int32 total_count = 2;
+}
+
+message GetGameRequest {
+  string game_id = 1;
+}
+
+message GetGameResponse {
+  Game game = 1;
+}
+
+message CreateGameRequest {
+  Game game = 1;
+}
+
+message CreateGameResponse {
+  Game game = 1;
+}
+
+message UpdateGameRequest {
+  string game_id = 1;
+  Game game = 2;
+}
+
+message UpdateGameResponse {
+  Game game = 1;
+}
+
+message DeleteGameRequest {
+  string game_id = 1;
+}
+
+message DeleteGameResponse {
+  bool success = 1;
+}
+
+// Session management requests/responses
+message StartGameSessionRequest {
+  int32 user_id = 1;
+  string username = 2;
+  string game_id = 3;
+  TerminalSize terminal_size = 4;
+  bool enable_recording = 5;
+  bool enable_streaming = 6;
+  bool enable_encryption = 7;
+}
+
+message StartGameSessionResponse {
+  GameSession session = 1;
+}
+
+message StopGameSessionRequest {
+  string session_id = 1;
+  string reason = 2;
+  bool force = 3;
+}
+
+message StopGameSessionResponse {
+  bool success = 1;
+}
+
+message GetGameSessionRequest {
+  string session_id = 1;
+}
+
+message GetGameSessionResponse {
+  GameSession session = 1;
+}
+
+message ListGameSessionsRequest {
+  int32 user_id = 1;
+  string game_id = 2;
+  SessionStatus status = 3;
+  int32 limit = 4;
+  int32 offset = 5;
+}
+
+message ListGameSessionsResponse {
+  repeated GameSession sessions = 1;
+  int32 total_count = 2;
+}
+
+// Save management requests/responses
+message SaveGameRequest {
+  int32 user_id = 1;
+  string game_id = 2;
+  bytes data = 3;
+  SaveMetadata metadata = 4;
+}
+
+message SaveGameResponse {
+  GameSave save = 1;
+}
+
+message LoadGameRequest {
+  int32 user_id = 1;
+  string game_id = 2;
+  string save_id = 3;
+}
+
+message LoadGameResponse {
+  GameSave save = 1;
+}
+
+message DeleteSaveRequest {
+  int32 user_id = 1;
+  string game_id = 2;
+  string save_id = 3;
+}
+
+message DeleteSaveResponse {
+  bool success = 1;
+}
+
+message ListSavesRequest {
+  int32 user_id = 1;
+  string game_id = 2;
+  SaveStatus status = 3;
+  int32 limit = 4;
+  int32 offset = 5;
+}
+
+message ListSavesResponse {
+  repeated GameSave saves = 1;
+  int32 total_count = 2;
+}
+
+// PTY streaming messages
+message GameIORequest {
+  oneof request {
+    ConnectPTYRequest connect = 1;
+    PTYInput input = 2;
+    DisconnectPTYRequest disconnect = 3;
+  }
+}
+
+message GameIOResponse {
+  oneof response {
+    ConnectPTYResponse connected = 1;
+    PTYOutput output = 2;
+    PTYEvent event = 3;
+    DisconnectPTYResponse disconnected = 4;
+  }
+}
+
+message ConnectPTYRequest {
+  string session_id = 1;
+  TerminalSize terminal_size = 2;
+  string term_type = 3;
+}
+
+message ConnectPTYResponse {
+  bool success = 1;
+  string error = 2;
+  string pty_id = 3;
+}
+
+message PTYInput {
+  string session_id = 1;
+  bytes data = 2;
+}
+
+message PTYOutput {
+  string session_id = 1;
+  bytes data = 2;
+}
+
+message PTYEvent {
+  string session_id = 1;
+  PTYEventType type = 2;
+  string message = 3;
+  map<string, string> metadata = 4;
+}
+
+enum PTYEventType {
+  PTY_EVENT_UNSPECIFIED = 0;
+  PTY_EVENT_PROCESS_EXIT = 1;
+  PTY_EVENT_PROCESS_ERROR = 2;
+  PTY_EVENT_SESSION_TIMEOUT = 3;
+  PTY_EVENT_SESSION_TERMINATED = 4;
+}
+
+message DisconnectPTYRequest {
+  string session_id = 1;
+  string reason = 2;
+}
+
+message DisconnectPTYResponse {
+  bool success = 1;
+}
+
+message ResizeTerminalRequest {
+  string session_id = 1;
+  TerminalSize new_size = 2;
+}
+
+message ResizeTerminalResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+// Spectator management requests/responses
+message AddSpectatorRequest {
+  string session_id = 1;
+  int32 spectator_user_id = 2;
+  string spectator_username = 3;
+}
+
+message AddSpectatorResponse {
+  bool success = 1;
+  string error = 2;
+  SpectatorInfo spectator = 3;
+}
+
+message RemoveSpectatorRequest {
+  string session_id = 1;
+  int32 spectator_user_id = 2;
+}
+
+message RemoveSpectatorResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+// Health response
+message HealthResponse {
+  string status = 1;
+  map<string, string> details = 2;
+}

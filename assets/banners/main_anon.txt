@@ -1,0 +1,13 @@
+DungeonGate
+
+Connected as: Anonymous
+Date: $DATE | Time: $TIME
+
+Menu Options:
+  [l] Login
+  [r] Register
+  [w] Watch games
+  [c] Credits
+  [q] Quit
+
+Choice: 

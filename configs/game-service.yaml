@@ -1,0 +1,252 @@
+# ============================================================================
+# DungeonGate Game Service Configuration
+# ============================================================================
+# This configuration file controls the game management service that handles
+# game execution, process/container management, resource allocation, and
+# game-specific settings for all supported games in the platform.
+#
+# This configuration inherits common settings from common.yaml and overrides
+# service-specific values as needed.
+# ============================================================================
+
+# ============================================================================
+# Common Configuration Import
+# ============================================================================
+# NOTE: This section indicates that this config inherits from common.yaml
+# The actual import mechanism would be implemented in the configuration loader
+inherit_from: "common.yaml"
+
+# ============================================================================
+# HTTP/gRPC Server Configuration
+# ============================================================================
+# Controls the game service HTTP API and gRPC endpoints
+server:
+  # HTTP API server port (REST endpoints for game management)
+  port: 8086          
+  
+  # gRPC server port (game requests from session service)
+  grpc_port: 50051    
+  
+  # Bind address (localhost for development, 0.0.0.0 for production)
+  host: "localhost"
+  
+  # Request timeout for HTTP/gRPC operations
+  timeout: "30s"
+  
+  # Maximum concurrent connections
+  max_connections: 100
+
+# ============================================================================
+# Database Configuration  
+# ============================================================================
+# Database configuration is inherited from common.yaml
+# All services share the same database configuration in development
+
+# ============================================================================
+# Game Engine Configuration
+# ============================================================================
+# Controls how games are executed: as processes, containers, or hybrid
+game_engine:
+  # Execution mode: "process" (native), "container" (isolated), "hybrid" (mixed)
+  mode: "process"
+  
+  # Process pool configuration (for "process" and "hybrid" modes)
+  process_pool:
+    # Maximum number of worker processes for game execution
+    max_workers: 100
+    
+    # Timeout for worker process operations
+    worker_timeout: "30s"
+    
+  # Security and isolation configuration
+  isolation:
+    # Enable Linux namespaces for process isolation (Linux only)
+    enable_namespaces: false
+    
+    # Enable cgroups for resource limiting (Linux only)
+    enable_cgroups: false
+    
+  # Default resource limits for all games (can be overridden per-game)
+  resources:
+    # Default CPU limit (Kubernetes-style: 1000m = 1 CPU core)
+    default_cpu_limit: "1000m"
+    
+    # Default memory limit (Kubernetes-style: Mi = mebibytes)
+    default_memory_limit: "512Mi"
+    
+    # Default timeout for game sessions
+    default_timeout: "3600s"
+
+# ============================================================================
+# Game Definitions
+# ============================================================================
+# Configuration for each supported game
+games:
+  # NetHack Configuration
+  - id: "nethack"                        # Unique identifier for the game
+    name: "NetHack"                       # Display name shown to users
+    short_name: "NH"                      # Short name for logs/UI
+    version: "3.6.7"                      # Game version
+    enabled: true                         # Whether this game is available
+    
+    # Game executable configuration
+    binary:
+      # Path to the game executable
+      path: "/opt/homebrew/bin/nethack"
+      
+      # Command line arguments passed to the game
+      args: []
+      
+      # Working directory for game execution
+      working_directory: "/tmp"
+      
+    # Game-specific settings
+    settings:
+      # Maximum concurrent players for this game
+      max_players: 50
+      
+      # Maximum duration for a single game session
+      max_session_duration: "8h"
+      
+      # Idle timeout before terminating inactive sessions
+      idle_timeout: "30m"
+      
+      # Enable automatic saving of game state
+      auto_save: true
+      
+    # Path configuration for NetHack
+    paths:
+      # Auto-detect system paths using `nethack --showpaths`
+      auto_detect: true
+      
+      # System-level paths (detected automatically or configured manually)
+      system:
+        # Directory containing score files
+        score_dir: "/opt/homebrew/share/nethack/"
+        
+        # System configuration file
+        sysconf_file: "/opt/homebrew/Cellar/nethack/3.6.7/libexec/sysconf"
+        
+        # Symbols file for display
+        symbols_file: "/opt/homebrew/Cellar/nethack/3.6.7/libexec/symbols"
+        
+        # Main data file
+        data_file: "nhdat"
+        
+      # User-specific paths (relative to user's home directory)
+      user:
+        # Base directory for user's game data
+        base_dir: "games/nethack"
+        
+        # Directory for save files
+        save_dir: "games/nethack/saves"
+        
+        # Directory for user configuration
+        config_dir: "games/nethack/config"
+        
+        # Directory for bones files (shared ghosts)
+        bones_dir: "games/nethack/bones"
+        
+        # Directory for level files
+        level_dir: "games/nethack/levels"
+        
+        # Directory for lock files (prevent multiple instances)
+        lock_dir: "games/nethack/locks"
+        
+        # Directory for trouble/recovery files
+        trouble_dir: "games/nethack/trouble"
+        
+    # Game setup configuration (run when user first plays)
+    setup:
+      # Create user-specific directories
+      create_user_dirs: true
+      
+      # Copy default configuration files to user directory
+      copy_default_config: true
+      
+      # Initialize shared game files if needed
+      initialize_shared: true
+      
+      # Validate that all paths exist and are accessible
+      validate_paths: true
+      
+      # Set proper file permissions
+      set_permissions: true
+      
+      # Detect system paths automatically
+      detect_system_paths: true
+      
+      # Create symbolic links for save files
+      create_save_links: true
+      
+    # Game cleanup configuration (run when user stops playing)
+    cleanup:
+      # Remove user directories on cleanup (usually false)
+      remove_user_dirs: false
+      
+      # Clear temporary files
+      clear_temp_files: true
+      
+      # Remove lock files to allow restart
+      remove_lock_files: true
+      
+      # Clear personal bones files (usually false)
+      clear_personal_bones: false
+      
+      # Preserve user configuration files
+      preserve_config: true
+      
+      # Backup save files before cleanup
+      backup_saves: true
+      
+      # Clean up save file symbolic links
+      cleanup_save_links: true
+      
+      # Validate cleanup operations
+      validate_cleanup: true
+      
+# ============================================================================
+# Logging Configuration Overrides
+# ============================================================================
+# Game service logging overrides (inherits base config from common.yaml)
+logging:
+  # Service-specific log file name
+  file:
+    filename: "game-service.log"
+  
+  # Service-specific journald configuration
+  journald:
+    identifier: "dungeongate-game"
+    fields:
+      service: "game-service"
+      component: "dungeongate"
+  
+# ============================================================================
+# Metrics and Monitoring
+# ============================================================================
+# Prometheus metrics and health monitoring for game service
+metrics:
+  # Enable Prometheus metrics collection
+  enabled: true
+  
+  # Port for metrics endpoint (/metrics)
+  port: 9090
+  
+# Health check configuration
+health:
+  # Enable health check endpoint
+  enabled: true
+  
+  # Port for health check endpoint
+  port: 8085
+
+# ============================================================================
+# Security Configuration
+# ============================================================================
+# Security settings for game execution
+security:
+  # Enable encryption for game data
+  enable_encryption: false
+  
+  # Enable process/container isolation
+  enable_isolation: false

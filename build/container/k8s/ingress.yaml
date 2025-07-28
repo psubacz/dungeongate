@@ -1,0 +1,109 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: dungeongate-ingress
+  namespace: default
+  labels:
+    app: dungeongate
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+    # Enable gRPC support
+    nginx.ingress.kubernetes.io/grpc-backend: "true"
+spec:
+  ingressClassName: nginx
+  rules:
+  # HTTP API endpoints
+  - host: dungeongate.local
+    http:
+      paths:
+      # Auth Service HTTP API
+      - path: /auth
+        pathType: Prefix
+        backend:
+          service:
+            name: dungeongate-auth
+            port:
+              number: 8081
+      # Game Service HTTP API
+      - path: /game
+        pathType: Prefix
+        backend:
+          service:
+            name: dungeongate-game
+            port:
+              number: 8085
+      # Session Service HTTP API
+      - path: /session
+        pathType: Prefix
+        backend:
+          service:
+            name: dungeongate-session
+            port:
+              number: 8083
+      # Metrics endpoints
+      - path: /metrics/auth
+        pathType: Prefix
+        backend:
+          service:
+            name: dungeongate-auth
+            port:
+              number: 9091
+      - path: /metrics/game
+        pathType: Prefix
+        backend:
+          service:
+            name: dungeongate-game
+            port:
+              number: 9090
+      - path: /metrics/session
+        pathType: Prefix
+        backend:
+          service:
+            name: dungeongate-session
+            port:
+              number: 8085
+
+  # gRPC API endpoints (separate host)
+  - host: grpc.dungeongate.local
+    http:
+      paths:
+      # Auth Service gRPC
+      - path: /dungeongate.auth.v1.AuthService
+        pathType: Prefix
+        backend:
+          service:
+            name: dungeongate-auth
+            port:
+              number: 8082
+      # Game Service gRPC
+      - path: /dungeongate.games.v2.GameService
+        pathType: Prefix
+        backend:
+          service:
+            name: dungeongate-game
+            port:
+              number: 50051
+      # Session Service gRPC
+      - path: /dungeongate.session.v1.SessionService
+        pathType: Prefix
+        backend:
+          service:
+            name: dungeongate-session
+            port:
+              number: 9093
+
+---
+# TLS configuration (optional)
+apiVersion: v1
+kind: Secret
+metadata:
+  name: dungeongate-tls
+  namespace: default
+type: kubernetes.io/tls
+data:
+  # Base64 encoded TLS certificate and key
+  # Replace with your actual certificates
+  tls.crt: LS0tLS1CRUdJTi4uLi0tLS0t
+  tls.key: LS0tLS1CRUdJTi4uLi0tLS0t

@@ -1,0 +1,306 @@
+package application
+
+import (
+	"context"
+	"fmt"
+	"log/slog"
+	"os"
+	"path/filepath"
+	"syscall"
+	"time"
+
+	"github.com/dungeongate/internal/games/domain"
+	"github.com/google/uuid"
+)
+
+// CleanupService handles game session and save cleanup operations
+type CleanupService struct {
+	sessionRepo domain.SessionRepository
+	saveRepo    domain.SaveRepository
+	eventRepo   domain.EventRepository
+	logger      *slog.Logger
+}
+
+// NewCleanupService creates a new cleanup service
+func NewCleanupService(
+	sessionRepo domain.SessionRepository,
+	saveRepo domain.SaveRepository,
+	eventRepo domain.EventRepository,
+	logger *slog.Logger,
+) *CleanupService {
+	return &CleanupService{
+		sessionRepo: sessionRepo,
+		saveRepo:    saveRepo,
+		eventRepo:   eventRepo,
+		logger:      logger,
+	}
+}
+
+// CleanupExpiredSessions removes expired game sessions from the database
+func (s *CleanupService) CleanupExpiredSessions(ctx context.Context, maxAge time.Duration) error {
+	s.logger.Info("Cleaning up sessions older than duration", "max_age", maxAge)
+
+	count, err := s.sessionRepo.DeleteExpiredSessions(ctx, maxAge)
+	if err != nil {
+		return fmt.Errorf("failed to delete expired sessions: %w", err)
+	}
+
+	if count > 0 {
+		s.logger.Info("Cleaned up expired sessions", "count", count)
+	}
+
+	return nil
+}
+
+// CleanupOrphanedProcesses finds and terminates orphaned game processes
+func (s *CleanupService) CleanupOrphanedProcesses(ctx context.Context) error {
+	// Find all running/starting sessions
+	runningSessions, err := s.sessionRepo.FindByStatus(ctx, domain.SessionStatusActive)
+	if err != nil {
+		return fmt.Errorf("failed to find running sessions: %w", err)
+	}
+
+	startingSessions, err := s.sessionRepo.FindByStatus(ctx, domain.SessionStatusStarting)
+	if err != nil {
+		return fmt.Errorf("failed to find starting sessions: %w", err)
+	}
+
+	allActiveSessions := append(runningSessions, startingSessions...)
+
+	orphanedCount := 0
+	for _, session := range allActiveSessions {
+		processInfo := session.ProcessInfo()
+		if processInfo.PID != 0 {
+			// Check if process is still running
+			if !s.isProcessRunning(processInfo.PID) {
+				s.logger.Info("Found orphaned session %s with dead process %d",
+					session.ID().String(), processInfo.PID)
+
+				// Mark session as crashed
+				session.Fail("Process terminated unexpectedly")
+
+				// Update session in database
+				err := s.sessionRepo.Save(ctx, session)
+				if err != nil {
+					s.logger.Info("Failed to update orphaned session %s: %v",
+						session.ID().String(), err)
+				}
+
+				// Record event (simplified - we'll create this later)
+				event := &domain.GameEvent{
+					ID:        fmt.Sprintf("event_%d", time.Now().UnixNano()),
+					Type:      "game.crashed",
+					GameID:    session.GameID().String(),
+					SessionID: session.ID().String(),
+					UserID:    session.UserID().Int(),
+					Data: map[string]interface{}{
+						"reason":  "Process terminated unexpectedly",
+						"old_pid": processInfo.PID,
+					},
+					Timestamp: time.Now(),
+				}
+				s.eventRepo.SaveEvent(ctx, event)
+
+				orphanedCount++
+			}
+		}
+	}
+
+	if orphanedCount > 0 {
+		s.logger.Info("Cleaned up orphaned sessions", "count", orphanedCount)
+	}
+
+	return nil
+}
+
+// CleanupGameData removes temporary game files and directories for ended sessions
+func (s *CleanupService) CleanupGameData(ctx context.Context, sessionID uuid.UUID, gameDataPath string) error {
+	sessionIDDomain := domain.NewSessionID(sessionID.String())
+	session, err := s.sessionRepo.FindByID(ctx, sessionIDDomain)
+	if err != nil {
+		return fmt.Errorf("session not found: %w", err)
+	}
+
+	// Only cleanup if session has ended
+	if session.Status() != domain.SessionStatusEnded && session.Status() != domain.SessionStatusFailed {
+		return fmt.Errorf("cannot cleanup data for active session")
+	}
+
+	// Find all saves for this user and game
+	saves, err := s.saveRepo.FindByUser(ctx, session.UserID())
+	if err != nil {
+		return fmt.Errorf("failed to find saves for user: %w", err)
+	}
+
+	// Ensure all saves are properly stored before cleanup
+	for _, save := range saves {
+		if !save.Verify() {
+			s.logger.Info("Warning: Save failed verification before cleanup", "save_id", save.ID().String())
+			save.MarkCorrupt()
+			s.saveRepo.Save(ctx, save)
+		}
+	}
+
+	// Clean up temporary session directory
+	sessionTempDir := filepath.Join(gameDataPath, "sessions", sessionID.String())
+	if _, err := os.Stat(sessionTempDir); err == nil {
+		s.logger.Info("Removing session temp directory", "path", sessionTempDir)
+		err = os.RemoveAll(sessionTempDir)
+		if err != nil {
+			return fmt.Errorf("failed to remove session temp directory: %w", err)
+		}
+	}
+
+	// Record cleanup event
+	event := &domain.GameEvent{
+		ID:        fmt.Sprintf("event_%d", time.Now().UnixNano()),
+		Type:      "session.cleaned",
+		GameID:    session.GameID().String(),
+		SessionID: session.ID().String(),
+		UserID:    session.UserID().Int(),
+		Data: map[string]interface{}{
+			"temp_dir_removed": sessionTempDir,
+			"saves_verified":   len(saves),
+		},
+		Timestamp: time.Now(),
+	}
+	s.eventRepo.SaveEvent(ctx, event)
+
+	return nil
+}
+
+// BackupAndCleanupOldSaves creates backups of old saves and removes very old ones
+func (s *CleanupService) BackupAndCleanupOldSaves(ctx context.Context, userID int, gameID int, maxSaves int) error {
+	userIDDomain := domain.NewUserID(userID)
+	gameIDDomain := domain.NewGameID(fmt.Sprintf("%d", gameID))
+
+	// For simplicity, get all saves for the user and filter by game later
+	saves, err := s.saveRepo.FindByUser(ctx, userIDDomain)
+	if err != nil {
+		return fmt.Errorf("failed to find saves: %w", err)
+	}
+
+	// Filter saves for the specific game
+	var gameSaves []*domain.GameSave
+	for _, save := range saves {
+		if save.GameID().String() == gameIDDomain.String() {
+			gameSaves = append(gameSaves, save)
+		}
+	}
+
+	if len(gameSaves) <= maxSaves {
+		return nil // No cleanup needed
+	}
+
+	// Sort saves by updated time (newest first)
+	// Keep the most recent maxSaves, cleanup the rest
+	savesToDelete := gameSaves[maxSaves:]
+
+	for _, save := range savesToDelete {
+		// Create backup before deletion
+		backupID := fmt.Sprintf("cleanup_%d", time.Now().Unix())
+		backupPath := fmt.Sprintf("%s.bak.%s", save.FilePath(), backupID)
+
+		// Copy file to backup location
+		err := s.copyFile(save.FilePath(), backupPath)
+		if err != nil {
+			s.logger.Info("Failed to create backup for save %s: %v", save.ID().String(), err)
+			continue
+		}
+
+		// Create backup using domain model
+		backup := save.CreateBackup(backupID, backupPath)
+		err = s.saveRepo.SaveBackup(ctx, save.ID(), backup)
+		if err != nil {
+			s.logger.Info("Failed to record backup for save %s: %v", save.ID().String(), err)
+		}
+
+		// Mark save as archived
+		save.Archive()
+		err = s.saveRepo.Save(ctx, save)
+		if err != nil {
+			s.logger.Info("Failed to archive save %s: %v", save.ID().String(), err)
+		}
+
+		s.logger.Info("Archived old save %s for user %d, game %d",
+			"save_id", save.ID().String(), "user_id", userID, "game_id", gameID)
+	}
+
+	return nil
+}
+
+// StartPeriodicCleanup starts background cleanup processes
+func (s *CleanupService) StartPeriodicCleanup(ctx context.Context, interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	s.logger.Info("Starting periodic cleanup", "interval", interval)
+
+	for {
+		select {
+		case <-ctx.Done():
+			s.logger.Info("Stopping periodic cleanup")
+			return
+		case <-ticker.C:
+			// Cleanup expired sessions (older than 24 hours)
+			err := s.CleanupExpiredSessions(ctx, 24*time.Hour)
+			if err != nil {
+				s.logger.Info("Error during session cleanup", "error", err)
+			}
+
+			// Find and cleanup orphaned processes
+			err = s.CleanupOrphanedProcesses(ctx)
+			if err != nil {
+				s.logger.Info("Error during orphaned process cleanup", "error", err)
+			}
+		}
+	}
+}
+
+// isProcessRunning checks if a process with the given PID is still running
+func (s *CleanupService) isProcessRunning(pid int) bool {
+	process, err := os.FindProcess(pid)
+	if err != nil {
+		return false
+	}
+
+	// Send signal 0 to check if process exists without affecting it
+	err = process.Signal(syscall.Signal(0))
+	return err == nil
+}
+
+// copyFile copies a file from src to dst
+func (s *CleanupService) copyFile(src, dst string) error {
+	sourceFile, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer sourceFile.Close()
+
+	// Create destination directory if it doesn't exist
+	destDir := filepath.Dir(dst)
+	err = os.MkdirAll(destDir, 0755)
+	if err != nil {
+		return err
+	}
+
+	destFile, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer destFile.Close()
+
+	// Copy file contents
+	_, err = destFile.ReadFrom(sourceFile)
+	if err != nil {
+		return err
+	}
+
+	// Copy file permissions
+	sourceInfo, err := sourceFile.Stat()
+	if err != nil {
+		return err
+	}
+
+	return os.Chmod(dst, sourceInfo.Mode())
+}

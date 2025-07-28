@@ -1,0 +1,102 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dungeongate-game
+  namespace: default
+  labels:
+    app: dungeongate
+    service: game
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: dungeongate
+      service: game
+  template:
+    metadata:
+      labels:
+        app: dungeongate
+        service: game
+    spec:
+      containers:
+      - name: game-service
+        image: dungeongate-game
+        ports:
+        - name: http
+          containerPort: 8085
+          protocol: TCP
+        - name: grpc
+          containerPort: 50051
+          protocol: TCP
+        - name: metrics
+          containerPort: 9090
+          protocol: TCP
+        env:
+        - name: LOG_LEVEL
+          value: "info"
+        - name: DATABASE_URL
+          value: "sqlite:///app/data/sqlite/dungeongate.db"
+        volumeMounts:
+        - name: config
+          mountPath: /app/configs
+          readOnly: true
+        - name: data
+          mountPath: /app/data
+        - name: logs
+          mountPath: /app/logs
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8085
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8085
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "300m"
+      volumes:
+      - name: config
+        configMap:
+          name: dungeongate-config
+      - name: data
+        persistentVolumeClaim:
+          claimName: dungeongate-data
+      - name: logs
+        emptyDir: {}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dungeongate-game
+  namespace: default
+  labels:
+    app: dungeongate
+    service: game
+spec:
+  selector:
+    app: dungeongate
+    service: game
+  ports:
+  - name: http
+    port: 8085
+    targetPort: 8085
+    protocol: TCP
+  - name: grpc
+    port: 50051
+    targetPort: 50051
+    protocol: TCP
+  - name: metrics
+    port: 9090
+    targetPort: 9090
+    protocol: TCP
+  type: ClusterIP
